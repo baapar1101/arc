@@ -123,7 +123,9 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 2,
         ),
-      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+      if (ctx.canManageBusiness &&
+          ctx.isMultiCurrency &&
+          ctx.canAccessAdvancedAccounting)
         _item(
           id: 'fx_revaluation',
           title: 'settingsInvoiceFxPolicyTitle',
@@ -134,7 +136,9 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 3,
         ),
-      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+      if (ctx.canManageBusiness &&
+          ctx.isMultiCurrency &&
+          ctx.canAccessAdvancedAccounting)
         _item(
           id: 'fx_auto_sync',
           title: 'settingsFxAutoSyncTitle',
@@ -145,7 +149,9 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 4,
         ),
-      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+      if (ctx.canManageBusiness &&
+          ctx.isMultiCurrency &&
+          ctx.canAccessAdvancedAccounting)
         _item(
           id: 'period_end_fx',
           title: 'تسعیر پایان دوره',
@@ -262,6 +268,17 @@ class BusinessSettingsCategorizationService {
         ),
       if (ctx.canJoinSettings)
         _item(
+          id: 'pay_page',
+          title: 'businessSettingsPayPage',
+          description: 'businessSettingsPayPageDescription',
+          icon: Icons.link_outlined,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/pay-page'),
+          categoryId: 'sales_documents',
+          order: 6,
+        ),
+      if (ctx.canJoinSettings && ctx.canAccessAdvancedAccounting)
+        _item(
           id: 'report_templates',
           title: 'templates',
           description: 'businessSettingsTemplatesDescription',
@@ -269,7 +286,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFFC62828),
           route: ctx.panelRoute('report-templates'),
           categoryId: 'sales_documents',
-          order: 6,
+          order: 7,
         ),
       if (ctx.canJoinSettings)
         _item(
@@ -280,7 +297,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF6A1B9A),
           route: ctx.panelRoute('document-monetization'),
           categoryId: 'sales_documents',
-          order: 7,
+          order: 8,
         ),
     ];
 
@@ -352,6 +369,25 @@ class BusinessSettingsCategorizationService {
           route: ctx.panelRoute('settings/woocommerce'),
           categoryId: 'integrations',
           order: 4,
+        ),
+      if (ctx.canAccessDigipay)
+        _item(
+          id: 'digipay',
+          title: 'settingsDigipayTitle',
+          description: 'settingsDigipaySubtitle',
+          icon: Icons.credit_score_outlined,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/digipay'),
+          categoryId: 'integrations',
+          order: 5,
+          tags: const [
+            'digipay',
+            'دیجی‌پی',
+            'دیجی پی',
+            'اعتباری',
+            'upg',
+            'credit',
+          ],
         ),
     ];
 
@@ -434,6 +470,28 @@ class BusinessSettingsCategorizationService {
           route: ctx.panelRoute('settings/payroll'),
           categoryId: 'modules',
           order: 5,
+        ),
+      if (ctx.canAccessOfficeAutomation)
+        _item(
+          id: 'office_automation',
+          title: 'businessSettingsOfficeAutomation',
+          description: 'businessSettingsOfficeAutomationDescription',
+          icon: Icons.mark_email_unread_outlined,
+          color: const Color(0xFF37474F),
+          route: ctx.panelRoute('settings/office-automation'),
+          categoryId: 'modules',
+          order: 5,
+        ),
+      if (ctx.canAccessFixedAssets)
+        _item(
+          id: 'fixed_assets',
+          title: 'businessSettingsFixedAssets',
+          description: 'businessSettingsFixedAssetsDescription',
+          icon: Icons.chair_alt_outlined,
+          color: const Color(0xFF5D4037),
+          route: ctx.panelRoute('settings/fixed-assets'),
+          categoryId: 'modules',
+          order: 6,
         ),
     ];
 
@@ -545,7 +603,7 @@ class BusinessSettingsCategorizationService {
 
   static SettingsCategory _advanced(BusinessSettingsContext ctx) {
     final items = <SettingsItem>[
-      if (ctx.canJoinSettings)
+      if (ctx.canJoinSettings && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'backup',
           title: 'dataBackup',
@@ -557,7 +615,7 @@ class BusinessSettingsCategorizationService {
           order: 1,
           tags: const ['advanced'],
         ),
-      if (ctx.canManageFtp)
+      if (ctx.canManageFtp && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'ftp_backup',
           title: 'ftpBackupSettingsTitle',
@@ -581,7 +639,7 @@ class BusinessSettingsCategorizationService {
           order: 3,
           tags: const ['advanced', 'ai'],
         ),
-      if (ctx.canJoinSettings)
+      if (ctx.canJoinSettings && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'restore',
           title: 'dataRestore',
@@ -644,7 +702,7 @@ class BusinessSettingsCategorizationService {
           order: 1,
           tags: const ['danger'],
         ),
-      if (ctx.canFiscalYearRollback)
+      if (ctx.canFiscalYearRollback && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'fiscal_year_rollback',
           title: 'businessSettingsFiscalYearRollback',

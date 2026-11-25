@@ -38,6 +38,61 @@ def _resolve_default_inventory_account_id(db: Session) -> int:
     )
 
 
+def _iso_ob_date(value: Any) -> Optional[str]:
+    if value in (None, ""):
+        return None
+    if hasattr(value, "isoformat"):
+        return str(value.isoformat())[:10]
+    text = str(value).strip()
+    return text[:10] if text else None
+
+
+def opening_balance_lot_extra(
+    *,
+    lot_code: Any = None,
+    manufacturing_date: Any = None,
+    expiry_date: Any = None,
+    quantity: Any = None,
+) -> Dict[str, Any]:
+    """لات و تاریخ موجودی اولیه را برای extra_info خط افتتاحیه می‌سازد."""
+    extra: Dict[str, Any] = {}
+    code = str(lot_code or "").strip()
+    mfg = _iso_ob_date(manufacturing_date)
+    exp = _iso_ob_date(expiry_date)
+    if code:
+        extra["lot_code"] = code
+    if mfg:
+        extra["manufacturing_date"] = mfg
+    if exp:
+        extra["expiry_date"] = exp
+    if extra:
+        extra["lot_allocations"] = [
+            {
+                "lot_code": extra.get("lot_code"),
+                "manufacturing_date": extra.get("manufacturing_date"),
+                "expiry_date": extra.get("expiry_date"),
+                "quantity": quantity,
+            }
+        ]
+    return extra
+
+
+def _lot_fields_from_ob(ob: Any) -> Dict[str, Any]:
+    if ob is None:
+        return {}
+    if isinstance(ob, dict):
+        return {
+            "lot_code": ob.get("lot_code"),
+            "manufacturing_date": ob.get("manufacturing_date"),
+            "expiry_date": ob.get("expiry_date"),
+        }
+    return {
+        "lot_code": getattr(ob, "lot_code", None),
+        "manufacturing_date": getattr(ob, "manufacturing_date", None),
+        "expiry_date": getattr(ob, "expiry_date", None),
+    }
+
+
 def _warehouse_id_from_line(line: Dict[str, Any]) -> Optional[int]:
     info = dict(line.get("extra_info") or {})
     wid = info.get("warehouse_id")
@@ -73,6 +128,9 @@ def _extract_product_ob_line(
             "quantity": qty,
             "cost_price": float(info.get("cost_price") or 0),
             "warehouse_id": line_wh,
+            "lot_code": info.get("lot_code"),
+            "manufacturing_date": info.get("manufacturing_date"),
+            "expiry_date": info.get("expiry_date"),
         }
     return None
 
@@ -320,6 +378,9 @@ def _build_ob_payload_with_product_line(
     product_name: str,
     remove_line: bool,
     remove_warehouse_ids: Optional[List[int]] = None,
+    lot_code: Any = None,
+    manufacturing_date: Any = None,
+    expiry_date: Any = None,
 ) -> Dict[str, Any]:
     existing_doc = get_opening_balance(db, business_id, fy_id)
     _, fy_start, _ = _ensure_fiscal_year(db, business_id, fy_id)
@@ -383,6 +444,14 @@ def _build_ob_payload_with_product_line(
         }
         if cost_dec > 0:
             extra_info["cost_price"] = float(cost_dec)
+        extra_info.update(
+            opening_balance_lot_extra(
+                lot_code=lot_code,
+                manufacturing_date=manufacturing_date,
+                expiry_date=expiry_date,
+                quantity=float(qty_dec),
+            )
+        )
         inventory_lines.append(
             {
                 "product_id": int(product_id),
@@ -430,6 +499,9 @@ def upsert_product_opening_balance_line(
     product_name: str,
     remove_line: bool = False,
     previous_warehouse_id: Optional[int] = None,
+    lot_code: Any = None,
+    manufacturing_date: Any = None,
+    expiry_date: Any = None,
 ) -> Dict[str, Any]:
     """افزودن، به‌روزرسانی یا حذف خط موجودی اولیه کالا در سند تراز افتتاحیه."""
     ctx = validate_product_opening_balance_allowed(
@@ -474,6 +546,9 @@ def upsert_product_opening_balance_line(
         product_name=product_name,
         remove_line=remove_line,
         remove_warehouse_ids=remove_wh or None,
+        lot_code=lot_code,
+        manufacturing_date=manufacturing_date,
+        expiry_date=expiry_date,
     )
     return upsert_opening_balance(db, business_id, int(user_id), payload)
 
@@ -489,6 +564,9 @@ def append_product_line_to_opening_balance(
     warehouse_id: int,
     fiscal_year_id: Optional[int],
     product_name: str,
+    lot_code: Any = None,
+    manufacturing_date: Any = None,
+    expiry_date: Any = None,
 ) -> Dict[str, Any]:
     """افزودن خط موجودی اولیه کالا به سند تراز افتتاحیه (ایجاد کالای جدید)."""
     validate_product_opening_balance_allowed(
@@ -509,6 +587,9 @@ def append_product_line_to_opening_balance(
         fiscal_year_id=fiscal_year_id,
         product_name=product_name,
         remove_line=False,
+        lot_code=lot_code,
+        manufacturing_date=manufacturing_date,
+        expiry_date=expiry_date,
     )
 
 
@@ -553,6 +634,14 @@ def _merge_product_opening_balance_changes(
         }
         if cost_price > 0:
             info["cost_price"] = float(cost_price)
+        info.update(
+            opening_balance_lot_extra(
+                lot_code=change.get("lot_code"),
+                manufacturing_date=change.get("manufacturing_date"),
+                expiry_date=change.get("expiry_date"),
+                quantity=float(quantity),
+            )
+        )
         by_key[(product_id, warehouse_id)] = {
             "product_id": product_id,
             "quantity": float(quantity),
@@ -682,6 +771,35 @@ def _merged_default_warehouse_id(payload: Any, existing: Optional[Product]) -> O
     return None
 
 
+def _maybe_sync_opening_warehouse(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    ob_doc: Optional[Dict[str, Any]],
+    product_id: int,
+) -> None:
+    """رسید/حوالهٔ افتتاحیه را برای کالای بدون گردش انبار می‌سازد تا لات تاریخ‌دار ثبت شود."""
+    doc_id = (ob_doc or {}).get("id")
+    if doc_id is None:
+        return
+    from app.services.opening_balance_warehouse_sync_service import (
+        find_products_with_unrelated_posted_warehouse_history,
+        sync_opening_balance_warehouse_documents,
+    )
+
+    if find_products_with_unrelated_posted_warehouse_history(
+        db, int(business_id), [int(product_id)]
+    ):
+        return
+    sync_opening_balance_warehouse_documents(
+        db,
+        int(business_id),
+        int(user_id),
+        int(doc_id),
+        [int(product_id)],
+    )
+
+
 def create_product_with_opening_balance(
     db: Session,
     business_id: int,
@@ -729,7 +847,9 @@ def create_product_with_opening_balance(
             warehouse_id=wh_id,
             fiscal_year_id=ob.fiscal_year_id,
             product_name=product_name,
+            **_lot_fields_from_ob(ob),
         )
+        _maybe_sync_opening_warehouse(db, business_id, user_id, ob_doc, product_id)
     except Exception:
         success, _ = delete_product_fn(db, product_id, business_id)
         if not success:
@@ -799,7 +919,7 @@ def update_product_with_opening_balance(
             default_warehouse_id=default_wh,
             fallback_warehouse_ids=fallbacks,
         )
-        upsert_product_opening_balance_line(
+        ob_doc = upsert_product_opening_balance_line(
             db,
             business_id,
             user_id,
@@ -812,6 +932,7 @@ def update_product_with_opening_balance(
             remove_line=True,
             previous_warehouse_id=previous_warehouse_id,
         )
+        _maybe_sync_opening_warehouse(db, business_id, user_id, ob_doc, product_id)
         msg = "کالا ویرایش شد و تعداد اولیه از سند تراز افتتاحیه حذف شد"
     else:
         wh_id = _resolve_warehouse_id(
@@ -819,7 +940,7 @@ def update_product_with_opening_balance(
             default_warehouse_id=default_wh,
             fallback_warehouse_ids=fallbacks,
         )
-        upsert_product_opening_balance_line(
+        ob_doc = upsert_product_opening_balance_line(
             db,
             business_id,
             user_id,
@@ -831,7 +952,9 @@ def update_product_with_opening_balance(
             product_name=product_name,
             remove_line=False,
             previous_warehouse_id=previous_warehouse_id,
+            **_lot_fields_from_ob(ob),
         )
+        _maybe_sync_opening_warehouse(db, business_id, user_id, ob_doc, product_id)
         msg = "کالا ویرایش شد و تعداد اولیه در سند تراز افتتاحیه به‌روزرسانی شد"
 
     data = dict(result.get("data") or {})

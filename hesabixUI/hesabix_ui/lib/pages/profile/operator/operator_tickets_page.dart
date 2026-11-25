@@ -462,6 +462,14 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   onPressed: _showCommandPalette,
                 ),
                 IconButton(
+                  tooltip: Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Support MCP'
+                      : 'اتصال MCP پشتیبانی',
+                  icon: const Icon(Icons.smart_toy_outlined, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => context.push('/user/profile/operator/mcp-connections'),
+                ),
+                IconButton(
                   tooltip: 'بروزرسانی',
                   icon: const Icon(Icons.refresh, size: 20),
                   visualDensity: VisualDensity.compact,

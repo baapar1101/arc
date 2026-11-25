@@ -86,7 +86,7 @@ def _normalize_phone_for_search(phone: str) -> str | None:
 
 @router.get("/{business_id}/users/telegram-connected",
     summary="لیست کاربران متصل به تلگرام",
-    description="دریافت لیست کاربران عضو کسب و کار که به ربات تلگرام متصل هستند",
+    description="ابزار MCP: `list_telegram_connected_users`. شناسه چت در ابزار برنمی‌گردد.",
     responses={
         200: {
             "description": "لیست کاربران متصل به تلگرام",
@@ -170,7 +170,7 @@ def get_telegram_connected_users(
 
 @router.get("/{business_id}/users/bale-connected",
     summary="لیست کاربران متصل به بله",
-    description="دریافت لیست کاربران عضو کسب و کار که به ربات بله متصل هستند",
+    description="ابزار MCP: `list_bale_connected_users`. شناسه چت در ابزار برنمی‌گردد.",
     responses={
         200: {"description": "لیست کاربران متصل به بله"},
         401: {"description": "کاربر احراز هویت نشده است"},
@@ -248,7 +248,7 @@ def get_bale_connected_users(
 
 @router.get("/{business_id}/users/{user_id}", 
     summary="دریافت جزئیات کاربر", 
-    description="دریافت جزئیات کاربر و دسترسی‌هایش در کسب و کار",
+    description="ابزار MCP: `get_business_user`. جزئیات عضو کسب‌وکار شامل نقش، وضعیت عضویت، تاریخ انقضا و ماتریس دسترسی‌ها. نیازمند settings.users.",
     responses={
         200: {
             "description": "جزئیات کاربر با موفقیت دریافت شد",
@@ -362,7 +362,7 @@ def get_user_details(
 
 @router.get("/{business_id}/users", 
     summary="لیست کاربران کسب و کار", 
-    description="دریافت لیست کاربران یک کسب و کار",
+    description="ابزار MCP: `list_business_users`.",
     response_model=BusinessUsersListResponse,
     responses={
         200: {
@@ -506,7 +506,7 @@ def get_users(
 
 @router.post("/{business_id}/users", 
     summary="افزودن کاربر به کسب و کار", 
-    description="افزودن کاربر جدید به کسب و کار با ایمیل یا شماره تلفن",
+    description="دعوت کاربر ثبت‌شده حسابیکس با ایمیل یا موبایل. کاربر باید از قبل حساب داشته باشد. ابزار MCP: invite_business_user.",
     response_model=AddUserResponse,
     responses={
         200: {
@@ -668,7 +668,7 @@ def add_user(
 
 @router.put("/{business_id}/users/{user_id}/permissions", 
     summary="به‌روزرسانی دسترسی‌های کاربر", 
-    description="به‌روزرسانی دسترسی‌های یک کاربر در کسب و کار",
+    description="ابزار MCP: `update_business_user_permissions` (نیازمند تأیید).",
     response_model=UpdatePermissionsResponse,
     responses={
         200: {
@@ -760,7 +760,7 @@ def update_permissions(
 
 @router.delete("/{business_id}/users/{user_id}", 
     summary="حذف کاربر از کسب و کار", 
-    description="حذف کاربر از کسب و کار",
+    description="ابزار MCP: `remove_business_user` (نیازمند تأیید).",
     response_model=RemoveUserResponse,
     responses={
         200: {
@@ -844,7 +844,7 @@ def remove_user(
 
 @router.delete("/{business_id}/leave", 
     summary="خروج از کسب و کار", 
-    description="خروج خودکار کاربر از کسب و کار (فقط برای اعضای غیر از مالک)",
+    description="خروج خودکار کاربر از کسب و کار (فقط برای اعضای غیر از مالک). ابزار MCP: leave_connected_business.",
     response_model=LeaveBusinessResponse,
     responses={
         200: {

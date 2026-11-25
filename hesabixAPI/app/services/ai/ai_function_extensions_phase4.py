@@ -101,19 +101,68 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
         AIFunction(
             name="get_report",
             description=(
-                "گزارش یکپارچه. ابتدا list_available_reports را ببینید. "
-                f"نمونه report_type: sales_by_product, trial_balance, inventory_stock, basalam_overview. "
-                f"مجموعاً {len(_REPORT_TYPES)} نوع. general_ledger نیاز به account_ids دارد."
+                "گزارش یکپارچه معادل صفحهٔ گزارشات. ابتدا list_available_reports را ببینید. "
+                "نمونه report_type: trial_balance, cash_flow_statement, ar_aging, installments, "
+                "checks, stock_count, financial_package, fx_revaluation, woocommerce_overview. "
+                f"مجموعاً {len(_REPORT_TYPES)} نوع. general_ledger نیاز به account_ids دارد. "
+                "خروجی JSON است؛ فایل Excel/PDF برنمی‌گردد."
             ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "report_type": {"type": "string", "description": "نوع گزارش؛ از list_available_reports"},
+                    "report_type": {
+                        "type": "string",
+                        "enum": list(_REPORT_TYPES),
+                        "description": "نوع گزارش؛ از list_available_reports",
+                    },
                     "from_date": {"type": "string", "format": "date"},
                     "to_date": {"type": "string", "format": "date"},
-                    "fiscal_year_id": {"type": "integer"},
-                    "product_id": {"type": "integer"},
                     "as_of_date": {"type": "string", "format": "date"},
+                    "due_from": {"type": "string", "format": "date"},
+                    "due_to": {"type": "string", "format": "date"},
+                    "fiscal_year_id": {"type": "integer"},
+                    "currency_id": {"type": "integer"},
+                    "project_id": {"type": "integer"},
+                    "product_id": {"type": "integer"},
+                    "product_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "account_id": {"type": "integer"},
+                    "account_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "person_id": {"type": "integer"},
+                    "person_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "warehouse_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "category_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "bank_account_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "cash_register_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "petty_cash_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 100},
+                    "invoice_id": {"type": "integer"},
+                    "target_user_id": {"type": "integer"},
+                    "skip": {"type": "integer", "minimum": 0},
+                    "take": {"type": "integer", "minimum": 1, "maximum": 200},
+                    "search": {"type": "string"},
+                    "status": {"type": "string"},
+                    "status_in": {"type": "array", "items": {"type": "string"}, "maxItems": 20},
+                    "check_type": {"type": "string"},
+                    "document_type": {"type": "string"},
+                    "account_type": {"type": "string"},
+                    "detail_level": {"type": "string"},
+                    "display_mode": {"type": "string"},
+                    "compare_mode": {"type": "string"},
+                    "group_by": {"type": "string"},
+                    "bucket": {"type": "string"},
+                    "log_category": {"type": "string"},
+                    "entity_type": {"type": "string"},
+                    "conflict_type": {"type": "string"},
+                    "direction": {"type": "string"},
+                    "item_type": {"type": "string"},
+                    "include_zero_balance": {"type": "boolean"},
+                    "include_indirect": {"type": "boolean"},
+                    "include_proforma": {"type": "boolean"},
+                    "include_base_equivalent": {"type": "boolean"},
+                    "compare_prior_period": {"type": "boolean"},
+                    "only_with_balance": {"type": "boolean"},
+                    "account_level": {"type": "integer"},
+                    "column_mode": {"type": "integer"},
+                    "chart_days": {"type": "integer", "minimum": 1, "maximum": 365},
                 },
                 "required": ["report_type"],
             },
@@ -428,6 +477,62 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
             is_readonly=False,
         )
     )
+
+    def check_product_usage_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from adapters.db.models.product import Product
+        from app.services.product_service import check_product_has_related_documents
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        product_id = int(args["product_id"])
+        product = db.query(Product).filter(
+            Product.id == product_id, Product.business_id == business_id
+        ).first()
+        if not product:
+            raise ValueError("کالا در کسب‌وکار متصل پیدا نشد")
+        has_documents, document_types = check_product_has_related_documents(db, product_id)
+        return {
+            "product_id": product_id,
+            "can_delete": not has_documents,
+            "has_related_documents": has_documents,
+            "related_document_types": document_types,
+        }
+
+    registry.register(AIFunction(
+        name="check_product_usage",
+        description="پیش‌بررسی وابستگی‌های کالا در اسناد، BOM و گردش‌های دیگر؛ بدون تغییر داده. پیش از حذف این ابزار را اجرا کن.",
+        parameters_schema={
+            "type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}},
+            "required": ["product_id"],
+        },
+        handler=create_handler(check_product_usage_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["products.read"], category="products",
+    ))
+
+    def delete_product_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.product_service import delete_product
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        product_id = int(args["product_id"])
+        deleted, error = delete_product(db, product_id, business_id)
+        if not deleted:
+            raise ValueError(error or "حذف کالا انجام نشد")
+        return {"product_id": product_id, "deleted": True}
+
+    registry.register(AIFunction(
+        name="delete_product",
+        description="حذف کالا از سرویس دامنه؛ کالاهای دارای وابستگی حذف نمی‌شوند. ابتدا check_product_usage را اجرا کن. حذف غیرقابل بازگشت و نیازمند تأیید است.",
+        parameters_schema={
+            "type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}},
+            "required": ["product_id"],
+        },
+        handler=create_handler(delete_product_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["products.delete"], category="products",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
 
     # --- Write: check ---
     def create_check_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
+import '../../../services/person_service.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
 import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import '../../../widgets/invoice/product_combobox_widget.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
-
-/// صفحه فرم ثبت/ویرایش سفارش تعمیر
 class RepairOrderFormPage extends StatefulWidget {
   final int businessId;
   final int? orderId;
@@ -31,27 +32,35 @@ class RepairOrderFormPage extends StatefulWidget {
 class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
   final _formKey = GlobalKey<FormState>();
   late final RepairShopService _service;
+  late final PersonService _personService;
+
+  bool _isLoading = false;
+  bool _isSaving = false;
+
+  Person? _selectedCustomer;
+  Map<String, dynamic>? _selectedProduct;
+  DateTime? _estimatedDeliveryAt;
+  final TextEditingController _productNameController = TextEditingController();
+  final TextEditingController _productSerialController = TextEditingController();
+  final TextEditingController _problemController = TextEditingController();
+  final TextEditingController _customerNotesController = TextEditingController();
+  final TextEditingController _technicianNotesController =
+      TextEditingController();
+  final TextEditingController _estimatedCostController = TextEditingController();
+  final TextEditingController _warrantyCodeController = TextEditingController();
+
+  bool get _isEdit => widget.orderId != null;
 
   @override
   void initState() {
     super.initState();
     final apiClient = ApiClient();
     _service = RepairShopService(apiClient);
-    if (widget.orderId != null) {
+    _personService = PersonService(apiClient: apiClient);
+    if (_isEdit) {
       _loadOrder();
     }
   }
-
-  final _isLoading = false;
-  bool _isSaving = false;
-
-  Person? _selectedCustomer;
-  DateTime? _estimatedDeliveryAt;
-  final TextEditingController _productNameController = TextEditingController();
-  final TextEditingController _productSerialController = TextEditingController();
-  final TextEditingController _problemController = TextEditingController();
-  final TextEditingController _customerNotesController = TextEditingController();
-  final TextEditingController _estimatedCostController = TextEditingController();
 
   @override
   void dispose() {
@@ -59,12 +68,57 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
     _productSerialController.dispose();
     _problemController.dispose();
     _customerNotesController.dispose();
+    _technicianNotesController.dispose();
     _estimatedCostController.dispose();
+    _warrantyCodeController.dispose();
     super.dispose();
   }
 
   Future<void> _loadOrder() async {
-    // TODO: بارگذاری سفارش برای ویرایش
+    setState(() => _isLoading = true);
+    try {
+      final order = await _service.getOrder(
+        businessId: widget.businessId,
+        orderId: widget.orderId!,
+      );
+      Person? customer;
+      try {
+        customer = await _personService.getPerson(order.customerPersonId);
+      } catch (_) {
+        customer = null;
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedCustomer = customer;
+        _productNameController.text = order.productName;
+        _productSerialController.text = order.productSerial ?? '';
+        _problemController.text = order.problemDescription;
+        _customerNotesController.text = order.customerNotes ?? '';
+        _technicianNotesController.text = order.technicianNotes ?? '';
+        _estimatedCostController.text = order.estimatedCost != null
+            ? order.estimatedCost!.toStringAsFixed(0)
+            : '';
+        _warrantyCodeController.text =
+            order.warrantyCodeId != null ? order.warrantyCodeId.toString() : '';
+        _estimatedDeliveryAt = order.estimatedDeliveryAt;
+        if (order.productId != null) {
+          _selectedProduct = {
+            'id': order.productId,
+            'name': order.productName,
+          };
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).repairShopLoadOrderError(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
+    }
   }
 
   Future<void> _saveOrder() async {
@@ -72,8 +126,11 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
       return;
     }
 
-    if (_selectedCustomer == null) {
-      SnackBarHelper.show(context, message: 'لطفاً مشتری را انتخاب کنید');
+    if (!_isEdit && _selectedCustomer == null) {
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).repairShopSelectCustomer,
+      );
       return;
     }
 
@@ -81,18 +138,20 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
 
     try {
       final orderData = <String, dynamic>{
-        'customer_person_id': _selectedCustomer!.id,
-        'product_name': _productNameController.text,
-        'product_serial': _productSerialController.text.isNotEmpty
-            ? _productSerialController.text
+        'product_name': _productNameController.text.trim(),
+        'product_serial': _productSerialController.text.trim().isNotEmpty
+            ? _productSerialController.text.trim()
             : null,
-        'problem_description': _problemController.text,
-        'customer_notes': _customerNotesController.text.isNotEmpty
-            ? _customerNotesController.text
+        'product_id': _selectedProduct?['id'],
+        'problem_description': _problemController.text.trim(),
+        'customer_notes': _customerNotesController.text.trim().isNotEmpty
+            ? _customerNotesController.text.trim()
             : null,
-        'estimated_cost': _estimatedCostController.text.isNotEmpty
-            ? double.tryParse(_estimatedCostController.text)
+        'estimated_cost': _estimatedCostController.text.trim().isNotEmpty
+            ? double.tryParse(
+                _estimatedCostController.text.replaceAll(',', '').trim())
             : null,
+        'warranty_code_id': int.tryParse(_warrantyCodeController.text.trim()),
       };
 
       if (_estimatedDeliveryAt != null) {
@@ -100,21 +159,39 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
             '${HesabixDateUtils.formatForApiDate(_estimatedDeliveryAt!)}T00:00:00';
       }
 
-      await _service.createOrder(
-        businessId: widget.businessId,
-        orderData: orderData,
-      );
+      if (_isEdit) {
+        if (_technicianNotesController.text.trim().isNotEmpty) {
+          orderData['technician_notes'] =
+              _technicianNotesController.text.trim();
+        }
+        await _service.updateOrder(
+          businessId: widget.businessId,
+          orderId: widget.orderId!,
+          orderData: orderData,
+        );
+      } else {
+        orderData['customer_person_id'] = _selectedCustomer!.id;
+        await _service.createOrder(
+          businessId: widget.businessId,
+          orderData: orderData,
+        );
+      }
 
       if (mounted) {
-        SnackBarHelper.show(context, message: 'سفارش تعمیر با موفقیت ثبت شد');
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
+          context,
+          message: _isEdit ? t.repairShopOrderUpdated : t.repairShopOrderCreated,
+        );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message:
-              'خطا در ثبت سفارش: ${ErrorExtractor.forContext(e, context)}',
+          message: AppLocalizations.of(context).repairShopSaveOrderError(
+            ErrorExtractor.forContext(e, context),
+          ),
         );
       }
     } finally {
@@ -129,10 +206,12 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
     return ListenableBuilder(
       listenable: widget.calendarController,
       builder: (context, _) {
+        final t = AppLocalizations.of(context);
         return Scaffold(
           appBar: AppBar(
-            title: Text(widget.orderId == null ? 'سفارش تعمیر جدید' : 'ویرایش سفارش'),
-            leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+            title: Text(_isEdit ? t.repairShopEditOrderTitle : t.repairShopNewOrderTitle),
+            leading: hesabixBackAppBarLeading(context,
+                businessId: widget.businessId),
             actions: [
               if (_isSaving)
                 const Padding(
@@ -147,7 +226,7 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                 IconButton(
                   icon: const Icon(Icons.check),
                   onPressed: _saveOrder,
-                  tooltip: 'ذخیره',
+                  tooltip: t.save,
                 ),
             ],
           ),
@@ -160,42 +239,79 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        PersonComboboxWidget(
-                          businessId: widget.businessId,
-                          showFinancialBalance: true,
-                          selectedPerson: _selectedCustomer,
-                          onChanged: (person) {
-                            setState(() => _selectedCustomer = person);
-                          },
-                          label: 'مشتری',
-                          hintText: 'جست‌وجو و انتخاب مشتری',
-                          isRequired: true,
-                          searchHint: 'جستجو بر اساس نام، تلفن یا ایمیل...',
-                        ),
+                        if (!_isEdit)
+                          PersonComboboxWidget(
+                            businessId: widget.businessId,
+                            showFinancialBalance: true,
+                            selectedPerson: _selectedCustomer,
+                            onChanged: (person) {
+                              setState(() => _selectedCustomer = person);
+                            },
+                            label: t.repairShopCustomer,
+                            hintText: t.repairShopCustomerHint,
+                            isRequired: true,
+                            searchHint: t.repairShopCustomerSearchHint,
+                          )
+                        else if (_selectedCustomer != null)
+                          Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.person),
+                              title: Text(_selectedCustomer!.displayName),
+                              subtitle: Text(t.repairShopCustomerSubtitle),
+                            ),
+                          ),
                         const SizedBox(height: 24),
                         const Divider(),
                         const SizedBox(height: 16),
+                        ProductComboboxWidget(
+                          businessId: widget.businessId,
+                          selectedProduct: _selectedProduct,
+                          label: t.repairShopCatalogProduct,
+                          hintText: t.repairShopCatalogProductHint,
+                          onChanged: (product) {
+                            setState(() {
+                              _selectedProduct = product;
+                              final name = product?['name']?.toString();
+                              if (name != null && name.isNotEmpty) {
+                                _productNameController.text = name;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
                         TextFormField(
                           controller: _productNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'نام کالا/دستگاه',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.devices),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopProductName,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.devices),
+                            helperText: t.repairShopProductNameHint,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'نام کالا الزامی است';
+                            if (value == null || value.trim().isEmpty) {
+                              return t.repairShopProductNameRequired;
                             }
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
+                          controller: _warrantyCodeController,
+                          decoration: InputDecoration(
+                            labelText: t.repairShopWarrantyCodeId,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.verified_user_outlined),
+                            helperText: t.repairShopWarrantyCodeHelper,
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
                           controller: _productSerialController,
-                          decoration: const InputDecoration(
-                            labelText: 'شماره سریال (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.qr_code),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopSerialOptional,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.qr_code),
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -203,15 +319,15 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _problemController,
-                          decoration: const InputDecoration(
-                            labelText: 'شرح مشکل',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.report_problem),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopProblemDescription,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.report_problem),
                           ),
                           maxLines: 3,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'شرح مشکل الزامی است';
+                            if (value == null || value.trim().isEmpty) {
+                              return t.repairShopProblemRequired;
                             }
                             return null;
                           },
@@ -219,27 +335,39 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _customerNotesController,
-                          decoration: const InputDecoration(
-                            labelText: 'یادداشت مشتری (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.note),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopCustomerNotesOptional,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.note),
                           ),
                           maxLines: 2,
                         ),
+                        if (_isEdit) ...[
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _technicianNotesController,
+                            decoration: InputDecoration(
+                              labelText: t.repairShopTechnicianNotesOptional,
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.engineering),
+                            ),
+                            maxLines: 2,
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _estimatedCostController,
-                          decoration: const InputDecoration(
-                            labelText: 'برآورد هزینه (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.attach_money),
-                            helperText: 'به واحد ارز پیش‌فرض کسب‌وکار',
+                          decoration: InputDecoration(
+                            labelText: t.repairShopEstimatedCostOptional,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.attach_money),
+                            helperText: t.repairShopEstimatedCostHelper,
                           ),
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 16),
                         DateInputField(
-                          labelText: 'تاریخ تحویل تقریبی (اختیاری)',
+                          labelText: t.repairShopEstimatedDeliveryOptional,
                           value: _estimatedDeliveryAt,
                           calendarController: widget.calendarController,
                           onChanged: (value) {
@@ -253,10 +381,13 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
                                 )
                               : const Icon(Icons.check),
-                          label: Text(_isSaving ? 'در حال ذخیره...' : 'ثبت سفارش'),
+                          label: Text(_isSaving
+                              ? t.saving
+                              : (_isEdit ? t.repairShopSaveChanges : t.repairShopSubmitOrder)),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.all(16),
                           ),

@@ -158,6 +158,230 @@ class AIFunctionRegistry:
         )
 
         register_phase11_business_functions(self)
+
+        from app.services.ai.ai_function_extensions_mcp_crm import register_mcp_crm_functions
+
+        register_mcp_crm_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_crm_meta import register_mcp_crm_meta_functions
+
+        register_mcp_crm_meta_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_invoice_extra import register_mcp_invoice_extra_functions
+
+        register_mcp_invoice_extra_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_checks import register_mcp_check_action_functions
+
+        register_mcp_check_action_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_stock_count import register_mcp_stock_count_functions
+
+        register_mcp_stock_count_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_bulk_financial import register_mcp_bulk_financial_functions
+
+        register_mcp_bulk_financial_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_payroll import register_mcp_payroll_functions
+
+        register_mcp_payroll_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_office_automation import (
+            register_mcp_office_automation_functions,
+        )
+
+        register_mcp_office_automation_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_procurement import register_mcp_procurement_functions
+
+        register_mcp_procurement_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_products_batch import register_mcp_products_batch_functions
+
+        register_mcp_products_batch_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_warehouse_reports import register_mcp_warehouse_report_functions
+
+        register_mcp_warehouse_report_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_repair import register_mcp_repair_functions
+
+        register_mcp_repair_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_warranty import register_mcp_warranty_functions
+
+        register_mcp_warranty_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_production import register_mcp_production_functions
+
+        register_mcp_production_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_advanced_production import (
+            register_mcp_advanced_production_functions,
+        )
+
+        register_mcp_advanced_production_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_distribution import register_mcp_distribution_functions
+
+        register_mcp_distribution_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_discovery import register_mcp_discovery_functions
+
+        register_mcp_discovery_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_documents import register_mcp_document_functions
+
+        register_mcp_document_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_treasury import register_mcp_treasury_functions
+
+        register_mcp_treasury_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_fixed_assets import register_mcp_fixed_assets_functions
+
+        register_mcp_fixed_assets_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_telephony import register_mcp_telephony_functions
+
+        register_mcp_telephony_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_barcode import register_mcp_barcode_functions
+
+        register_mcp_barcode_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_settings import register_mcp_settings_functions
+
+        register_mcp_settings_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_projects import register_mcp_project_functions
+
+        register_mcp_project_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_person_groups import register_mcp_person_group_functions
+
+        register_mcp_person_group_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_credit import register_mcp_credit_functions
+
+        register_mcp_credit_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_bundles import register_mcp_bundle_functions
+
+        register_mcp_bundle_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_price_lists import register_mcp_price_list_functions
+
+        register_mcp_price_list_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_categories import register_mcp_category_functions
+
+        register_mcp_category_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_instances import register_mcp_instance_functions
+
+        register_mcp_instance_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_warehouse import register_mcp_warehouse_master_functions
+
+        register_mcp_warehouse_master_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_freq import register_mcp_frequent_description_functions
+
+        register_mcp_frequent_description_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_spec import register_mcp_catalog_spec_functions
+
+        register_mcp_catalog_spec_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_fx import register_mcp_fx_functions
+
+        register_mcp_fx_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_loans import register_mcp_loan_functions
+
+        register_mcp_loan_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_fiscal import register_mcp_fiscal_functions
+
+        register_mcp_fiscal_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_quick_sales import register_mcp_quick_sales_functions
+
+        register_mcp_quick_sales_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_club import register_mcp_club_extra_functions
+
+        register_mcp_club_extra_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_notifications import register_mcp_notification_functions
+
+        register_mcp_notification_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_gei import register_mcp_gei_functions
+
+        register_mcp_gei_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_zohal import register_mcp_zohal_functions
+
+        register_mcp_zohal_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_digipay import register_mcp_digipay_functions
+
+        register_mcp_digipay_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_pay_page import register_mcp_pay_page_functions
+
+        register_mcp_pay_page_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_period_fx import register_mcp_period_fx_functions
+
+        register_mcp_period_fx_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_variants import register_mcp_variant_functions
+
+        register_mcp_variant_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_storage import register_mcp_storage_functions
+
+        register_mcp_storage_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_crm_chat import register_mcp_crm_chat_functions
+
+        register_mcp_crm_chat_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_doc_monetization import register_mcp_doc_monetization_functions
+
+        register_mcp_doc_monetization_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_connectors import register_mcp_connector_functions
+
+        register_mcp_connector_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_remaining_ops import register_mcp_remaining_ops_functions
+
+        register_mcp_remaining_ops_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops2 import register_mcp_ops2_functions
+
+        register_mcp_ops2_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops3 import register_mcp_ops3_functions
+
+        register_mcp_ops3_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops4 import register_mcp_ops4_functions
+
+        register_mcp_ops4_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops5 import register_mcp_ops5_functions
+
+        register_mcp_ops5_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops6 import register_mcp_ops6_functions
+
+        register_mcp_ops6_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops7 import register_mcp_ops7_functions
+
+        register_mcp_ops7_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops8 import register_mcp_ops8_functions
+
+        register_mcp_ops8_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops9 import register_mcp_ops9_functions
+
+        register_mcp_ops9_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops10 import register_mcp_ops10_functions
+
+        register_mcp_ops10_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops11 import register_mcp_ops11_functions
+
+        register_mcp_ops11_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops12 import register_mcp_ops12_functions
+
+        register_mcp_ops12_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops13 import register_mcp_ops13_functions
+
+        register_mcp_ops13_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops14 import register_mcp_ops14_functions
+
+        register_mcp_ops14_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops15 import register_mcp_ops15_functions
+
+        register_mcp_ops15_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops16 import register_mcp_ops16_functions
+
+        register_mcp_ops16_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops17 import register_mcp_ops17_functions
+
+        register_mcp_ops17_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops18 import register_mcp_ops18_functions
+
+        register_mcp_ops18_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops19 import register_mcp_ops19_functions
+
+        register_mcp_ops19_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops20 import register_mcp_ops20_functions
+
+        register_mcp_ops20_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops21 import register_mcp_ops21_functions
+
+        register_mcp_ops21_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops22 import register_mcp_ops22_functions
+
+        register_mcp_ops22_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops23 import register_mcp_ops23_functions
+
+        register_mcp_ops23_functions(self)
+        from app.services.ai.ai_function_extensions_tax_extra import register_tax_extra_functions
+
+        register_tax_extra_functions(self)
         from app.services.ai.ai_function_extensions_memory import register_memory_functions
 
         register_memory_functions(self)
@@ -1364,7 +1588,10 @@ class AIFunctionRegistry:
             return d
 
         def search_leads_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
             q = db.query(Lead).filter(Lead.business_id == business_id)
+            q = restrict_visibility_query(q, db, business_id, acl_actor(db, int(user_id)), Lead, "lead")
             if kwargs.get("process_definition_id"):
                 q = q.filter(Lead.process_definition_id == kwargs["process_definition_id"])
             if kwargs.get("stage_id"):
@@ -1389,15 +1616,21 @@ class AIFunctionRegistry:
             return {"items": [_lead_to_dict_simple(lead) for lead in items], "total": total}
 
         def get_lead_details_wrapper(db, business_id, user_id, lead_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, guard_record
+
             lead = db.query(Lead).filter(
                 and_(Lead.id == lead_id, Lead.business_id == business_id)
             ).first()
             if not lead:
                 raise ValueError(f"Lead {lead_id} not found")
+            guard_record(db, business_id, acl_actor(db, int(user_id)), "lead", lead)
             return _lead_to_dict_simple(lead)
 
         def search_deals_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
             q = db.query(Deal).filter(Deal.business_id == business_id)
+            q = restrict_visibility_query(q, db, business_id, acl_actor(db, int(user_id)), Deal, "deal")
             if kwargs.get("process_definition_id"):
                 q = q.filter(Deal.process_definition_id == kwargs["process_definition_id"])
             if kwargs.get("stage_id"):
@@ -1419,15 +1652,21 @@ class AIFunctionRegistry:
             return {"items": [_deal_to_dict_simple(dl) for dl in items], "total": total}
 
         def get_deal_details_wrapper(db, business_id, user_id, deal_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, guard_record
+
             deal = db.query(Deal).filter(
                 and_(Deal.id == deal_id, Deal.business_id == business_id)
             ).first()
             if not deal:
                 raise ValueError(f"Deal {deal_id} not found")
+            guard_record(db, business_id, acl_actor(db, int(user_id)), "deal", deal)
             return _deal_to_dict_simple(deal)
 
         def search_activities_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, restrict_activity_query
+
             q = db.query(CrmActivity).filter(CrmActivity.business_id == business_id)
+            q = restrict_activity_query(q, db, business_id, acl_actor(db, int(user_id)), CrmActivity)
             if kwargs.get("person_id"):
                 q = q.filter(CrmActivity.person_id == kwargs["person_id"])
             if kwargs.get("deal_id"):
@@ -1441,19 +1680,18 @@ class AIFunctionRegistry:
             return {"items": [_activity_to_dict_simple(a) for a in items], "total": total}
 
         def get_crm_summary_wrapper(db, business_id, user_id, **kwargs):
-            total_leads = db.query(Lead).filter(Lead.business_id == business_id).count()
-            converted_leads = db.query(Lead).filter(
-                Lead.business_id == business_id, Lead.person_id.isnot(None)
-            ).count()
-            total_deals = db.query(Deal).filter(Deal.business_id == business_id).count()
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
+            actor = acl_actor(db, int(user_id))
+            leads = restrict_visibility_query(db.query(Lead).filter(Lead.business_id == business_id), db, business_id, actor, Lead, "lead")
+            deals = restrict_visibility_query(db.query(Deal).filter(Deal.business_id == business_id), db, business_id, actor, Deal, "deal")
+            total_leads = leads.count()
+            converted_leads = leads.filter(Lead.person_id.isnot(None)).count()
+            total_deals = deals.count()
             deals_amount = (
-                db.query(sql_func.coalesce(sql_func.sum(Deal.amount), 0))
-                .filter(Deal.business_id == business_id)
-                .scalar() or 0
+                deals.with_entities(sql_func.coalesce(sql_func.sum(Deal.amount), 0)).scalar() or 0
             )
-            closed_deals = db.query(Deal).filter(
-                Deal.business_id == business_id, Deal.closed_at.isnot(None)
-            ).count()
+            closed_deals = deals.filter(Deal.closed_at.isnot(None)).count()
             conversion_rate = (converted_leads / total_leads * 100) if total_leads else 0
             return {
                 "total_leads": total_leads,
@@ -1482,6 +1720,15 @@ class AIFunctionRegistry:
             )
             if process_def_id:
                 q = q.filter(CrmProcessDefinition.id == process_def_id)
+            from sqlalchemy.orm import aliased
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
+            deal_alias = aliased(Deal)
+            visible_deals = restrict_visibility_query(
+                db.query(deal_alias.id).filter(deal_alias.business_id == business_id),
+                db, business_id, acl_actor(db, int(user_id)), deal_alias, "deal",
+            )
+            q = q.filter(or_(Deal.id.is_(None), Deal.id.in_(visible_deals)))
             q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
             q = q.order_by(CrmProcessStage.order_index)
             rows = q.all()
@@ -1507,6 +1754,15 @@ class AIFunctionRegistry:
             )
             if process_def_id:
                 q = q.filter(CrmProcessDefinition.id == process_def_id)
+            from sqlalchemy.orm import aliased
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
+            lead_alias = aliased(Lead)
+            visible_leads = restrict_visibility_query(
+                db.query(lead_alias.id).filter(lead_alias.business_id == business_id),
+                db, business_id, acl_actor(db, int(user_id)), lead_alias, "lead",
+            )
+            q = q.filter(or_(Lead.id.is_(None), Lead.id.in_(visible_leads)))
             q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
             q = q.order_by(CrmProcessStage.order_index)
             rows = q.all()
@@ -1646,8 +1902,9 @@ class AIFunctionRegistry:
 
     def _register_operator_functions(self):
         """ثبت function های مخصوص اپراتورهای پشتیبانی"""
-        # این function ها بعداً اضافه می‌شوند
-        pass
+        from app.services.ai.ai_function_extensions_mcp_support import register_mcp_support_functions
+
+        register_mcp_support_functions(self)
     
     def _register_admin_functions(self):
         """ثبت function های مخصوص مدیر سیستم"""

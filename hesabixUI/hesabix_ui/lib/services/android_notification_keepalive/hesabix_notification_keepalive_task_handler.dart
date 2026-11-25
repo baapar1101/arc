@@ -9,6 +9,7 @@ import '../notifications_ws_client.dart';
 import '../system_notifications/android_notification_content_builder.dart';
 import '../system_notifications/system_notifications_service.dart';
 import '../system_notifications/notification_payload_codec.dart';
+import '../telephony/softphone_background_presence.dart';
 import '../telephony/softphone_incoming_notifications.dart';
 import '../telephony/softphone_ws_client.dart';
 
@@ -35,6 +36,7 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
   String? _softphoneMediaTicket;
   String? _softphoneExtension;
   String? _softphoneApiBaseUrl;
+  bool _heartbeatBusy = false;
 
   static const NotificationIcon _notificationIcon = NotificationIcon(
     metaDataName: 'com.hesabix.notificationIcon',
@@ -55,8 +57,18 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
     _softphoneMediaTicket = await FlutterForegroundTask.getData<String>(key: 'softphoneMediaTicket');
     _softphoneExtension = await FlutterForegroundTask.getData<String>(key: 'softphoneExtension');
     _softphoneApiBaseUrl = await FlutterForegroundTask.getData<String>(key: 'softphoneApiBaseUrl');
+    // After reboot / system restart the UI isolate is gone — FGS must own WS.
+    if ('$starter' != 'TaskStarter.developer') {
+      _uiAttached = false;
+      _softphoneUiHoldingWs = false;
+      await FlutterForegroundTask.saveData(key: 'uiAttached', value: false);
+      await FlutterForegroundTask.saveData(key: 'softphoneUiHoldingWs', value: false);
+    }
     await _refreshKeepAliveNotification(timestamp);
     await _connectWs();
+    if (_softphoneDesired) {
+      await _httpSoftphoneHeartbeat(allowRecreate: true);
+    }
     await _syncSoftphoneWs();
   }
 
@@ -217,6 +229,9 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
   void onRepeatEvent(DateTime timestamp) {
     // Refresh personalized clock/date on the persistent FGS notification.
     unawaited(_refreshKeepAliveNotification(timestamp));
+    if (_softphoneDesired) {
+      unawaited(_httpSoftphoneHeartbeat(allowRecreate: !_softphoneUiHoldingWs));
+    }
   }
 
   @override
@@ -341,4 +356,131 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
       debugPrint('FGS softphone decline failed: $e');
     }
   }
+
+  Future<void> _httpSoftphoneHeartbeat({required bool allowRecreate}) async {
+    if (_heartbeatBusy) return;
+    final sid = _softphoneSessionId;
+    if (sid == null || sid.isEmpty) {
+      if (allowRecreate) await _httpSoftphoneRecreateSession();
+      return;
+    }
+    final businessId = _softphoneBusinessId;
+    if (businessId == null) return;
+    _heartbeatBusy = true;
+    try {
+      final res = await _softphoneHttp(
+        'POST',
+        '/api/v1/telephony/business/$businessId/softphone/sessions/$sid/heartbeat',
+      );
+      if (res == null) return;
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = unwrapSoftphoneApiData(res.body);
+        if (data != null && data['extension'] != null) {
+          _softphoneExtension = '${data['extension']}'.trim();
+        }
+        return;
+      }
+      if (allowRecreate && isSoftphoneSessionGone(statusCode: res.statusCode, body: res.body)) {
+        await _httpSoftphoneRecreateSession();
+      }
+    } catch (e) {
+      debugPrint('FGS softphone heartbeat failed: $e');
+    } finally {
+      _heartbeatBusy = false;
+    }
+  }
+
+  Future<void> _httpSoftphoneRecreateSession() async {
+    final businessId = _softphoneBusinessId;
+    if (businessId == null) return;
+    try {
+      final res = await _softphoneHttp(
+        'POST',
+        '/api/v1/telephony/business/$businessId/softphone/sessions',
+        body: <String, dynamic>{
+          'client_info': <String, dynamic>{
+            'platform': 'android',
+            'engine': 'softphone_relay_r1',
+            'media': 'pcm_ws_v1_live',
+            'background': true,
+          },
+        },
+      );
+      if (res == null || res.statusCode < 200 || res.statusCode >= 300) return;
+      final data = unwrapSoftphoneApiData(res.body);
+      if (data == null) return;
+      final sid = extractSoftphoneSessionId(data);
+      final ticket = extractSoftphoneMediaTicket(data);
+      if (sid == null || ticket == null) return;
+      _softphoneSessionId = sid;
+      _softphoneMediaTicket = ticket;
+      final session = data['session'];
+      if (session is Map && session['extension'] != null) {
+        _softphoneExtension = '${session['extension']}'.trim();
+      }
+      await FlutterForegroundTask.saveData(key: 'softphoneSessionId', value: sid);
+      await FlutterForegroundTask.saveData(key: 'softphoneMediaTicket', value: ticket);
+      await FlutterForegroundTask.saveData(key: 'softphoneExtension', value: _softphoneExtension ?? '');
+      FlutterForegroundTask.sendDataToMain(<String, dynamic>{
+        'type': 'softphone_session_replaced',
+        'softphone': true,
+        'session_id': sid,
+        'media_ticket': ticket,
+        'extension': _softphoneExtension,
+        if (session is Map) 'session': Map<String, dynamic>.from(session),
+      });
+      _disconnectSoftphoneWs();
+      await _syncSoftphoneWs();
+    } catch (e) {
+      debugPrint('FGS softphone recreate session failed: $e');
+    }
+  }
+
+  Future<_SoftphoneHttpResult?> _softphoneHttp(
+    String method,
+    String path, {
+    Object? body,
+  }) async {
+    final base = (_softphoneApiBaseUrl ?? '').replaceAll(RegExp(r'/+$'), '');
+    final apiKey = _apiKey;
+    if (base.isEmpty || apiKey == null || apiKey.isEmpty) return null;
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$base$path');
+      late final HttpClientRequest req;
+      switch (method) {
+        case 'POST':
+          req = await client.postUrl(uri);
+          break;
+        case 'DELETE':
+          req = await client.deleteUrl(uri);
+          break;
+        default:
+          req = await client.getUrl(uri);
+      }
+      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      req.headers.set(HttpHeaders.authorizationHeader, 'ApiKey $apiKey');
+      if (body != null) {
+        req.add(utf8.encode(jsonEncode(body)));
+      }
+      final res = await req.close().timeout(const Duration(seconds: 20));
+      final text = await res.transform(utf8.decoder).join();
+      Map<String, dynamic>? json;
+      if (text.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(text);
+          if (decoded is Map) json = Map<String, dynamic>.from(decoded);
+        } catch (_) {}
+      }
+      return _SoftphoneHttpResult(res.statusCode, json);
+    } finally {
+      client.close(force: true);
+    }
+  }
+}
+
+class _SoftphoneHttpResult {
+  const _SoftphoneHttpResult(this.statusCode, this.body);
+  final int statusCode;
+  final Map<String, dynamic>? body;
 }

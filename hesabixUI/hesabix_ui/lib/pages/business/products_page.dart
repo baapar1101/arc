@@ -12,6 +12,8 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/product_list_category_filter_bar.dart';
 import '../../widgets/product/category_tree_widget.dart';
+import '../../models/product_measurement.dart';
+import '../../services/business_api_service.dart';
 import '../../services/category_service.dart';
 import '../../services/list_filter_preferences_service.dart';
 import '../../services/report_template_service.dart';
@@ -35,6 +37,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/date_formatters.dart';
 import '../../services/warehouse_service.dart';
 import '../../services/price_list_service.dart';
+import '../../services/product_service.dart';
 import '../../utils/image_cache.dart';
 import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
@@ -61,11 +64,13 @@ class _InfoTileData {
   final String label;
   final String value;
   final IconData icon;
+  final bool fitValue;
   
   const _InfoTileData({
     required this.label,
     required this.value,
     required this.icon,
+    this.fitValue = false,
   });
 }
 
@@ -592,6 +597,12 @@ class _ProductsPageState extends State<ProductsPage> {
         final valueStyle = isMobile
             ? theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)
             : theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+        final value = Text(
+          item.value.isEmpty ? '-' : item.value,
+          style: valueStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
         return Container(
           padding: EdgeInsets.all(tilePad),
           decoration: BoxDecoration(
@@ -622,12 +633,8 @@ class _ProductsPageState extends State<ProductsPage> {
                 ],
               ),
               SizedBox(height: isMobile ? 4 : 8),
-              Text(
-                item.value.isEmpty ? '-' : item.value,
-                style: valueStyle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              if (item.fitValue) FittedBox(fit: BoxFit.scaleDown, child: value)
+              else value,
             ],
           ),
         );
@@ -773,6 +780,7 @@ class _ProductsPageState extends State<ProductsPage> {
     required String serviceType,
     required String barcode,
     required AppLocalizations t,
+    required Future<List<_InfoTileData>>? measurements,
   }) {
     final theme = Theme.of(dialogContext);
     final generalItems = [
@@ -824,6 +832,24 @@ class _ProductsPageState extends State<ProductsPage> {
             builder: (context, constraints) {
               final isMobile = ResponsiveHelper.isMobile(context);
               final generalFooter = <Widget>[
+                if (measurements != null) ...[
+                  SizedBox(height: sectionGap),
+                  Text('مشخصات فیزیکی', style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  FutureBuilder<List<_InfoTileData>>(
+                    future: measurements,
+                    builder: (context, snapshot) {
+                      final items = snapshot.data;
+                      if (items != null) {
+                        return _buildInfoGrid(theme, items, context);
+                      }
+                      if (snapshot.hasError) {
+                        return const Text('مشخصات فیزیکی کالا دریافت نشد.');
+                      }
+                      return const LinearProgressIndicator();
+                    },
+                  ),
+                ],
                 SizedBox(height: overviewCompact ? 10 : 12),
                 Text(
                   t.productGeneralBarcodes,
@@ -1163,6 +1189,33 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
+  Future<List<_InfoTileData>> _loadProductMeasurements(int productId) async {
+    final (product, business) = await (
+      ProductService().getProduct(businessId: widget.businessId, productId: productId),
+      BusinessApiService.getBusiness(widget.businessId),
+    ).wait;
+    if (product.isEmpty) throw StateError('Could not load product details.');
+
+    final dimension = ProductMeasurementUnit.dimensionFromCode(business.productDimensionUnit);
+    final weight = ProductMeasurementUnit.weightFromCode(business.productWeightUnit);
+    return ProductMeasurement.values.map((field) {
+      final unit = field == ProductMeasurement.weight ? weight : dimension;
+      final display = unit.format(product[field.apiKey] as String?);
+      final prefix = display.approximate ? '≈ ' : '';
+      return _InfoTileData(
+        label: field.label,
+        value: display.value.isEmpty ? '' : '$prefix${display.value} ${unit.label}',
+        icon: switch (field) {
+          ProductMeasurement.length => Icons.straighten,
+          ProductMeasurement.width => Icons.swap_horiz,
+          ProductMeasurement.height => Icons.swap_vert,
+          ProductMeasurement.weight => Icons.scale_outlined,
+        },
+        fitValue: true,
+      );
+    }).toList();
+  }
+
   Future<void> _showProductDetailsDialog(Map<String, dynamic> product) async {
     final t = AppLocalizations.of(context);
     // در صورت وجود thumbnail، می‌توان از آن برای پیش‌نمایش استفاده کرد؛ در غیر این صورت تصویر اصلی
@@ -1171,6 +1224,13 @@ class _ProductsPageState extends State<ProductsPage> {
     );
     final attachmentsKey = AttachedFilesWidgetKey();
     bool uploadingFile = false;
+    final productId = product['id'];
+    final parsedProductId = productId is int
+        ? productId
+        : (productId is num ? productId.toInt() : int.tryParse(productId?.toString() ?? ''));
+    late final measurements = parsedProductId != null && product['item_type'] == 'کالا'
+        ? _loadProductMeasurements(parsedProductId)
+        : null;
     
     await showGlassDialog<void>(
       context: context,
@@ -1185,10 +1245,6 @@ class _ProductsPageState extends State<ProductsPage> {
             final tracking = product['track_inventory'] == true ? t.yes : t.no;
             final serviceType = _stringValue(product['item_type']);
             final barcode = _stringValue(product['barcode']);
-            final productId = product['id'];
-            final parsedProductId = productId is int
-                ? productId
-                : (productId is num ? productId.toInt() : int.tryParse(productId?.toString() ?? ''));
             final tabRules = _ProductDetailsTabRules.resolve(
               product: product,
               parsedProductId: parsedProductId,
@@ -1344,6 +1400,7 @@ class _ProductsPageState extends State<ProductsPage> {
                               serviceType: serviceType,
                               barcode: barcode,
                               t: t,
+                              measurements: measurements,
                             ),
                             if (tabRules.showInstancesTab)
                               ProductUniqueInstancesTab(

@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'telephony_l10n.dart';
 
 const String softphoneCallChannelId = 'hesabix_softphone_incoming';
-const String softphoneCallChannelName = 'تماس ورودی Softphone';
-const String softphoneCallChannelDescription =
-    'اعلان تمام‌صفحه تماس ورودی وقتی Softphone آنلاین است';
+String get softphoneCallChannelName => telephonyL10n().telephonyIncomingChannelName;
+String get softphoneCallChannelDescription =>
+    telephonyL10n().telephonyIncomingChannelDesc;
 const int softphoneIncomingNotificationId = 9100500;
 const String softphoneActionAnswer = 'softphone_answer';
 const String softphoneActionDecline = 'softphone_decline';
@@ -75,7 +76,7 @@ class SoftphoneIncomingNotifications {
 
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         softphoneCallChannelId,
         softphoneCallChannelName,
         description: softphoneCallChannelDescription,
@@ -118,8 +119,9 @@ class SoftphoneIncomingNotifications {
       if (sessionId != null) 'session_id': sessionId,
     });
 
-    final title = 'تماس ورودی · داخلی $extension';
-    final body = caller.isEmpty ? 'شماره ناشناس' : caller;
+    final t = telephonyL10n();
+    final title = t.telephonyIncomingExt(extension);
+    final body = caller.isEmpty ? t.telephonyUnknownNumber : caller;
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -138,15 +140,15 @@ class SoftphoneIncomingNotifications {
         ticker: title,
         icon: '@drawable/ic_stat_hesabix',
         actions: <AndroidNotificationAction>[
-          const AndroidNotificationAction(
+          AndroidNotificationAction(
             softphoneActionAnswer,
-            'پاسخ',
+            t.telephonyAnswerAction,
             showsUserInterface: true,
             cancelNotification: true,
           ),
-          const AndroidNotificationAction(
+          AndroidNotificationAction(
             softphoneActionDecline,
-            'رد',
+            t.telephonyDecline,
             cancelNotification: true,
           ),
         ],

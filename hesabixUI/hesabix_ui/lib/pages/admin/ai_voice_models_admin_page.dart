@@ -6,9 +6,12 @@ import 'package:hesabix_ui/models/ai_voice_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class AIVoiceModelsAdminPage extends StatefulWidget {
-  const AIVoiceModelsAdminPage({super.key});
+  final bool embedded;
+  const AIVoiceModelsAdminPage({super.key, this.embedded = false});
 
   @override
   State<AIVoiceModelsAdminPage> createState() => _AIVoiceModelsAdminPageState();
@@ -89,7 +92,6 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
     final apiBaseCtrl = TextEditingController(
       text: model?.extra['api_base_url']?.toString() ?? '',
     );
-    final apiKeyCtrl = TextEditingController();
     String kind = model?.kind ?? 'stt';
     String provider = model?.provider ?? 'local';
     String audioEndpoint =
@@ -164,14 +166,10 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
                             hintText: 'https://ai.parspack.com/v1',
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: apiKeyCtrl,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: l10n.aiVoiceAdminApiKey,
-                            helperText: l10n.aiVoiceAdminApiKeyHint,
-                          ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.aiVoiceAdminApiKeyHint,
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                         if (kind == 'stt') ...[
                           const SizedBox(height: 12),
@@ -269,8 +267,6 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
                         'credential_provider':
                             provider == 'custom' ? 'custom' : provider,
                       },
-                      if (apiKeyCtrl.text.trim().isNotEmpty)
-                        'api_key': apiKeyCtrl.text.trim(),
                     },
                   };
                   try {
@@ -303,7 +299,6 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
     voiceCtrl.dispose();
     descCtrl.dispose();
     apiBaseCtrl.dispose();
-    apiKeyCtrl.dispose();
   }
 
   @override
@@ -311,17 +306,23 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
         title: Text(l10n.settingsAIVoiceModels),
         actions: [
           IconButton(
             tooltip: l10n.aiVoiceAdminSeed,
-            icon: const Icon(Icons.auto_fix_high),
+            icon: const Icon(Icons.auto_fix_high, size: 20),
             onPressed: _seed,
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
           IconButton(
-            icon: const Icon(Icons.add),
+            tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: _load,
+          ),
+          IconButton(
+            tooltip: adminTx(context, 'مدل صوتی جدید', 'New voice model'),
+            icon: const Icon(Icons.add, size: 20),
             onPressed: () => _showEditor(),
           ),
         ],
@@ -331,7 +332,7 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
           : _error != null
               ? Center(child: Text(_error!))
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: context.settingsHub.pagePadding,
                   children: [
                     SwitchListTile(
                       title: Text(l10n.aiVoiceAdminAllowCloud),

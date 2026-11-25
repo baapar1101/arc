@@ -63,6 +63,9 @@ class InvoiceTransaction {
   /// تأیید صریح اختلاف تسعیر بزرگ (>۲۵٪) برای عبور از گارد بک‌اند.
   final bool allowLargeFxDiff;
 
+  /// فرادادهٔ پرداخت (مثلاً شناسه تیکت دیجی‌پی).
+  final Map<String, dynamic>? extraInfo;
+
   const InvoiceTransaction({
     required this.id,
     required this.type,
@@ -89,6 +92,7 @@ class InvoiceTransaction {
     this.fxRate,
     this.paymentCurrencyId,
     this.allowLargeFxDiff = false,
+    this.extraInfo,
   });
 
   /// مبلغ مؤثر برای مانده فاکتور (به ارز فاکتور).
@@ -123,6 +127,7 @@ class InvoiceTransaction {
     Object? fxRate = _unset,
     Object? paymentCurrencyId = _unset,
     bool? allowLargeFxDiff,
+    Object? extraInfo = _unset,
   }) {
     return InvoiceTransaction(
       id: id ?? this.id,
@@ -154,6 +159,9 @@ class InvoiceTransaction {
           ? this.paymentCurrencyId
           : paymentCurrencyId as int?,
       allowLargeFxDiff: allowLargeFxDiff ?? this.allowLargeFxDiff,
+      extraInfo: identical(extraInfo, _unset)
+          ? this.extraInfo
+          : extraInfo as Map<String, dynamic>?,
     );
   }
 
@@ -194,6 +202,13 @@ class InvoiceTransaction {
     }
     if (allowLargeFxDiff) {
       map['allow_large_fx_diff'] = true;
+    }
+    if (extraInfo != null && extraInfo!.isNotEmpty) {
+      map['extra_info'] = extraInfo;
+      final providerId = extraInfo!['digipay_provider_id'];
+      if (providerId != null) {
+        map['digipay_provider_id'] = providerId;
+      }
     }
     return map;
   }
@@ -257,6 +272,9 @@ class InvoiceTransaction {
       fxRate: json['fx_rate'] as num? ?? json['exchange_rate'] as num?,
       paymentCurrencyId: (json['payment_currency_id'] as num?)?.toInt(),
       allowLargeFxDiff: json['allow_large_fx_diff'] == true,
+      extraInfo: json['extra_info'] is Map
+          ? Map<String, dynamic>.from(json['extra_info'] as Map)
+          : null,
     );
   }
 }

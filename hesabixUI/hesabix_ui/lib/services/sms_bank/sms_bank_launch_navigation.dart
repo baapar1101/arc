@@ -92,7 +92,7 @@ class SmsBankLaunchNavigation {
     if (path == '/login' || path == '/404') return true;
     if (path == '/capture' || path.startsWith('/sms-bank/')) return true;
     if (path.startsWith('/public/')) return true;
-    if (path.startsWith('/i/') || path.startsWith('/p/')) return true;
+    if (path.startsWith('/i/') || path.startsWith('/p/') || path.startsWith('/u/')) return true;
     if (path.startsWith('/wallet/')) return true;
     if (path.startsWith('/mobile-launcher/')) return true;
     if (path.startsWith('/user/profile/')) return true;
@@ -101,8 +101,10 @@ class SmsBankLaunchNavigation {
   }
 
   /// Redirect desktop / stale route information away from non-app paths (404).
+  /// Recognized app routes win even if they look like a one-letter Windows path
+  /// (e.g. `/u/shop` must not be treated as `/D/hesabixArc`).
   static bool shouldRedirectUnknownPathToRoot(String path) {
-    return isFilesystemRoutePath(path) || !isRecognizedAppRoutePath(path);
+    return !isRecognizedAppRoutePath(path);
   }
 
   static bool _isDesktopFilesystemBase(Uri base) {

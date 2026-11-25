@@ -137,7 +137,11 @@ def _enqueue_ftp_rq_or_background(
 	return job_id
 
 
-@router.get("/settings")
+@router.get(
+	"/settings",
+	summary="تنظیمات FTP پشتیبان",
+	description="ابزار MCP: `get_ftp_backup_settings`. رمز عبور برنمی‌گردد.",
+)
 async def get_ftp_settings(
 	request: Request,
 	business_id: int,
@@ -149,7 +153,11 @@ async def get_ftp_settings(
 	return success_response(row_to_public_dict(row), request=request)
 
 
-@router.put("/settings")
+@router.put(
+	"/settings",
+	summary="ذخیره تنظیمات FTP پشتیبان",
+	description="مسیر رمز FTP است و در MCP ثبت نشده. خواندن بدون رمز: `get_ftp_backup_settings`.",
+)
 async def save_ftp_settings(
 	request: Request,
 	business_id: int,
@@ -198,7 +206,11 @@ async def save_ftp_settings(
 	return success_response(row_to_public_dict(row), request=request, message="FTP settings saved")
 
 
-@router.delete("/settings")
+@router.delete(
+	"/settings",
+	summary="حذف تنظیمات FTP پشتیبان",
+	description="ابزار MCP: `delete_ftp_backup_settings` (نیازمند تأیید).",
+)
 async def delete_ftp_settings(
 	request: Request,
 	business_id: int,
@@ -213,7 +225,11 @@ async def delete_ftp_settings(
 	return success_response({"deleted": True}, request=request)
 
 
-@router.post("/test")
+@router.post(
+	"/test",
+	summary="تست اتصال FTP پشتیبان",
+	description="ابزار MCP: `test_ftp_backup_saved` (نیازمند تأیید). رمز از MCP پذیرفته نمی‌شود.",
+)
 async def start_ftp_test_job(
 	request: Request,
 	business_id: int,
@@ -238,7 +254,11 @@ async def start_ftp_test_job(
 	return success_response({"job_id": job_id}, request=request, message="FTP test started")
 
 
-@router.post("/usage-scan")
+@router.post(
+	"/usage-scan",
+	summary="اسکن فضای FTP پشتیبان",
+	description="ابزار MCP: `scan_ftp_backup_usage` (نیازمند تأیید).",
+)
 async def start_ftp_usage_job(
 	request: Request,
 	business_id: int,

@@ -504,11 +504,21 @@ class Hesabix_V2_Updater {
 			$sections['description'] = esc_html__('اتصال ووکامرس به نسخهٔ جدید حسابیکس با API پیشرفته.', 'hesabix-v2');
 		}
 
+		$plugin_name = isset($info['name']) ? (string) $info['name'] : 'Hesabix V2: WooCommerce';
+		$author_html = '<a href="https://hesabix.ir" target="_blank" rel="noopener">Hesabix</a>';
+		if (class_exists('Hesabix_V2_Brand')) {
+			$plugin_name = Hesabix_V2_Brand::rebrand($plugin_name);
+			$author_html = Hesabix_V2_Brand::rebrand($author_html);
+			foreach ($sections as $section_key => $section_html) {
+				$sections[$section_key] = Hesabix_V2_Brand::rebrand($section_html);
+			}
+		}
+
 		$out = (object) array(
-			'name' => $info['name'],
+			'name' => $plugin_name,
 			'slug' => $dir,
 			'version' => $info['version'],
-			'author' => '<a href="https://hesabix.ir" target="_blank" rel="noopener">Hesabix</a>',
+			'author' => $author_html,
 			'homepage' => !empty($info['homepage']) ? esc_url((string) $info['homepage']) : 'https://hesabix.ir/',
 			'last_updated' => !empty($info['last_updated']) ? (string) $info['last_updated'] : null,
 			'download_link' => !empty($info['download_url']) ? esc_url((string) $info['download_url']) : '',
@@ -517,6 +527,14 @@ class Hesabix_V2_Updater {
 		);
 		if (!empty($info['icons']) && is_array($info['icons'])) {
 			$out->icons = $info['icons'];
+		} elseif (class_exists('Hesabix_V2_Brand')) {
+			$icon = Hesabix_V2_Brand::menu_icon_url();
+			if ($icon !== '') {
+				$out->icons = array(
+					'1x' => $icon,
+					'2x' => $icon,
+				);
+			}
 		}
 		return $out;
 	}

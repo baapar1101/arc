@@ -65,7 +65,7 @@ def _skill_value_error(e: ValueError) -> None:
     raise ApiError(code, code, http_status=400)
 
 
-@router.get("/ai/skills/marketplace/packages/{package_id}", summary="جزئیات مهارت مارکت‌پلیس")
+@router.get("/ai/skills/marketplace/packages/{package_id}", summary="جزئیات مهارت مارکت‌پلیس", description="ابزار MCP: `get_ai_skill_package`.")
 async def marketplace_get_package(
     request: Request,
     package_id: int,
@@ -105,6 +105,7 @@ async def marketplace_get_package(
 @router.post(
     "/businesses/{business_id}/ai/skills/install-anthropic",
     summary="نصب مهارت prebuilt Anthropic",
+    description="ابزار MCP: `install_anthropic_ai_skill` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def install_anthropic_skill(
@@ -139,6 +140,7 @@ async def install_anthropic_skill(
 @router.post(
     "/ai/skills/marketplace/packages/{package_id}/reviews",
     summary="ثبت امتیاز برای مهارت",
+    description="امتیاز کاربر است و در MCP ثبت نشده. جزئیات: `get_ai_skill_package`.",
 )
 async def post_review(
     request: Request,
@@ -167,7 +169,7 @@ async def post_review(
     )
 
 
-@router.get("/ai/skills/catalog/anthropic", summary="کاتالوگ مهارت‌های prebuilt Anthropic")
+@router.get("/ai/skills/catalog/anthropic", summary="کاتالوگ مهارت‌های prebuilt Anthropic", description="ابزار MCP: `list_anthropic_skill_catalog`.")
 async def anthropic_skill_catalog(
     request: Request,
     ctx: AuthContext = Depends(get_current_user),
@@ -179,7 +181,11 @@ async def anthropic_skill_catalog(
     )
 
 
-@router.get("/ai/skills/marketplace/packages", summary="لیست مهارت‌های منتشرشده")
+@router.get(
+    "/ai/skills/marketplace/packages",
+    summary="لیست مهارت‌های منتشرشده",
+    description="ابزار MCP: `list_ai_skill_marketplace`.",
+)
 async def marketplace_list(
     request: Request,
     db: Session = Depends(get_db),
@@ -205,6 +211,7 @@ async def marketplace_list(
 @router.get(
     "/businesses/{business_id}/ai/skills/installed",
     summary="مهارت‌های نصب‌شده در کسب‌وکار",
+    description="ابزار MCP: `list_installed_ai_skills`.",
 )
 @require_business_access("business_id")
 async def list_business_installed(
@@ -225,6 +232,7 @@ async def list_business_installed(
 @router.get(
     "/businesses/{business_id}/ai/skills/owned",
     summary="مهارت‌های مالکیت کسب‌وکار (برای انتشار)",
+    description="ابزار MCP: `list_owned_ai_skills`.",
 )
 @require_business_access("business_id")
 async def list_business_owned(
@@ -251,6 +259,7 @@ async def list_business_owned(
 @router.get(
     "/businesses/{business_id}/ai/skills/publisher/revenue",
     summary="گزارش درآمد ناشر مهارت‌های AI",
+    description="ابزار MCP: `get_ai_skill_publisher_revenue`.",
 )
 @require_business_access("business_id")
 async def publisher_revenue(
@@ -272,6 +281,7 @@ async def publisher_revenue(
 @router.post(
     "/businesses/{business_id}/ai/skills/import",
     summary="import مهارت از ZIP (agentskills.io)",
+    description="آپلود باینری ZIP است و در MCP ثبت نشده. Git: `import_ai_skill_from_git`.",
 )
 @require_business_access("business_id")
 async def import_zip(
@@ -303,6 +313,7 @@ async def import_zip(
 @router.post(
     "/businesses/{business_id}/ai/skills/import-git",
     summary="import مهارت از URL مخزن GitHub",
+    description="ابزار MCP: `import_ai_skill_from_git` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def import_git(
@@ -335,6 +346,7 @@ async def import_git(
 @router.post(
     "/businesses/{business_id}/ai/skills/purchase",
     summary="خرید مهارت پولی (قبل از نصب)",
+    description="ابزار MCP: `purchase_ai_skill` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def purchase_skill(
@@ -362,6 +374,7 @@ async def purchase_skill(
 @router.post(
     "/businesses/{business_id}/ai/skills",
     summary="ایجاد مهارت بومی (hesabix_native)",
+    description="ابزار MCP: `create_native_ai_skill` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_skill(
@@ -395,6 +408,7 @@ async def create_skill(
 @router.post(
     "/businesses/{business_id}/ai/skills/install",
     summary="نصب مهارت در کسب‌وکار",
+    description="ابزار MCP: `install_ai_skill` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def install_skill(
@@ -426,6 +440,7 @@ async def install_skill(
 @router.put(
     "/businesses/{business_id}/ai/skills/enabled",
     summary="فعال/غیرفعال کردن داینامیک مهارت‌های نصب‌شده",
+    description="ابزار MCP: `set_ai_skills_enabled` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_enabled(
@@ -451,6 +466,7 @@ async def update_enabled(
 @router.post(
     "/businesses/{business_id}/ai/skills/{package_id}/publish",
     summary="ارسال مهارت به مارکت‌پلیس (pending_review)",
+    description="ابزار MCP: `publish_ai_skill` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def publish_skill(
@@ -487,6 +503,7 @@ async def publish_skill(
 @router.get(
     "/businesses/{business_id}/ai/skills/packages/{package_id}",
     summary="جزئیات بسته مهارت",
+    description="ابزار MCP: `get_ai_skill_package`.",
 )
 @require_business_access("business_id")
 async def get_package(

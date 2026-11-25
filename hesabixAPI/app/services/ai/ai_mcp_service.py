@@ -8,14 +8,83 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from app.core.auth_dependency import AuthContext
-from app.services.ai.ai_write_guard import is_readonly_function
+from app.core.ai_mcp_plugin_dependency import (
+    STATUS_TOOL_NAME,
+    get_ai_mcp_plugin_access,
+    inject_mcp_status_tool,
+    mcp_plugin_inactive_instructions,
+    mcp_status_catalog_item,
+    public_ai_mcp_plugin_access,
+    restricted_mcp_tool_list,
+)
+from app.services.ai.ai_mcp_discovery import (
+    AGENT_TOOL_NAME,
+    WRITE_SCOPE,
+    mcp_readonly as _mcp_readonly,
+    mcp_visible_definitions as _get_tools,
+    visible_tool_catalog as _visible_tool_catalog,
+)
 
 logger = logging.getLogger(__name__)
 MCP_PROTOCOL_VERSION = "2025-11-25"
 SERVER_NAME = "hesabix-ai"
-SERVER_VERSION = "1.1.0"
-WRITE_SCOPE = "ai:tools:write"
-AGENT_TOOL_NAME = "ask_hesabix_agent"
+SERVER_VERSION = "1.9.0"
+_ACTIVE_MCP_INSTRUCTIONS = (
+    "Tools operate only on the business and current user's permissions bound to this credential. "
+    "Read hesabix://mcp/capabilities to discover this connection's tools. "
+    "Write operations require a granted ai:tools:write scope and the user's current domain permission. "
+    "If get_ai_mcp_plugin_status reports the MCP add-on is inactive or expired, tell the user and do not invent business data."
+)
+
+_PROMPT_CATALOG = {
+    "business_summary": ("خلاصه مدیریتی کسب‌وکار", "business", "وضعیت کلی و شاخص‌های مدیریتی کسب‌وکار را جمع‌بندی کن."),
+    "sales_review": ("مرور فروش", "financial", "فروش، فاکتورها، دریافت‌ها و روندهای قابل مشاهده را مرور کن."),
+    "inventory_review": ("مرور موجودی", "warehouse", "موجودی، کالاهای کم‌موجود و اسناد انبار را بررسی کن."),
+    "receivables_review": ("مرور مطالبات", "financial", "مانده حساب مشتریان و دریافت‌های ثبت‌شده را بر اساس ابزارهای مجاز بررسی کن."),
+    "payables_review": ("مرور بدهی‌ها", "financial", "مانده حساب تأمین‌کنندگان و پرداخت‌های ثبت‌شده را بر اساس ابزارهای مجاز بررسی کن."),
+    "payroll_review": ("مرور حقوق و دستمزد", "payroll", "وضعیت دوره‌ها و اجراهای حقوق، جمع ناخالص/کسورات/خالص و وضعیت تأیید یا ثبت را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. داده بانکی، شناسه مالیاتی یا جزئیات فردی را فقط وقتی درخواست شده و برای پاسخ لازم است نمایش بده؛ هیچ اجرا را تأیید، قطعی یا پرداخت نکن مگر کاربر همان عملیات را صریحاً درخواست کند."),
+    "office_automation_review": ("مرور کارتابل اتوماسیون اداری", "office_automation", "کارتابل سمت فعال، پیش‌نویس، ارجاع، پاراف، پیوست و دبیرخانه را فقط با ابزارهای مجاز همین کسب‌وکار بررسی کن. نامه را فقط وقتی درخواست شده ثبت، ارجاع، پاراف یا بایگانی کن؛ سمت فعال را از list_my_oa_positions بگیر و as_position_id را در هر عملیات بنویس. پیشنهاد ارجاع را بدون refer_oa_letter برنگردان به اجرا. پیش‌نویس فرآیند از متن منتشر نمی‌شود. هر عمل نوشتنی تا تأیید میز کار اجرا نمی‌شود."),
+    "procurement_review": ("مرور تدارکات", "procurement", "درخواست، استعلام، سفارش، رسید، تطبیق فاکتور، بودجه و امتیاز تأمین‌کننده را فقط از ابزارهای مجاز همین کسب‌وکار بخوان. سفارش، رسید، فاکتور و انتخاب برنده را فقط با درخواست صریح و تأیید کاربر انجام بده. کمترین قیمت را بدون دلیل جایزه نکن."),
+    "crm_review": ("مرور CRM", "crm", "سرنخ‌ها، فرصت‌ها، فعالیت‌ها، توالی‌های پیگیری و قیف فروش را مرور کن؛ ثبت‌نام یا تغییر توالی را فقط در صورت درخواست روشن انجام بده."),
+    "repair_review": ("مرور تعمیرگاه", "repair", "سفارش‌های تعمیر و وضعیت، تعمیرکار، قطعات و هزینه را از ابزارهای مجاز کسب‌وکار بررسی کن. پیش از تغییر وضعیت، اعلان به مشتری، مصرف قطعه، اتمام/تحویل یا صدور فاکتور، اثر عملیات و سفارش دقیق را بیان کن و تأیید صریح بگیر."),
+    "warranty_review": ("مرور گارانتی", "warranty", "کدها و وضعیت گارانتی را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. اطلاعات تماس مشتری و کد لینک رهگیری را در پاسخ عادی نمایش نده. پیش از تولید کد، تغییر تنظیمات یا حذف، دامنه اثر را شرح بده و تأیید صریح بگیر؛ فعال‌سازی عمومی گارانتی را از طرف مشتری انجام نده."),
+    "production_review": ("مرور تولید", "production", "وضعیت سفارش‌های تولید، مواد موردنیاز، lot و بهای تمام‌شده را از ابزارهای مجاز بررسی کن. BOM را فقط با محصولات همان کسب‌وکار به کار ببر. آزادسازی، شروع، تکمیل یا لغو سفارش می‌تواند روی موجودی اثر بگذارد؛ پیش از هر اقدام اثر، شناسه سفارش و نسخه را روشن کن و تأیید صریح بگیر."),
+    "advanced_production_review": ("مرور تولید پیشرفته", "advanced_production", "گزارش‌های افزونه تولید پیشرفته را فقط اگر ابزارهای advanced_production در این اتصال هستند بخوان. روش بها فقط گزارش است و دفتر کل را عوض نمی‌کند. اگر ابزار در دسترس نیست بگو افزونه فعال نیست."),
+    "distribution_review": ("مرور توزیع", "distribution", "برنامه ویزیت، مسیرها، سفارش‌ها، مرجوعی، موجودی خودرو، تسویه و تحویل را فقط با ابزارهای مجاز همین کسب‌وکار بررسی کن. عملیات توزیع می‌تواند فاکتور، سند انبار، پرداخت، اطلاعات مکانی یا ارتباط با مشتری ایجاد کند؛ اثر و رکورد هدف را پیش از نوشتن مشخص کن و تأیید صریح بگیر. داده مکانی و اطلاعات مشتری را فقط در پاسخ لازم به درخواست کاربر نمایش بده."),
+    "invoice_draft": ("آماده‌سازی فاکتور", "invoices", "اطلاعات لازم برای ثبت فاکتور را جمع‌آوری و پیش‌نویس ورودی ابزار را آماده کن."),
+    "tax_review": ("بررسی وضعیت مالیاتی فاکتورها", "tax", "وضعیت کارپوشه، خطاهای ارسال و اعتبار اطلاعات مالیاتی فاکتورهای انتخابی را بررسی کن. پیش از هر ارسال، ابطال یا استعلام بیرونی، اثر عملیات و شناسهٔ فاکتور را روشن کن و تأیید صریح بگیر."),
+    "warehouse_document": ("آماده‌سازی حواله انبار", "warehouse", "اطلاعات لازم برای حواله را جمع‌آوری و پیش‌نویس ورودی ابزار را آماده کن."),
+}
+_PROMPT_CATEGORY_ALIASES = {
+    "financial": {"financial", "invoices", "checks", "accounting"},
+}
+
+
+def _prompt_category_available(category: str, visible: set[str]) -> bool:
+    return bool((_PROMPT_CATEGORY_ALIASES.get(category) or {category}) & visible)
+
+
+def _prompt_content(name: str, title: str, goal: str, user_request: str, catalog: list[dict[str, Any]]) -> str:
+    categories = sorted({item["category"] for item in catalog})
+    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "office_automation", "procurement", "repair", "production", "advanced_production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
+    tool_names = ", ".join(item["name"] for item in tools[:100]) or "هیچ ابزار دامنه‌ای در این اتصال مجاز نیست"
+    text = (
+        f"{title}. {goal}\n"
+        "فقط به کسب‌وکار متصل‌شده و ابزارهای صریحاً در دسترس این اتصال محدود هستی. "
+        "فهرست ابزارها را از منبع hesabix://mcp/capabilities بخوان و فقط نام‌ها و پارامترهای همان ابزارها را استفاده کن؛ "
+        "وجود یک قابلیت در نرم‌افزار به معنی مجاز بودن آن برای این اتصال نیست.\n"
+        f"دسته‌های قابل مشاهده: {', '.join(categories) or 'هیچ‌کدام'}.\n"
+        f"ابزارهای اصلی قابل مشاهده: {tool_names}.\n"
+        "برای پاسخ تحلیلی، داده را از ابزارهای خواندنی بگیر، بازه و واحد را روشن کن، محاسبه را از دادهٔ واقعی جدا کن و اگر ابزار یا داده کافی نیست صریح بگو. "
+        "شناسه‌ها را با جستجو به دست بیاور و حدس نزن. هیچ تغییری در داده‌ها ایجاد نکن مگر کاربر در همین گفتگو صریحاً همان تغییر را درخواست کرده باشد. "
+        "پیش از هر فراخوانی نوشتنی، اقدام دقیق و آرگومان‌های مهم را به کاربر نشان بده و تا تأیید صریح و اختصاصی همان عملیات صبر کن؛ مجوز write اتصال تأیید آن تراکنش نیست. "
+        "هر عمل نوشتنی اتوماسیون اداری تا وقتی همان کاربر آن را در میز کار تأیید نکرده اجرا نمی‌شود. شناسه تأیید را فقط پس از تأیید میز کار بفرست. پرچم داخل آرگومان مجوز نیست. "
+        "برای نوشتنی‌های خارج از اتوماسیون اداری، سرور تأیید موردی را مستقلاً راستی‌آزمایی نمی‌کند. "
+        "هرگز محدودیت مجوز، تأیید یا tenant را دور نزن."
+    )
+    if user_request.strip():
+        text += "\nدرخواست تکمیلی کاربر: " + user_request.strip()
+    return text
 
 
 def prepare_mcp_tool_arguments(arguments: Dict[str, Any], *, business_id: int) -> Dict[str, Any]:
@@ -23,6 +92,7 @@ def prepare_mcp_tool_arguments(arguments: Dict[str, Any], *, business_id: int) -
     cleaned = dict(arguments or {})
     cleaned.pop("_approve_writes", None)
     cleaned.pop("approve_writes", None)
+    cleaned.pop("user_id", None)
     if "business_id" in cleaned:
         cleaned["business_id"] = int(business_id)
     return cleaned
@@ -31,20 +101,6 @@ def prepare_mcp_tool_arguments(arguments: Dict[str, Any], *, business_id: int) -
 def mcp_explicit_write_approval(params: Dict[str, Any]) -> bool:
     """Kept for old callers; an RPC boolean is never an authorization signal."""
     return False
-
-
-def _mcp_readonly(name: str, registry: Any) -> bool:
-    """Fail closed if registry metadata is missing or internally inconsistent."""
-    function = registry.get_function(name)
-    if function is None:
-        return False
-    return bool(
-        is_readonly_function(name, registry)
-        and not getattr(function, "requires_approval", False)
-        and not getattr(function, "intent_write", False)
-        and not getattr(function, "always_confirm", False)
-        and getattr(function, "side_effect", "none") in {None, "none", "read"}
-    )
 
 
 def _jsonrpc_result(req_id: Any, result: Any) -> Dict[str, Any]:
@@ -56,6 +112,99 @@ def _jsonrpc_error(req_id: Any, code: int, message: str, data: Any = None) -> Di
     if data is not None:
         err["data"] = data
     return {"jsonrpc": "2.0", "id": req_id, "error": err}
+
+
+def _validate_schema_value(value: Any, schema: Dict[str, Any], path: str = "arguments") -> None:
+    """Validate the JSON Schema subset used by registered MCP tools, without optional runtime deps."""
+    if not isinstance(schema, dict):
+        raise ValueError(f"Invalid schema for {path}")
+    for branch_key in ("oneOf", "anyOf"):
+        branches = schema.get(branch_key)
+        if branches:
+            errors = []
+            for branch in branches:
+                try:
+                    _validate_schema_value(value, branch, path)
+                    return
+                except ValueError as exc:
+                    errors.append(str(exc))
+            raise ValueError(f"{path} does not match {branch_key}")
+    expected = schema.get("type")
+    expected_types = expected if isinstance(expected, list) else ([expected] if expected else [])
+    type_matches = {
+        "object": lambda v: isinstance(v, dict),
+        "array": lambda v: isinstance(v, list),
+        "string": lambda v: isinstance(v, str),
+        "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+        "boolean": lambda v: isinstance(v, bool),
+        "null": lambda v: v is None,
+    }
+    if expected_types and not any(type_matches.get(t, lambda _v: True)(value) for t in expected_types):
+        raise ValueError(f"{path} must be {' or '.join(expected_types)}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"{path} must be one of the allowed values")
+    if isinstance(value, dict):
+        properties = schema.get("properties") or {}
+        missing = [key for key in schema.get("required", []) if key not in value]
+        if missing:
+            raise ValueError(f"{path} is missing required field(s): {', '.join(missing)}")
+        if schema.get("additionalProperties") is False:
+            extras = [key for key in value if key not in properties]
+            if extras:
+                raise ValueError(f"{path} has unsupported field(s): {', '.join(extras)}")
+        for key, child in properties.items():
+            if key in value:
+                _validate_schema_value(value[key], child, f"{path}.{key}")
+        additional = schema.get("additionalProperties")
+        if isinstance(additional, dict):
+            for key, child_value in value.items():
+                if key not in properties:
+                    _validate_schema_value(child_value, additional, f"{path}.{key}")
+    elif isinstance(value, list):
+        if schema.get("minItems") is not None and len(value) < int(schema["minItems"]):
+            raise ValueError(f"{path} has too few items")
+        if schema.get("maxItems") is not None and len(value) > int(schema["maxItems"]):
+            raise ValueError(f"{path} has too many items")
+        if schema.get("uniqueItems"):
+            for index, item in enumerate(value):
+                if any(item == previous for previous in value[:index]):
+                    raise ValueError(f"{path} items must be unique")
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, child_value in enumerate(value):
+                _validate_schema_value(child_value, item_schema, f"{path}[{index}]")
+    elif isinstance(value, str):
+        if schema.get("minLength") is not None and len(value) < int(schema["minLength"]):
+            raise ValueError(f"{path} is too short")
+        if schema.get("maxLength") is not None and len(value) > int(schema["maxLength"]):
+            raise ValueError(f"{path} is too long")
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        if schema.get("minimum") is not None and value < schema["minimum"]:
+            raise ValueError(f"{path} is below the minimum")
+        if schema.get("maximum") is not None and value > schema["maximum"]:
+            raise ValueError(f"{path} is above the maximum")
+        if schema.get("exclusiveMinimum") is not None and value <= schema["exclusiveMinimum"]:
+            raise ValueError(f"{path} must be greater than the exclusive minimum")
+        if schema.get("exclusiveMaximum") is not None and value >= schema["exclusiveMaximum"]:
+            raise ValueError(f"{path} must be less than the exclusive maximum")
+
+
+def _validate_tool_arguments(arguments: Dict[str, Any], schema: Dict[str, Any]) -> Optional[str]:
+    # User identity is injected from the authenticated context; tenant is pinned before validation.
+    properties = schema.get("properties") or {}
+    payload = {
+        key: value
+        for key, value in arguments.items()
+        if key not in {"user_id", "approve_writes", "_approve_writes", "business_id"}
+    }
+    if "business_id" in properties and "business_id" in arguments:
+        payload["business_id"] = arguments["business_id"]
+    try:
+        _validate_schema_value(payload, schema)
+        return None
+    except (ValueError, TypeError) as exc:
+        return str(exc)
 
 
 def _openai_tool_to_mcp(tool_def: Dict[str, Any], registry: Any) -> Dict[str, Any]:
@@ -73,30 +222,6 @@ def _openai_tool_to_mcp(tool_def: Dict[str, Any], registry: Any) -> Dict[str, An
             "openWorldHint": False,
         },
     }
-
-
-def _get_tools(db: Session, ctx: AuthContext, business_id: int) -> tuple[Any, list[dict[str, Any]]]:
-    from app.services.ai.function_registry import AIRole, registry
-
-    context = {
-        "db": db,
-        "user_context": ctx,
-        "business_id": business_id,
-        "session_business_id": business_id,
-    }
-    definitions = registry.get_function_definitions(context)
-    # External business connections must never publish operator/system-wide tools.
-    business_roles = {AIRole.USER, AIRole.BUSINESS_OWNER}
-    definitions = [
-        item
-        for item in definitions
-        if (function := registry.get_function(str((item.get("function") or {}).get("name", ""))))
-        and getattr(function, "enabled", True)
-        and not getattr(function, "deprecated", False)
-        and function.business_context_required
-        and bool(function.allowed_roles & business_roles)
-    ]
-    return registry, definitions
 
 
 async def handle_mcp_request(
@@ -120,6 +245,13 @@ async def handle_mcp_request(
     if not eff_business:
         return _jsonrpc_error(req_id, -32001, "Business-bound MCP credential required")
 
+    plugin_access = get_ai_mcp_plugin_access(db, eff_business)
+    channel_open = bool(plugin_access.get("is_active"))
+    mcp_instructions = (
+        _ACTIVE_MCP_INSTRUCTIONS if channel_open else mcp_plugin_inactive_instructions(plugin_access)
+    )
+    plugin_public = public_ai_mcp_plugin_access(plugin_access)
+
     request_meta = params.get("_meta") if isinstance(params, dict) else None
     modern = isinstance(request_meta, dict) and request_meta.get("io.modelcontextprotocol/protocolVersion") == "2026-07-28"
 
@@ -133,9 +265,9 @@ async def handle_mcp_request(
                 "resources": {"subscribe": False, "listChanged": False},
                 "prompts": {"listChanged": False},
             },
-            "instructions": "Tools are restricted to the business bound to this credential. Write tools require explicit owner consent.",
-            "ttlMs": 300000,
-            "cacheScope": "public",
+            "instructions": mcp_instructions,
+            "ttlMs": 0 if not channel_open else 300000,
+            "cacheScope": "private" if not channel_open else "public",
         })
 
     if method == "initialize":
@@ -154,7 +286,7 @@ async def handle_mcp_request(
                     "prompts": {"listChanged": False},
                 },
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-                "instructions": "Tools operate only on the business bound to this credential. Read tools are available by default; write tools require a separately granted ai:tools:write connection scope.",
+                "instructions": mcp_instructions,
             },
         )
 
@@ -165,20 +297,60 @@ async def handle_mcp_request(
         return _jsonrpc_result(req_id, {})
 
     if method == "resources/list":
-        return _jsonrpc_result(req_id, {
-            "resources": [{
+        if not channel_open:
+            resources = [{
+                "uri": "hesabix://mcp/capabilities",
+                "name": "وضعیت افزونه MCP",
+                "description": str(plugin_public.get("message") or ""),
+                "mimeType": "application/json",
+            }]
+        else:
+            resources = [{
                 "uri": "hesabix://business/overview",
                 "name": "نمای کلی کسب‌وکار",
                 "description": "اطلاعات پایه کسب‌وکاری که این اتصال به آن محدود است.",
                 "mimeType": "application/json",
-            }],
+            }, {
+                "uri": "hesabix://mcp/capabilities",
+                "name": "قابلیت‌های مجاز اتصال",
+                "description": "فهرست ابزارها، دسته‌ها، نوع اثر و مجوزهای لازم که برای همین کاربر و اتصال قابل استفاده‌اند.",
+                "mimeType": "application/json",
+            }]
+        return _jsonrpc_result(req_id, {
+            "resources": resources,
             **({"resultType": "complete", "ttlMs": 0, "cacheScope": "private"} if modern else {}),
         })
 
     if method == "resources/read":
         uri = params.get("uri")
+        if uri == "hesabix://mcp/capabilities":
+            catalog = (
+                [mcp_status_catalog_item(plugin_access)]
+                if not channel_open
+                else _visible_tool_catalog(db, ctx, eff_business)
+            )
+            categories: Dict[str, int] = {}
+            for item in catalog:
+                categories[item["category"]] = categories.get(item["category"], 0) + 1
+            content = json.dumps({
+                "business_id": eff_business,
+                "plugin": plugin_public,
+                "tool_count": len(catalog),
+                "categories": categories,
+                "tools": catalog,
+            }, ensure_ascii=False)
+            return _jsonrpc_result(req_id, {
+                "contents": [{"uri": uri, "mimeType": "application/json", "text": content}],
+                **({"resultType": "complete"} if modern else {}),
+            })
         if uri != "hesabix://business/overview":
             return _jsonrpc_error(req_id, -32602, "Resource not found")
+        if not channel_open:
+            content = json.dumps({"plugin": plugin_public}, ensure_ascii=False)
+            return _jsonrpc_result(req_id, {
+                "contents": [{"uri": uri, "mimeType": "application/json", "text": content}],
+                **({"resultType": "complete"} if modern else {}),
+            })
         from adapters.db.models.business import Business
 
         business = db.query(Business).filter(
@@ -191,6 +363,7 @@ async def handle_mcp_request(
             "name": business.name,
             "type": business.business_type.value if hasattr(business.business_type, "value") else str(business.business_type),
             "field": business.business_field.value if hasattr(business.business_field, "value") else str(business.business_field),
+            "plugin": plugin_public,
         }, ensure_ascii=False)
         return _jsonrpc_result(req_id, {
             "contents": [{"uri": uri, "mimeType": "application/json", "text": content}],
@@ -198,10 +371,21 @@ async def handle_mcp_request(
         })
 
     if method == "prompts/list":
+        if not channel_open:
+            return _jsonrpc_result(req_id, {
+                "prompts": [],
+                **({"resultType": "complete", "ttlMs": 0, "cacheScope": "private"} if modern else {}),
+            })
+        catalog = _visible_tool_catalog(db, ctx, eff_business)
+        categories = {item["category"] for item in catalog}
         prompts = [
-            {"name": "business_summary", "description": "تهیهٔ خلاصه مدیریتی از وضعیت کسب‌وکار با ابزارهای مجاز."},
-            {"name": "sales_review", "description": "بررسی روند فروش و نکات قابل پیگیری در کسب‌وکار جاری."},
-            {"name": "inventory_review", "description": "مرور وضعیت موجودی و شناسایی موارد نیازمند توجه."},
+            {
+                "name": name,
+                "description": f"{title} با اتکا به ابزارهای مجاز این اتصال.",
+                "arguments": [{"name": "request", "description": "درخواست تکمیلی کاربر (اختیاری)", "required": False}],
+            }
+            for name, (title, category, _goal) in _PROMPT_CATALOG.items()
+            if _prompt_category_available(category, categories) or (name == "business_summary" and bool(catalog))
         ]
         return _jsonrpc_result(req_id, {
             "prompts": prompts,
@@ -210,51 +394,56 @@ async def handle_mcp_request(
 
     if method == "prompts/get":
         prompt_name = params.get("name")
-        prompt_titles = {
-            "business_summary": "خلاصه مدیریتی کسب‌وکار",
-            "sales_review": "مرور فروش",
-            "inventory_review": "مرور موجودی",
-        }
-        if prompt_name not in prompt_titles:
+        prompt_config = _PROMPT_CATALOG.get(prompt_name)
+        if not prompt_config:
             return _jsonrpc_error(req_id, -32602, "Prompt not found")
         arguments = params.get("arguments") or {}
-        user_request = arguments.get("request", "") if isinstance(arguments, dict) else ""
+        if not isinstance(arguments, dict) or set(arguments) - {"request"}:
+            return _jsonrpc_error(req_id, -32602, "Invalid prompt arguments")
+        user_request = arguments.get("request", "")
         if not isinstance(user_request, str) or len(user_request) > 2000:
             return _jsonrpc_error(req_id, -32602, "Invalid prompt arguments")
-        prompt_text = (
-            f"{prompt_titles[prompt_name]} برای همان کسب‌وکاری که این MCP به آن متصل است تهیه کن. "
-            "فقط از ابزارهای حسابیکس در دسترس استفاده کن؛ داده‌ای از کسب‌وکار دیگری نخواه و اگر داده‌ای در دسترس نیست صریح بگو. "
-            "هیچ عملیات تغییردهنده‌ای اجرا نکن مگر کاربر در همان گفتگو صریحاً درخواست کند و ابزار مربوطه مجاز باشد."
-        )
-        if user_request.strip():
-            prompt_text += "\nدرخواست تکمیلی کاربر: " + user_request.strip()
+        prompt_title, prompt_category, prompt_goal = prompt_config
+        if not channel_open:
+            return _jsonrpc_error(req_id, -32602, "Prompt is not available for this connection")
+        catalog = _visible_tool_catalog(db, ctx, eff_business)
+        visible_categories = {item["category"] for item in catalog}
+        if not _prompt_category_available(prompt_category, visible_categories) and not (prompt_name == "business_summary" and bool(catalog)):
+            return _jsonrpc_error(req_id, -32602, "Prompt is not available for this connection")
+        prompt_text = _prompt_content(prompt_name, prompt_title, prompt_goal, user_request.strip(), catalog)
         return _jsonrpc_result(req_id, {
-            "description": prompt_titles[prompt_name],
+            "description": prompt_title,
             "messages": [{"role": "user", "content": {"type": "text", "text": prompt_text}}],
             **({"resultType": "complete"} if modern else {}),
         })
 
     if method == "tools/list":
-        registry, definitions = _get_tools(db, ctx, eff_business)
-        tools = []
-        for definition in definitions:
-            tool = _openai_tool_to_mcp(definition, registry)
-            if tool["annotations"]["readOnlyHint"] or WRITE_SCOPE in getattr(ctx, "mcp_scopes", set()):
-                tools.append(tool)
-        tools.append(
-            {
-                "name": AGENT_TOOL_NAME,
-                "description": "پرسش چندمرحله‌ای از ایجنت حسابیکس؛ ایجنت ابزارهای مجاز و فقط‌خواندنی همین کسب‌وکار را انتخاب و ترکیب می‌کند.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"query": {"type": "string", "description": "درخواست یا پرسش درباره همین کسب‌وکار"}},
-                    "required": ["query"],
-                    "additionalProperties": False,
-                },
-                "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
-            }
-        )
-        tools.sort(key=lambda item: item["name"])
+        if not channel_open:
+            tools = restricted_mcp_tool_list(plugin_access)
+        else:
+            registry, definitions = _get_tools(db, ctx, eff_business)
+            tools = []
+            for definition in definitions:
+                tool = _openai_tool_to_mcp(definition, registry)
+                if tool["annotations"]["readOnlyHint"] or WRITE_SCOPE in getattr(ctx, "mcp_scopes", set()):
+                    tools.append(tool)
+            # The internal agent discovers tools independently. Hide it for scoped
+            # OAuth grants so it cannot bypass the per-tool allowlist.
+            if getattr(ctx, "mcp_tool_permissions", None) is None:
+                tools.append(
+                    {
+                        "name": AGENT_TOOL_NAME,
+                        "description": "پرسش چندمرحله‌ای از ایجنت حسابیکس؛ ایجنت ابزارهای مجاز و فقط‌خواندنی همین کسب‌وکار را انتخاب و ترکیب می‌کند.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {"query": {"type": "string", "description": "درخواست یا پرسش درباره همین کسب‌وکار"}},
+                            "required": ["query"],
+                            "additionalProperties": False,
+                        },
+                        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
+                    }
+                )
+            tools = inject_mcp_status_tool(tools, plugin_access)
         cursor = params.get("cursor")
         try:
             offset = max(0, int(cursor)) if cursor is not None else 0
@@ -275,14 +464,40 @@ async def handle_mcp_request(
         if not isinstance(name, str) or not name or not isinstance(arguments, dict):
             return _jsonrpc_error(req_id, -32602, "Invalid tool name or arguments")
 
+        if name == STATUS_TOOL_NAME:
+            return _jsonrpc_result(
+                req_id,
+                {
+                    "content": [{"type": "text", "text": json.dumps(plugin_public, ensure_ascii=False)}],
+                    "isError": False,
+                    **({"resultType": "complete"} if modern else {}),
+                },
+            )
+        if not channel_open:
+            return _jsonrpc_result(
+                req_id,
+                {
+                    "content": [{"type": "text", "text": str(plugin_public.get("message") or "")}],
+                    "isError": True,
+                    **({"resultType": "complete"} if modern else {}),
+                },
+            )
+
         registry, definitions = _get_tools(db, ctx, eff_business)
         available = {str((item.get("function") or {}).get("name")): item for item in definitions}
-        if name == AGENT_TOOL_NAME:
+        if name == AGENT_TOOL_NAME and getattr(ctx, "mcp_tool_permissions", None) is None:
             available[name] = {"function": {"name": name}}
         if name not in available:
             return _jsonrpc_error(req_id, -32602, "Tool not found or not permitted")
         if name != AGENT_TOOL_NAME and not _mcp_readonly(name, registry) and WRITE_SCOPE not in getattr(ctx, "mcp_scopes", set()):
             return _jsonrpc_error(req_id, -32003, "This MCP connection is read-only; create a separately authorized write connection.")
+        safe_arguments = prepare_mcp_tool_arguments(arguments, business_id=eff_business)
+        confirmation_id = safe_arguments.pop("confirmation_id", None)
+        if name != AGENT_TOOL_NAME:
+            tool_schema = (available[name].get("function") or {}).get("parameters") or {"type": "object"}
+            schema_error = _validate_tool_arguments(safe_arguments, tool_schema)
+            if schema_error:
+                return _jsonrpc_error(req_id, -32602, "Invalid tool arguments", {"reason": schema_error})
 
         logger.info(
             "mcp_tool_call_started diagnostic_id=%s tool=%s connection_id=%s user_id=%s business_id=%s",
@@ -292,7 +507,6 @@ async def handle_mcp_request(
             ctx.get_user_id(),
             eff_business,
         )
-        safe_arguments = prepare_mcp_tool_arguments(arguments, business_id=eff_business)
         context = {
             "user_context": ctx,
             "business_id": eff_business,
@@ -325,6 +539,27 @@ async def handle_mcp_request(
                 return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": str(rendered)}], "isError": False, **({"resultType": "complete"} if modern else {})})
 
             from app.services.ai.ai_db_helpers import run_ai_registry_function
+            from app.services.oa_mcp_confirmation import gate_sensitive_oa_call
+
+            held = gate_sensitive_oa_call(
+                db,
+                registry,
+                name,
+                safe_arguments,
+                user_id=ctx.get_user_id(),
+                business_id=eff_business,
+                connection_id=getattr(ctx, "mcp_connection_id", None),
+                confirmation_id=confirmation_id,
+            )
+            if held is not None:
+                return _jsonrpc_result(
+                    req_id,
+                    {
+                        "content": [{"type": "text", "text": json.dumps(held, ensure_ascii=False, default=str)}],
+                        "isError": True,
+                        **({"resultType": "complete"} if modern else {}),
+                    },
+                )
 
             result = run_ai_registry_function(name, safe_arguments, context)
             text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)

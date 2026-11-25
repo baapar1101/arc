@@ -10,6 +10,7 @@ Friend Class BaseDataTransferService
     Private Const BulkChunkSizeWithOpeningBalance As Integer = 50
 
     Public Event ProgressChanged As EventHandler(Of TransferProgressEventArgs)
+    Private _ignoreCompleted As Boolean
 
     Public Async Function RunAsync(
         session As MigrationSession,
@@ -18,8 +19,10 @@ Friend Class BaseDataTransferService
         currencyId As Integer,
         Optional resetCheckpoint As Boolean = False,
         Optional skipOpeningBalances As Boolean = False,
-        Optional ct As CancellationToken = Nothing
+        Optional ct As CancellationToken = Nothing,
+        Optional ignoreCompleted As Boolean = False
     ) As Task(Of String)
+        _ignoreCompleted = ignoreCompleted
         Dim businessId = session.SelectedBusiness.Id
         Dim store As New CheckpointStore(businessId, session.SelectedDatabase)
         If resetCheckpoint Then store.Reset()
@@ -54,7 +57,7 @@ Friend Class BaseDataTransferService
     Private Async Function TransferWarehouses(session As MigrationSession, api As HesabixApiClient, businessId As Integer, cp As TransferCheckpoint, store As CheckpointStore, ct As CancellationToken) As Task
         Dim key = MigrationModule.Warehouses.ToString()
         Dim modCp = cp.EnsureModule(key)
-        If modCp.Completed Then
+        If modCp.Completed AndAlso Not _ignoreCompleted Then
             RaiseProgress("انبارها", 0, 0, "قبلاً کامل شده — رد شد")
             Return
         End If
@@ -136,7 +139,7 @@ Friend Class BaseDataTransferService
     Private Async Function TransferPersons(session As MigrationSession, api As HesabixApiClient, businessId As Integer, cp As TransferCheckpoint, store As CheckpointStore, skipOpeningBalances As Boolean, ct As CancellationToken) As Task
         Dim key = MigrationModule.Persons.ToString()
         Dim modCp = cp.EnsureModule(key)
-        If modCp.Completed Then
+        If modCp.Completed AndAlso Not _ignoreCompleted Then
             RaiseProgress("اشخاص", 0, 0, "قبلاً کامل شده — رد شد")
             Return
         End If
@@ -405,7 +408,7 @@ Friend Class BaseDataTransferService
     Private Async Function TransferBanks(session As MigrationSession, api As HesabixApiClient, businessId As Integer, currencyId As Integer, cp As TransferCheckpoint, store As CheckpointStore, ct As CancellationToken) As Task
         Dim key = MigrationModule.BankAccounts.ToString()
         Dim modCp = cp.EnsureModule(key)
-        If modCp.Completed Then
+        If modCp.Completed AndAlso Not _ignoreCompleted Then
             RaiseProgress("حساب بانکی", 0, 0, "قبلاً کامل شده — رد شد")
             Return
         End If
@@ -448,7 +451,7 @@ Friend Class BaseDataTransferService
         Dim modKey = If(isRegister, MigrationModule.CashRegisters, MigrationModule.PettyCash).ToString()
         Dim title = If(isRegister, "صندوق", "تنخواه")
         Dim modCp = cp.EnsureModule(modKey)
-        If modCp.Completed Then
+        If modCp.Completed AndAlso Not _ignoreCompleted Then
             RaiseProgress(title, 0, 0, "قبلاً کامل شده — رد شد")
             Return
         End If
@@ -491,7 +494,7 @@ Friend Class BaseDataTransferService
     Private Async Function TransferProducts(session As MigrationSession, api As HesabixApiClient, businessId As Integer, warehouseMap As ModuleCheckpoint, cp As TransferCheckpoint, store As CheckpointStore, skipOpeningBalances As Boolean, ct As CancellationToken) As Task
         Dim key = MigrationModule.Products.ToString()
         Dim modCp = cp.EnsureModule(key)
-        If modCp.Completed Then
+        If modCp.Completed AndAlso Not _ignoreCompleted Then
             RaiseProgress("کالا", 0, 0, "قبلاً کامل شده — رد شد")
             Return
         End If

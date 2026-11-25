@@ -2225,7 +2225,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get systemSettingsDescription =>
-      'Manage system configuration and administration';
+      'Frequent tasks are at the top. Open a category or search for the rest.';
 
   @override
   String get storageManagement => 'Storage Management';
@@ -2732,6 +2732,256 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inquiries => 'Inquiries';
 
   @override
+  String get quickSalesMenu => 'Quick sales';
+
+  @override
+  String get productBundlesMenu => 'Product bundles';
+
+  @override
+  String get catalogSpecFieldsMenu => 'Supply spec templates';
+
+  @override
+  String get warehouseDocsMenu => 'Warehouse documents';
+
+  @override
+  String get stockCountMenu => 'Stock count';
+
+  @override
+  String get quickSalesStockDiscrepanciesMenu =>
+      'Quick sales stock discrepancies';
+
+  @override
+  String get goodsExpenseIncomeMenu => 'Expensed / income goods';
+
+  @override
+  String get productionOrdersMenu => 'Production orders';
+
+  @override
+  String get aiMenu => 'Artificial intelligence';
+
+  @override
+  String get aiAssistantMenu => 'AI assistant';
+
+  @override
+  String get aiSubscriptionMenu => 'AI subscription';
+
+  @override
+  String get aiUsageMenu => 'Usage stats';
+
+  @override
+  String get aiSkillsMarketplaceMenu => 'Skills marketplace';
+
+  @override
+  String get aiSkillsPublisherMenu => 'Skills earnings';
+
+  @override
+  String get aiMcpConnectionsMenu => 'Connected assistants';
+
+  @override
+  String get aiMcpConnectionsTitle => 'Connected assistants';
+
+  @override
+  String get aiMcpConnectionsSubtitle =>
+      'Review, narrow, or revoke ChatGPT and Claude access to this business.';
+
+  @override
+  String get aiMcpConnectHint =>
+      'In ChatGPT, add a custom MCP server and paste this address. After you approve access, the connection appears here so you can change or revoke it.';
+
+  @override
+  String get aiMcpServerUrlLabel => 'MCP server address';
+
+  @override
+  String get aiMcpCopyUrl => 'Copy address';
+
+  @override
+  String get aiMcpUrlCopied => 'Address copied.';
+
+  @override
+  String get aiMcpEmpty => 'No assistant is connected to this business yet.';
+
+  @override
+  String get aiMcpPluginInactiveBanner =>
+      'The AI MCP add-on is not active. Existing connections can still be revoked here.';
+
+  @override
+  String get aiMcpPluginExpiredBanner =>
+      'The AI MCP add-on has expired. Existing connections no longer receive business data; revoke them or renew the add-on.';
+
+  @override
+  String get aiMcpOpenMarketplace => 'Open add-on marketplace';
+
+  @override
+  String get aiMcpClientChatgpt => 'ChatGPT';
+
+  @override
+  String get aiMcpClientClaude => 'Claude';
+
+  @override
+  String get aiMcpClientOauth => 'OAuth assistant';
+
+  @override
+  String get aiMcpClientManual => 'Manual connection';
+
+  @override
+  String get aiMcpStatusActive => 'Active';
+
+  @override
+  String get aiMcpStatusExpired => 'Expired';
+
+  @override
+  String get aiMcpStatusRevoked => 'Revoked';
+
+  @override
+  String get aiMcpStatusMembershipInactive => 'Member no longer has access';
+
+  @override
+  String get aiMcpReadOnly => 'Read only';
+
+  @override
+  String get aiMcpReadWrite => 'Read and write';
+
+  @override
+  String get aiMcpUnrestrictedTools => 'All tools allowed for this role';
+
+  @override
+  String aiMcpToolCount(int count) {
+    return '$count tools';
+  }
+
+  @override
+  String aiMcpLastUsed(String when) {
+    return 'Last used: $when';
+  }
+
+  @override
+  String get aiMcpNeverUsed => 'Not used yet';
+
+  @override
+  String aiMcpConnectedAt(String when) {
+    return 'Connected: $when';
+  }
+
+  @override
+  String aiMcpExpiresAt(String when) {
+    return 'Expires: $when';
+  }
+
+  @override
+  String get aiMcpChangeAccess => 'Change access';
+
+  @override
+  String get aiMcpRevoke => 'Revoke access';
+
+  @override
+  String get aiMcpRevokeConfirmTitle => 'Revoke this assistant?';
+
+  @override
+  String get aiMcpRevokeConfirmBody =>
+      'ChatGPT or Claude will lose access to this business on the next request. This cannot be undone without a new approval.';
+
+  @override
+  String get aiMcpRevoked => 'Assistant access was revoked.';
+
+  @override
+  String get aiMcpRevokeAll => 'Revoke all assistants';
+
+  @override
+  String get aiMcpRevokeAllConfirmTitle => 'Revoke every assistant?';
+
+  @override
+  String get aiMcpRevokeAllConfirmBody =>
+      'All ChatGPT, Claude, and manual MCP connections for this business will be revoked immediately.';
+
+  @override
+  String aiMcpRevokeAllDone(int count) {
+    return '$count connections were revoked.';
+  }
+
+  @override
+  String get aiMcpPermissionsTitle => 'Tools for this connection';
+
+  @override
+  String get aiMcpSearchTools => 'Search tools';
+
+  @override
+  String get aiMcpEnableWrites => 'Allow write tools';
+
+  @override
+  String get aiMcpEnableWritesHint =>
+      'Write tools can create or change invoices, documents, and other records.';
+
+  @override
+  String get aiMcpWritesNeedConfirm =>
+      'You are granting write access. The assistant will be able to change records in this business.';
+
+  @override
+  String get aiMcpWidenConfirm =>
+      'You are granting additional tools to this assistant.';
+
+  @override
+  String get aiMcpDenyAllConfirm =>
+      'No tools will remain. The assistant stays connected but cannot read business data until you grant tools again.';
+
+  @override
+  String get aiMcpSaveAccess => 'Save access';
+
+  @override
+  String get aiMcpAccessSaved =>
+      'Connection permissions were updated. The assistant may need to refresh its tool list.';
+
+  @override
+  String get aiMcpNoTools => 'No tools are available for this user.';
+
+  @override
+  String get aiMcpCannotEditInactive =>
+      'This connection can only be revoked because the member no longer has access.';
+
+  @override
+  String get aiMcpCannotEditRevoked => 'This connection is no longer active.';
+
+  @override
+  String aiMcpConnectedBy(String name) {
+    return 'Connected by $name';
+  }
+
+  @override
+  String get crmMenu => 'CRM';
+
+  @override
+  String get crmMenuTasks => 'Work queue';
+
+  @override
+  String get crmMenuWebChat => 'Web chat';
+
+  @override
+  String get crmMenuLeads => 'Leads';
+
+  @override
+  String get crmMenuDeals => 'Sales opportunities';
+
+  @override
+  String get crmMenuActivities => 'Activities';
+
+  @override
+  String get crmMenuCustomer360 => 'Customer 360';
+
+  @override
+  String get crmMenuDashboard => 'Dashboard';
+
+  @override
+  String get crmMenuReports => 'Reports';
+
+  @override
+  String get crmMenuProcessDefinitions => 'Processes and funnel stages';
+
+  @override
+  String get crmMenuSequences => 'Automation sequences';
+
+  @override
+  String get crmMenuEnterprise => 'Sales organization';
+
+  @override
   String get storageSpace => 'Storage Space';
 
   @override
@@ -2775,6 +3025,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pluginMarketplaceCategoryCrmMarketing => 'CRM & marketing';
 
   @override
+  String get pluginMarketplaceCategoryAccounting => 'Accounting';
+
+  @override
   String get pluginMarketplaceWalletBalance => 'Available wallet balance';
 
   @override
@@ -2799,6 +3052,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pluginMarketplaceViewAndBuy => 'View & purchase';
+
+  @override
+  String get pluginMarketplaceViewDetails => 'View details';
+
+  @override
+  String get pluginMarketplaceIncluded =>
+      'Included for every business — no purchase needed.';
+
+  @override
+  String get pluginMarketplaceNotForSale =>
+      'This add-on is not available for purchase.';
 
   @override
   String get pluginMarketplaceReadMore => 'Read more';
@@ -3512,6 +3776,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get permissionInvoiceChangeUnitPrice =>
       'Change invoice unit price manually (invoice & quick sales)';
+
+  @override
+  String get permissionInvoiceConfirmExpiredSale =>
+      'Confirm sale of expired lots on invoices';
 
   @override
   String get permissionSectionCrmWebChat => 'Web chat widget (CRM)';
@@ -4420,6 +4688,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chooseFile => 'Choose file';
+
+  @override
+  String get productPhoto => 'Product photo';
+
+  @override
+  String get productPhotoTake => 'Take photo';
+
+  @override
+  String get productPhotoRetake => 'Retake photo';
+
+  @override
+  String get productPhotoUse => 'Use photo';
+
+  @override
+  String get productPhotoRemove => 'Remove photo';
+
+  @override
+  String get productPhotoCameraSecureContext =>
+      'Open Hesabix over HTTPS to use the camera, or choose a file.';
+
+  @override
+  String get productPhotoCameraPermission =>
+      'Camera access was denied. Check camera permissions in your browser or device settings.';
+
+  @override
+  String get productPhotoNoCamera =>
+      'No camera was found. Connect a camera or choose a file.';
+
+  @override
+  String get productPhotoCameraUnavailable =>
+      'The camera is unavailable. Check that it is connected and close any other app using it, or choose a file.';
+
+  @override
+  String get productPhotoCaptureFailed =>
+      'Could not take a photo. Try again or choose a file.';
+
+  @override
+  String get productPhotoEmpty =>
+      'The image is empty. Choose another file or take a photo.';
+
+  @override
+  String get productPhotoInvalidFormat =>
+      'Choose a JPG, PNG, GIF, WebP or BMP image.';
 
   @override
   String get matchBy => 'Match by';
@@ -6360,6 +6671,65 @@ class AppLocalizationsEn extends AppLocalizations {
       'Trial balance, balance sheet and P&L in one view';
 
   @override
+  String get reportsHscriptTitle => 'Script report builder';
+
+  @override
+  String get reportsHscriptSubtitle => 'Build custom reports with HScript';
+
+  @override
+  String get reportsHscriptKeywords =>
+      'hscript|script|custom report|dashboard|chart';
+
+  @override
+  String get reportsArAgingTitle => 'Customer receivables aging';
+
+  @override
+  String get reportsArAgingSubtitle => 'Analyze overdue customer receivables';
+
+  @override
+  String get reportsArAgingKeywords => 'aging|ar|receivables|due date';
+
+  @override
+  String get reportsApAgingTitle => 'Supplier payables aging';
+
+  @override
+  String get reportsApAgingSubtitle => 'Analyze overdue supplier payables';
+
+  @override
+  String get reportsApAgingKeywords => 'aging|ap|payables|supplier|due date';
+
+  @override
+  String get reportsPersonBalancesByCurrencyTitle =>
+      'Person balances by currency';
+
+  @override
+  String get reportsPersonBalancesByCurrencySubtitle =>
+      'Native balance per currency and base-currency equivalent';
+
+  @override
+  String get reportsPersonBalancesByCurrencyKeywords =>
+      'person balance|currency|base equivalent';
+
+  @override
+  String get reportsCashFlowTitle => 'Cash flow statement';
+
+  @override
+  String get reportsCashFlowSubtitle => 'Analyze cash inflows and outflows';
+
+  @override
+  String get reportsCashFlowKeywords => 'cash flow|cash|liquidity';
+
+  @override
+  String get reportsFxRevaluationTitle => 'Currency revaluation report';
+
+  @override
+  String get reportsFxRevaluationSubtitle =>
+      'Gains and losses from currency revaluation';
+
+  @override
+  String get reportsFxRevaluationKeywords => 'fx|revaluation|currency|exchange';
+
+  @override
   String get exportFinancialPackagePdf => 'Combined PDF (financial package)';
 
   @override
@@ -6453,6 +6823,280 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reportsCriticalStockSubtitle =>
       'Items with stock below the defined threshold';
+
+  @override
+  String get reportsExpiryStockTitle => 'Manufacturing and expiry stock';
+
+  @override
+  String get reportsExpiryStockSubtitle =>
+      'Sellable, near-expiry, blocked, and expired lots';
+
+  @override
+  String get expiryStatusSellable => 'Sellable';
+
+  @override
+  String get expiryStatusNearExpiry => 'Near expiry';
+
+  @override
+  String get expiryStatusBlocked => 'Blocked (off shelf)';
+
+  @override
+  String get expiryStatusExpired => 'Expired';
+
+  @override
+  String get expiryStatusUndated => 'Undated (existing stock)';
+
+  @override
+  String get expiryReportAsOf => 'As of';
+
+  @override
+  String get expiryReportAllStatuses => 'All';
+
+  @override
+  String get expiryColLotSerial => 'Lot / serial';
+
+  @override
+  String get expiryColManufacturing => 'Manufacturing date';
+
+  @override
+  String get expiryColExpiry => 'Expiry date';
+
+  @override
+  String get expiryColRemainingDays => 'Days remaining';
+
+  @override
+  String get quickSalesExpiredInstanceBlocked =>
+      'This unit is expired and cannot be sold';
+
+  @override
+  String get quickSalesPinnedProductsTitle => 'My pinned products';
+
+  @override
+  String get quickSalesRecentProductsTitle => 'Recent products';
+
+  @override
+  String get quickSalesPinnedAndRecentTitle => 'Pinned and recent products';
+
+  @override
+  String get quickSalesPinProduct => 'Pin in my quick sales';
+
+  @override
+  String get quickSalesUnpinProduct => 'Remove from my pinned products';
+
+  @override
+  String get quickSalesPinProductHint =>
+      'This product stays at the start of your quick-sales list, only for you';
+
+  @override
+  String quickSalesPinnedLimitReached(int max) {
+    return 'You can pin at most $max products';
+  }
+
+  @override
+  String get quickSalesProductPinned => 'Product pinned for you';
+
+  @override
+  String get quickSalesProductUnpinned =>
+      'Product removed from your pinned list';
+
+  @override
+  String get lotPickerTitlePrefix => 'Lot and dates —';
+
+  @override
+  String get lotPickerInboundHelp =>
+      'Dates live on the lot; a carton of 10 pieces shares the same manufacturing and expiry dates.';
+
+  @override
+  String get lotPickerOutboundHelp =>
+      'Outbound picking uses nearest expiry (FEFO) by default. You can change the lot.';
+
+  @override
+  String get lotPickerCode => 'Lot code';
+
+  @override
+  String get lotPickerAddAnother => 'Another lot';
+
+  @override
+  String get lotPickerDatesRequired =>
+      'Manufacturing or expiry date is required';
+
+  @override
+  String get lotPickerMinOne => 'Enter at least one lot with a quantity';
+
+  @override
+  String get lotPickerQtyMismatch =>
+      'Lot quantities must add up to the line quantity';
+
+  @override
+  String get lotPickerBestBeforePrefix => 'Best before';
+
+  @override
+  String get instanceDatesRequired =>
+      'Perishable units need a manufacturing or expiry date';
+
+  @override
+  String get productionLotsTitle => 'Material and output lots';
+
+  @override
+  String get productionLotsFefoHelp =>
+      'Materials are picked from the nearest expiry (FEFO).';
+
+  @override
+  String get productionPickFefo => 'Pick from FEFO stock';
+
+  @override
+  String get productionEditLots => 'Edit lots';
+
+  @override
+  String get quickSalesFefoSummary => 'FEFO issue from nearest expiry';
+
+  @override
+  String get lotAndDates => 'Lot and dates';
+
+  @override
+  String get lotPickerInboundPrompt =>
+      'Record lot manufacturing and expiry dates';
+
+  @override
+  String get openingBalanceLotCode => 'Opening-balance lot / batch code';
+
+  @override
+  String get openingBalanceManufacturing =>
+      'Opening-balance manufacturing date';
+
+  @override
+  String get openingBalanceExpiry => 'Opening-balance expiry date';
+
+  @override
+  String get uniqueInstanceSelectTitle => 'Select unique units';
+
+  @override
+  String get uniqueInstanceReturnTitle => 'Return sold units';
+
+  @override
+  String uniqueInstanceNeedCount(int count) {
+    return 'Need: $count units';
+  }
+
+  @override
+  String get uniqueInstanceSearchHint =>
+      'Search serial, barcode, or attributes';
+
+  @override
+  String get uniqueWarehouseSearchHint => 'Search serial or barcode';
+
+  @override
+  String get uniqueInstanceNotFound => 'No unique units found';
+
+  @override
+  String uniqueInstanceSelectExact(int required, int selected) {
+    return 'Select exactly $required units ($selected selected)';
+  }
+
+  @override
+  String uniqueInstanceSelectedOf(int selected, int required) {
+    return '$selected of $required units selected';
+  }
+
+  @override
+  String uniqueInstanceNeedMore(int count) {
+    return 'Select $count more units';
+  }
+
+  @override
+  String uniqueInstanceMaxCount(int count) {
+    return 'You can select only $count units';
+  }
+
+  @override
+  String get uniqueInstanceMinOne => 'Select at least one unit';
+
+  @override
+  String uniqueUnitsSelected(int count) {
+    return '$count units selected';
+  }
+
+  @override
+  String uniqueSerialPrefix(String serial) {
+    return 'Serial: $serial';
+  }
+
+  @override
+  String uniqueBarcodePrefix(String barcode) {
+    return 'Barcode: $barcode';
+  }
+
+  @override
+  String uniqueWarehousePrefix(String name) {
+    return 'Warehouse: $name';
+  }
+
+  @override
+  String uniqueAttributesPrefix(String value) {
+    return 'Attributes: $value';
+  }
+
+  @override
+  String get productionOutputsTitle => 'Outputs';
+
+  @override
+  String get productionPickUniqueUnits => 'Pick unique units';
+
+  @override
+  String get productionLotsSaved => 'Lots saved';
+
+  @override
+  String get aiToolListInventoryLots => 'Dated lot balances';
+
+  @override
+  String get aiToolGetExpiryStockReport => 'Expiry stock report';
+
+  @override
+  String get productTrackExpiry => 'Track manufacturing and expiry dates';
+
+  @override
+  String get productTrackExpiryHelp =>
+      'For perishables only. Other products stay unchanged. Dates live on the lot and apply from carton to piece.';
+
+  @override
+  String get productLotPolicy => 'Lot policy';
+
+  @override
+  String get productLotPolicyOptional =>
+      'Optional lot (produce without lot codes)';
+
+  @override
+  String get productLotPolicyRequired =>
+      'Required lot (pharma and packaged goods)';
+
+  @override
+  String get productShelfLifeDays => 'Shelf life from manufacturing (days)';
+
+  @override
+  String get productShelfLifeDaysHelp =>
+      'If only manufacturing date is entered, expiry is suggested from this number';
+
+  @override
+  String get productAlertOffsetDays => 'Alert days before expiry';
+
+  @override
+  String get productRemovalOffsetDays => 'Remove from shelf days before expiry';
+
+  @override
+  String get productBestBeforeOffsetDays => 'Best-before days before expiry';
+
+  @override
+  String get productExpiredSalePolicy => 'Sale of expired goods';
+
+  @override
+  String get productExpiredSalePolicyBlock => 'Blocked';
+
+  @override
+  String get productExpiredSalePolicyConfirm => 'Manager confirmation';
+
+  @override
+  String get productMinRemainingShelfLifeDays =>
+      'Minimum remaining days at sale';
 
   @override
   String get reportsInterWarehouseTransfersTitle => 'Inter-warehouse transfers';
@@ -10553,45 +11197,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noSettingsInCategory => 'No settings found in this category';
 
   @override
-  String get settingsCategoryCoreConfiguration => 'Core & Configuration';
+  String get settingsCategoryCoreConfiguration => 'Infrastructure';
 
   @override
   String get settingsCategoryCoreConfigurationDescription =>
-      'Basic system settings and configuration';
+      'Core configuration, cache, and firewall';
 
   @override
-  String get settingsCategoryStorageFiles => 'Storage & Files';
+  String get settingsCategoryStorageFiles => 'Files & plugins';
 
   @override
   String get settingsCategoryStorageFilesDescription =>
-      'File storage and storage plan management';
+      'Storage, plans, marketplace, and share links';
 
   @override
-  String get settingsCategoryFinancialPayment => 'Financial & Payment';
+  String get settingsCategoryFinancialPayment => 'Finance & payments';
 
   @override
   String get settingsCategoryFinancialPaymentDescription =>
-      'Wallet and payment gateway settings';
+      'Wallet, currencies, gateways, and pay page';
 
   @override
-  String get settingsCategoryUsersBusinesses => 'Users & Businesses';
+  String get settingsCategoryUsersBusinesses => 'Users & support';
 
   @override
   String get settingsCategoryUsersBusinessesDescription =>
-      'User and business management';
+      'Users, businesses, support, and reports';
 
   @override
   String get settingsCategoryCommunications => 'Communications';
 
   @override
   String get settingsCategoryCommunicationsDescription =>
-      'Email, notifications and announcements';
+      'Email, notifications, and message templates';
 
   @override
-  String get settingsCategoryAI => 'Artificial Intelligence';
+  String get settingsCategoryAI => 'Artificial intelligence';
 
   @override
-  String get settingsCategoryAIDescription => 'AI settings, plans and prompts';
+  String get settingsCategoryAIDescription =>
+      'Models, plans, prompts, and evaluation';
 
   @override
   String get aiStatusSending => 'Sending…';
@@ -11781,14 +12426,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsCategoryExternalServicesDescription =>
-      'External service integrations';
+      'Zohal, tax, and other integrations';
 
   @override
   String get settingsCategoryMonitoringLogs => 'Monitoring & Logs';
 
   @override
   String get settingsCategoryMonitoringLogsDescription =>
-      'System monitoring and logging';
+      'Health, service logs, and business activity';
 
   @override
   String get settingsShareLinks => 'Share Links';
@@ -12383,6 +13028,55 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage and configure payment gateways';
 
   @override
+  String get settingsPayPageAbuseReports => 'Pay-link abuse reports';
+
+  @override
+  String get settingsPayPageAbuseReportsDescription =>
+      'Phishing and abuse reports from public payment pages';
+
+  @override
+  String get settingsPayPageDomain => 'Pay-link domain';
+
+  @override
+  String get settingsPayPageDomainDescription =>
+      'Domain shown on the public pay-link poster and QR code';
+
+  @override
+  String get payPageDomainUrlLabel => 'Pay-link base URL';
+
+  @override
+  String get payPageDomainUrlHint =>
+      'For example https://hesabix.ir — the public link becomes https://hesabix.ir/username (without /u/). Leave empty to keep the current /u/username links.';
+
+  @override
+  String get payPageDomainUrlInvalid =>
+      'URL must start with http:// or https://';
+
+  @override
+  String get payPageDomainEffectiveUrl => 'Effective domain';
+
+  @override
+  String get payPageDomainSaved => 'Pay-link domain settings saved';
+
+  @override
+  String get payPageAbuseStatusNew => 'New';
+
+  @override
+  String get payPageAbuseStatusReviewed => 'Reviewed';
+
+  @override
+  String get payPageAbuseStatusDismissed => 'Dismissed';
+
+  @override
+  String get payPageAbuseEmpty => 'No reports yet';
+
+  @override
+  String get payPageAbuseReviewTitle => 'Review abuse report';
+
+  @override
+  String get payPageAbuseAdminNote => 'Admin note';
+
+  @override
   String get settingsBusinessesManagement => 'Businesses Management';
 
   @override
@@ -12931,6 +13625,1591 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get payrollPluginNotActive =>
       'The payroll add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get advancedAccountingMenu => 'Advanced accounting pack';
+
+  @override
+  String get advancedAccountingPluginNotActive =>
+      'The advanced accounting pack is not active for this business.';
+
+  @override
+  String get advancedAccountingPluginNotActiveHint =>
+      'Start a trial or purchase it from the plugin marketplace to unlock financial statements, year-end closing, FX revaluation, check ras-giri, loan facilities, business backup, and the invoice/document template studio.';
+
+  @override
+  String get oaMenu => 'Office automation';
+
+  @override
+  String get oaPluginNotActive =>
+      'The office automation add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get oaPermissionCompose =>
+      'Create and edit letter drafts and attachments';
+
+  @override
+  String get oaPermissionRefer =>
+      'Refer, paraph, return, and follow up letters';
+
+  @override
+  String get oaPermissionSecretariat =>
+      'Register incoming and outgoing letters';
+
+  @override
+  String get oaPermissionArchive => 'Archive letters';
+
+  @override
+  String get oaPermissionAdmin =>
+      'Manage organization, positions, occupancy, and settings';
+
+  @override
+  String get oaInbox => 'Inbox';
+
+  @override
+  String get oaAction => 'For action';
+
+  @override
+  String get oaCc => 'CC';
+
+  @override
+  String get oaDrafts => 'Drafts';
+
+  @override
+  String get oaSent => 'Sent';
+
+  @override
+  String get oaFollowUp => 'Follow-up';
+
+  @override
+  String get oaOverdue => 'Overdue';
+
+  @override
+  String get oaSaveFilter => 'Save filter';
+
+  @override
+  String get oaSavedFilters => 'Saved filters';
+
+  @override
+  String get oaFilterName => 'Filter name';
+
+  @override
+  String get oaNoSavedFilters => 'No saved filters';
+
+  @override
+  String get oaBoardView => 'Work board';
+
+  @override
+  String get oaListView => 'List';
+
+  @override
+  String get oaColumnPending => 'Waiting';
+
+  @override
+  String get oaColumnSeen => 'Seen';
+
+  @override
+  String get oaColumnDone => 'Done';
+
+  @override
+  String get oaColumnReturned => 'Returned';
+
+  @override
+  String get oaDropHere => 'Drop to save on the server';
+
+  @override
+  String get oaOpenLetter => 'Open letter';
+
+  @override
+  String get oaDropAttachment => 'Drop a file here to attach it';
+
+  @override
+  String get oaMyDesk => 'My desk';
+
+  @override
+  String get oaDueSoon => 'Due soon';
+
+  @override
+  String get oaFollowUpsDue => 'Follow-ups';
+
+  @override
+  String get oaProcesses => 'Processes';
+
+  @override
+  String get oaProcessTasks => 'My tasks';
+
+  @override
+  String get oaStartProcess => 'Start';
+
+  @override
+  String get oaCompleteTask => 'Complete task';
+
+  @override
+  String get oaPublishProcess => 'Publish process';
+
+  @override
+  String get oaProcessName => 'Process name';
+
+  @override
+  String get oaFormLabel => 'Form label';
+
+  @override
+  String get oaProcessVersions => 'Published versions';
+
+  @override
+  String get oaAssignee => 'Assignee position';
+
+  @override
+  String get oaProcessDesigner => 'Process designer';
+
+  @override
+  String get oaProcessDrafts => 'Drafts';
+
+  @override
+  String get oaProcessCode => 'Code';
+
+  @override
+  String get oaProcessCodeName => 'Enter a latin code and a name';
+
+  @override
+  String get oaNewProcess => 'New process';
+
+  @override
+  String get oaProcessInspector => 'Step';
+
+  @override
+  String get oaSelectNode => 'Select a step';
+
+  @override
+  String get oaConnectNodes => 'Connect';
+
+  @override
+  String get oaPickTarget => 'Choose the next step';
+
+  @override
+  String get oaDeleteNode => 'Remove step';
+
+  @override
+  String get oaGatewayField => 'Decision field';
+
+  @override
+  String get oaEdgeWhen => 'When value';
+
+  @override
+  String get oaEdgeDefault => 'Default';
+
+  @override
+  String get oaTimerHours => 'Wait hours';
+
+  @override
+  String get oaSlaHours => 'SLA hours';
+
+  @override
+  String get oaEscalateTo => 'Escalate to';
+
+  @override
+  String get oaSubprocessVersion => 'Published subprocess';
+
+  @override
+  String get oaNodeStart => 'Start';
+
+  @override
+  String get oaNodeTask => 'Task';
+
+  @override
+  String get oaNodeExclusive => 'Decision';
+
+  @override
+  String get oaNodeSplit => 'Split';
+
+  @override
+  String get oaNodeJoin => 'Join';
+
+  @override
+  String get oaNodeTimer => 'Timer';
+
+  @override
+  String get oaNodeSubprocess => 'Subprocess';
+
+  @override
+  String get oaNodeEnd => 'End';
+
+  @override
+  String get oaDocuments => 'Documents';
+
+  @override
+  String get oaDocumentSearch => 'Search documents';
+
+  @override
+  String get oaRegisterDocument => 'Register document';
+
+  @override
+  String get oaDocumentTitle => 'Document title';
+
+  @override
+  String get oaConfidentiality => 'Confidentiality';
+
+  @override
+  String get oaAddVersion => 'Add version';
+
+  @override
+  String get oaAcceptSuggestion => 'Accept';
+
+  @override
+  String get oaRejectSuggestion => 'Reject';
+
+  @override
+  String get oaNoDocuments => 'No documents you can see';
+
+  @override
+  String get oaDocumentVersions => 'Versions';
+
+  @override
+  String get oaPendingConfirmations => 'Pending sensitive actions';
+
+  @override
+  String get oaNoPendingConfirmations => 'No action is waiting for you';
+
+  @override
+  String get oaApproveAction => 'Approve';
+
+  @override
+  String get oaRejectAction => 'Reject';
+
+  @override
+  String get oaEnterprise => 'Branches and retention';
+
+  @override
+  String get oaBranches => 'Branches';
+
+  @override
+  String get oaBranchCode => 'Branch code';
+
+  @override
+  String get oaBranchName => 'Branch name';
+
+  @override
+  String get oaCreateBranch => 'Create branch';
+
+  @override
+  String get oaNoBranches => 'No branches yet';
+
+  @override
+  String get oaRetentionDue => 'Retention review';
+
+  @override
+  String get oaNoRetentionDue => 'No letter is due for review';
+
+  @override
+  String get oaHoldLetter => 'Keep';
+
+  @override
+  String get oaRetentionDocuments => 'Documents due for retention';
+
+  @override
+  String get oaHoldDocument => 'Keep document';
+
+  @override
+  String get oaHoldDocumentKeepsFile =>
+      'Keeping a document does not delete the document or its file.';
+
+  @override
+  String get oaRetentionPolicy => 'Retention policy';
+
+  @override
+  String get oaRetainDays => 'Retention days';
+
+  @override
+  String get oaNoRetentionPolicies => 'No retention policy yet';
+
+  @override
+  String get oaRetentionKeepsLetters => 'This policy does not delete letters.';
+
+  @override
+  String get oaSignatureProviders => 'Signature providers';
+
+  @override
+  String get oaNoSignatureProviders => 'No signature provider yet';
+
+  @override
+  String get oaProviderLive => 'The result comes from the provider URL';
+
+  @override
+  String get oaProviderManual =>
+      'The result is recorded with an external reference';
+
+  @override
+  String get oaRequestProviderSignature => 'Request provider signature';
+
+  @override
+  String get oaNoProviderRequests => 'No provider request yet';
+
+  @override
+  String get oaRecordProviderResult => 'Record provider result';
+
+  @override
+  String get oaProviderExternalRef => 'External reference';
+
+  @override
+  String get oaProviderCompleted => 'Completed';
+
+  @override
+  String get oaProviderRejected => 'Rejected';
+
+  @override
+  String get oaExchangeLetter => 'Exchange letter';
+
+  @override
+  String get oaTargetBusinessId => 'Target business id';
+
+  @override
+  String get oaTargetPositionId => 'Target secretariat position id';
+
+  @override
+  String get oaExchangeNormalOnly =>
+      'Only a registered normal letter can be exchanged.';
+
+  @override
+  String get oaProviderSignatureNote =>
+      'A provider signature record does not replace the image signature and is not a qualified electronic signature by itself.';
+
+  @override
+  String get oaCreateProvider => 'Add signature provider';
+
+  @override
+  String get oaProviderCode => 'Provider code';
+
+  @override
+  String get oaProviderName => 'Provider name';
+
+  @override
+  String get oaProviderEndpoint => 'Provider URL';
+
+  @override
+  String get oaProviderToken => 'Access token';
+
+  @override
+  String get oaCommercialLinks => 'Accounting and CRM';
+
+  @override
+  String get oaNoCommercialLinks => 'No accounting document or deal is linked';
+
+  @override
+  String get oaAddCommercialLink => 'Link existing record';
+
+  @override
+  String get oaLinkDocument => 'Accounting document';
+
+  @override
+  String get oaLinkDeal => 'Deal';
+
+  @override
+  String get oaCommercialTargetId => 'Record id';
+
+  @override
+  String get oaVersion => 'Version';
+
+  @override
+  String get oaArchive => 'Archive';
+
+  @override
+  String get oaUnarchive => 'Reopen from archive';
+
+  @override
+  String get oaRejectSign => 'Reject signature';
+
+  @override
+  String get oaRejectSignNote =>
+      'Rejecting this step marks the image signature as rejected. It does not create a secure electronic signature.';
+
+  @override
+  String get oaCancelReferral => 'Cancel referral';
+
+  @override
+  String get oaRegistry => 'Registry';
+
+  @override
+  String get oaNewLetter => 'New letter';
+
+  @override
+  String get oaOrg => 'Organization';
+
+  @override
+  String get oaSettings => 'Office automation settings';
+
+  @override
+  String get oaSubject => 'Subject';
+
+  @override
+  String get oaBody => 'Body';
+
+  @override
+  String get oaKindInternal => 'Internal';
+
+  @override
+  String get oaKindIncoming => 'Incoming';
+
+  @override
+  String get oaKindOutgoing => 'Outgoing';
+
+  @override
+  String get oaRegister => 'Register';
+
+  @override
+  String get oaRefer => 'Refer';
+
+  @override
+  String get oaParaph => 'Paraph';
+
+  @override
+  String get oaAttach => 'Attachment';
+
+  @override
+  String get oaComplete => 'Complete';
+
+  @override
+  String get oaReturn => 'Return';
+
+  @override
+  String get oaPosition => 'Acting position';
+
+  @override
+  String get oaNoPositions =>
+      'You have no active position. Ask an administrator to assign one.';
+
+  @override
+  String get oaEmptyFolder => 'This folder is empty.';
+
+  @override
+  String get oaUrgency => 'Urgency';
+
+  @override
+  String get oaConfidential => 'Confidentiality';
+
+  @override
+  String get oaSaveDraft => 'Save draft';
+
+  @override
+  String get oaLetterDate => 'Letter date';
+
+  @override
+  String get oaInstruction => 'Instruction';
+
+  @override
+  String get oaToPosition => 'To position';
+
+  @override
+  String get oaPrint => 'Print letter';
+
+  @override
+  String get oaFollowUpDate => 'Follow-up date';
+
+  @override
+  String get oaDelegations => 'Delegations';
+
+  @override
+  String get oaHolders => 'Occupancy';
+
+  @override
+  String get oaUnits => 'Units';
+
+  @override
+  String get oaPositions => 'Positions';
+
+  @override
+  String get oaAssign => 'Assign position';
+
+  @override
+  String get oaDelegate => 'Delegate';
+
+  @override
+  String get oaEnabled => 'Enable office automation';
+
+  @override
+  String get oaIncomingPrefix => 'Incoming prefix';
+
+  @override
+  String get oaOutgoingPrefix => 'Outgoing prefix';
+
+  @override
+  String get oaInternalPrefix => 'Internal prefix';
+
+  @override
+  String get oaNumberingCalendar => 'Numbering calendar';
+
+  @override
+  String get oaLetterKind => 'Letter type';
+
+  @override
+  String get oaReferralKind => 'Referral type';
+
+  @override
+  String get oaSignature => 'Signature';
+
+  @override
+  String get oaSender => 'Sender';
+
+  @override
+  String get oaReceiver => 'Receiver';
+
+  @override
+  String get oaSenderOrg => 'Sender organization';
+
+  @override
+  String get oaReceiverOrg => 'Receiver organization';
+
+  @override
+  String get oaCode => 'Code';
+
+  @override
+  String get oaLink => 'Link letter';
+
+  @override
+  String get oaRelatedLetter => 'Related letter ID';
+
+  @override
+  String get oaLinkRelated => 'Related';
+
+  @override
+  String get oaLinkReply => 'Reply';
+
+  @override
+  String get oaLinkFollowup => 'Follow-up';
+
+  @override
+  String get oaUrgencyNormal => 'Normal';
+
+  @override
+  String get oaUrgencyUrgent => 'Urgent';
+
+  @override
+  String get oaUrgencyImmediate => 'Immediate';
+
+  @override
+  String get oaConfidentialNormal => 'Normal';
+
+  @override
+  String get oaConfidentialRestricted => 'Confidential';
+
+  @override
+  String get oaSubtree => 'View organization subtree';
+
+  @override
+  String get oaParentUnit => 'Parent unit';
+
+  @override
+  String get oaNoParent => 'No parent unit';
+
+  @override
+  String get oaCodeFormat =>
+      'Start with a letter; then letters, digits, or underscore (max 64).';
+
+  @override
+  String get oaCodeExists => 'This code is already used.';
+
+  @override
+  String get oaNameRequired => 'Enter a name in Persian or English.';
+
+  @override
+  String get oaSelectUnit => 'Select a unit.';
+
+  @override
+  String get oaSelectPosition => 'Select a position.';
+
+  @override
+  String get oaSelectUser => 'Select a user.';
+
+  @override
+  String get oaAddChild => 'Add child unit';
+
+  @override
+  String get oaAddPosition => 'Add position';
+
+  @override
+  String get oaEmptyUnits => 'No units yet.';
+
+  @override
+  String get oaEmptyPositions => 'No positions yet.';
+
+  @override
+  String get oaJalali => 'Jalali';
+
+  @override
+  String get oaGregorian => 'Gregorian';
+
+  @override
+  String get oaLetterhead => 'Letterhead';
+
+  @override
+  String get oaSearchPosition => 'Search and select a position';
+
+  @override
+  String get oaSearchPositionHint => 'Type a position, unit, or occupant name';
+
+  @override
+  String get oaNoSearchResults => 'No results found.';
+
+  @override
+  String get oaInCirculation => 'In circulation';
+
+  @override
+  String get oaClosed => 'Closed';
+
+  @override
+  String get oaMarkdown => 'Markdown';
+
+  @override
+  String get oaHtml => 'HTML';
+
+  @override
+  String get oaEdit => 'Edit';
+
+  @override
+  String get oaPreview => 'Preview';
+
+  @override
+  String get oaBold => 'Bold';
+
+  @override
+  String get oaItalic => 'Italic';
+
+  @override
+  String get oaUnderline => 'Underline';
+
+  @override
+  String get oaHeading => 'Heading';
+
+  @override
+  String get oaBullet => 'List';
+
+  @override
+  String get oaQuote => 'Quote';
+
+  @override
+  String get oaInsertLink => 'Insert link';
+
+  @override
+  String get oaLinkLabel => 'Label';
+
+  @override
+  String get oaLinkUrl => 'URL';
+
+  @override
+  String get oaInsert => 'Insert';
+
+  @override
+  String get oaBodyHint => 'Write the letter with formatting…';
+
+  @override
+  String get oaUploadImage => 'Upload image';
+
+  @override
+  String get oaSearchLetter => 'Search related letter';
+
+  @override
+  String get oaLetterFormat => 'Letter format';
+
+  @override
+  String get oaLetterTemplate => 'Letter template';
+
+  @override
+  String get oaStationery => 'Letterhead & paper';
+
+  @override
+  String get oaBackground => 'Letter background';
+
+  @override
+  String get oaFooter => 'Footer';
+
+  @override
+  String get oaPaperSize => 'Paper size';
+
+  @override
+  String get oaPaperOrientation => 'Orientation';
+
+  @override
+  String get oaPortrait => 'Portrait';
+
+  @override
+  String get oaLandscape => 'Landscape';
+
+  @override
+  String get oaMargins => 'Margins (mm)';
+
+  @override
+  String get oaMarginTop => 'Top';
+
+  @override
+  String get oaMarginRight => 'Right';
+
+  @override
+  String get oaMarginBottom => 'Bottom';
+
+  @override
+  String get oaMarginLeft => 'Left';
+
+  @override
+  String get oaDefaultFormat => 'Default format';
+
+  @override
+  String get oaApplyTemplate => 'Apply template';
+
+  @override
+  String get oaSaveAsTemplate => 'Save as template';
+
+  @override
+  String get oaNewFormat => 'New format';
+
+  @override
+  String get oaNewTemplate => 'New template';
+
+  @override
+  String get oaFormatName => 'Format name';
+
+  @override
+  String get oaTemplateName => 'Template name';
+
+  @override
+  String get oaAllKinds => 'All types';
+
+  @override
+  String get oaCartable => 'Inbox';
+
+  @override
+  String get oaActingAs => 'Acting as';
+
+  @override
+  String get oaDocument => 'Letter document';
+
+  @override
+  String get oaTimeline => 'Timeline';
+
+  @override
+  String get oaCirculation => 'Circulation';
+
+  @override
+  String get oaMetadata => 'Letter details';
+
+  @override
+  String get oaCustomParty => 'Enter manually';
+
+  @override
+  String get oaPartyFromPosition => 'Pick from organization positions';
+
+  @override
+  String get oaLetterPreview => 'Letter preview';
+
+  @override
+  String get oaPaperA4 => 'A4';
+
+  @override
+  String get oaPaperA5 => 'A5';
+
+  @override
+  String get oaPaperLetter => 'Letter';
+
+  @override
+  String get oaDefaultBodyFormat => 'Default body format';
+
+  @override
+  String get oaMakeDefault => 'Default';
+
+  @override
+  String get oaEmptyTemplates => 'No templates yet.';
+
+  @override
+  String get oaEmptyFormats => 'No paper formats yet.';
+
+  @override
+  String get oaAddRecipient => 'Add recipient';
+
+  @override
+  String get oaCompose => 'Compose';
+
+  @override
+  String get oaViewLetter => 'View letter';
+
+  @override
+  String get oaMoreActions => 'More actions';
+
+  @override
+  String get oaNumbering => 'Numbering';
+
+  @override
+  String get oaTemplates => 'Templates';
+
+  @override
+  String get oaFormats => 'Formats';
+
+  @override
+  String get oaSelectTemplate => 'Choose a ready template';
+
+  @override
+  String get oaSelectFormat => 'Choose paper format and letterhead';
+
+  @override
+  String get oaHeaderHtml => 'Header text';
+
+  @override
+  String get oaDefaultBodyHint => 'Markdown or HTML';
+
+  @override
+  String get oaInboxHint => 'Letters referred to the active position';
+
+  @override
+  String get oaNewLetterHint =>
+      'Compose with templates, letterhead, and searchable positions';
+
+  @override
+  String oaPositionWithHolder(String title, String holder) {
+    return '$title · $holder';
+  }
+
+  @override
+  String get oaConfidentialHighly => 'Highly confidential';
+
+  @override
+  String get oaConfidentialSecret => 'Secret';
+
+  @override
+  String get oaSecretariats => 'Secretariats';
+
+  @override
+  String get oaNewSecretariat => 'New secretariat';
+
+  @override
+  String get oaSecretariatBranch => 'Secretariat branch';
+
+  @override
+  String get oaNoBranch => 'No branch';
+
+  @override
+  String get oaSecretariat => 'Secretariat';
+
+  @override
+  String get oaExternalOrgs => 'External organizations';
+
+  @override
+  String get oaNewExternalOrg => 'New organization';
+
+  @override
+  String get oaEmptyExternalOrgs => 'No external organizations yet.';
+
+  @override
+  String get oaExternalOrgsHint => 'Search by name, code, or ECE email';
+
+  @override
+  String get oaEceEmail => 'ECE email';
+
+  @override
+  String get oaNationalId => 'National ID';
+
+  @override
+  String get oaArchiveTree => 'Archive filing';
+
+  @override
+  String get oaArchiveFolders => 'Archive folders';
+
+  @override
+  String get oaNewArchiveFolder => 'New folder';
+
+  @override
+  String get oaParentFolder => 'Parent folder';
+
+  @override
+  String get oaAllLetters => 'All letters';
+
+  @override
+  String get oaReports => 'Correspondence reports';
+
+  @override
+  String get oaDelayReport => 'Delays';
+
+  @override
+  String get oaVolumeReport => 'Volume';
+
+  @override
+  String get oaPerformanceReport => 'Performance';
+
+  @override
+  String get oaAvgDays => 'Average days';
+
+  @override
+  String get oaPublicTrack => 'Letter tracking';
+
+  @override
+  String get oaPublicTrackHint =>
+      'Enter the tracking token printed on the registration receipt.';
+
+  @override
+  String get oaPublicTrackRestricted =>
+      'This letter has no public details. Sign in to Hesabix to view it.';
+
+  @override
+  String get oaPublicTrackResult => 'Letter status';
+
+  @override
+  String get oaTrackingToken => 'Tracking token';
+
+  @override
+  String get oaStatus => 'Status';
+
+  @override
+  String get oaSignatures => 'Signatures';
+
+  @override
+  String get oaEmptySignatures => 'No signature images yet.';
+
+  @override
+  String get oaSignatureImage => 'Signature image';
+
+  @override
+  String get oaSignPath => 'Sign path';
+
+  @override
+  String get oaEmptySignPaths => 'No sign paths yet.';
+
+  @override
+  String get oaRequireBeforeRegister =>
+      'Required before registering outgoing letters';
+
+  @override
+  String get oaCartableRules => 'Inbox rules';
+
+  @override
+  String get oaEmptyRules => 'No inbox rules yet.';
+
+  @override
+  String get oaSubjectContains => 'Subject contains';
+
+  @override
+  String get oaMarkSeen => 'Mark as seen automatically';
+
+  @override
+  String get oaEce => 'ECE exchange';
+
+  @override
+  String get oaEmptyEce => 'No ECE messages yet.';
+
+  @override
+  String get oaImportEce => 'Import ECE XML';
+
+  @override
+  String get oaEceXml => 'ECE XML';
+
+  @override
+  String get oaExportEce => 'Export ECE';
+
+  @override
+  String get oaEceEnabled => 'Enable ECE for this secretariat';
+
+  @override
+  String get oaSign => 'Sign';
+
+  @override
+  String get oaImageSignatureNote =>
+      'This records a stored signature image. It is not a secure electronic signature.';
+
+  @override
+  String get oaClassifiedStaysInside =>
+      'Classified letters are not emailed, exported, or sent to the assistant.';
+
+  @override
+  String get oaDispatch => 'Dispatch';
+
+  @override
+  String get oaAcknowledge => 'Acknowledge';
+
+  @override
+  String get oaVersions => 'Body versions';
+
+  @override
+  String get oaAiSummary => 'AI summary';
+
+  @override
+  String get oaOcr => 'Extract text (OCR)';
+
+  @override
+  String get oaPerson => 'Related person';
+
+  @override
+  String get oaKeywords => 'Keywords';
+
+  @override
+  String get oaReceiptNumber => 'External receipt number';
+
+  @override
+  String get oaReceiptDate => 'Receipt date';
+
+  @override
+  String get oaSendEce => 'Send ECE by email';
+
+  @override
+  String get oaSendEmail => 'Send as email';
+
+  @override
+  String get oaToEmail => 'Destination email';
+
+  @override
+  String get oaCopies => 'CC / copies';
+
+  @override
+  String get oaPublicTrackUrl => 'Public tracking link';
+
+  @override
+  String get oaConfidentialSecretariat => 'Confidential secretariat';
+
+  @override
+  String get oaAutoSecretariat => 'Default secretariat';
+
+  @override
+  String oaDaysLate(int days) {
+    return '$days days late';
+  }
+
+  @override
+  String get oaSignStatusPending => 'Waiting';
+
+  @override
+  String get oaSignStatusCurrent => 'Ready to sign';
+
+  @override
+  String get oaSignStatusSigned => 'Signed';
+
+  @override
+  String get oaSignStatusRejected => 'Rejected';
+
+  @override
+  String get oaStatusDispatched => 'Dispatched';
+
+  @override
+  String get oaStatusAcknowledged => 'Acknowledged';
+
+  @override
+  String get oaSentSuccessfully => 'Sent successfully';
+
+  @override
+  String get oaMorePages => 'More';
+
+  @override
+  String get businessSettingsOfficeAutomation => 'Office automation';
+
+  @override
+  String get businessSettingsOfficeAutomationDescription =>
+      'Numbering, letterhead, templates, and letter formats';
+
+  @override
+  String get fixedAssetsTitle => 'Fixed assets';
+
+  @override
+  String get fixedAssetsMenu => 'Fixed assets';
+
+  @override
+  String get fixedAssetsPluginNotActive =>
+      'The fixed assets add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get fixedAssetsPermissionManage =>
+      'Manage asset classes, locations, and settings';
+
+  @override
+  String get fixedAssetsPermissionOperate =>
+      'Create asset cards and draft depreciation runs';
+
+  @override
+  String get fixedAssetsPermissionPost =>
+      'Post acquisition and depreciation journals';
+
+  @override
+  String get fixedAssetsAssetsTab => 'Assets';
+
+  @override
+  String get fixedAssetsDepreciationTab => 'Depreciation';
+
+  @override
+  String get fixedAssetsSettingsTab => 'Settings';
+
+  @override
+  String get fixedAssetsNewAsset => 'New asset';
+
+  @override
+  String get fixedAssetsAssetName => 'Asset name';
+
+  @override
+  String get fixedAssetsClass => 'Class';
+
+  @override
+  String get fixedAssetsCost => 'Cost';
+
+  @override
+  String get fixedAssetsSalvage => 'Salvage value';
+
+  @override
+  String get fixedAssetsVat => 'Input VAT';
+
+  @override
+  String get fixedAssetsUsefulLifeMonths => 'Useful life (months)';
+
+  @override
+  String get fixedAssetsAcquisitionKind => 'Acquisition type';
+
+  @override
+  String get fixedAssetsKindPurchase =>
+      'Standalone purchase (no vendor invoice)';
+
+  @override
+  String get invoiceLineFixedAsset => 'Fixed asset / PPE';
+
+  @override
+  String get invoiceLineFixedAssetHint =>
+      'This line does not post inventory or a warehouse receipt; its cost is capitalized to PPE.';
+
+  @override
+  String get fixedAssetsKindOpening => 'Opening balance';
+
+  @override
+  String get fixedAssetsAcquisitionDate => 'Acquisition / ready-for-use date';
+
+  @override
+  String get fixedAssetsCapitalize => 'Capitalize and post';
+
+  @override
+  String get fixedAssetsCapitalizeHint =>
+      'Without a vendor invoice, the counterpart is cash, bank, a person, or opening equity. If there is a vendor invoice, mark the purchase line as capital so inventory is not debited.';
+
+  @override
+  String get fixedAssetsCounterparty => 'Counterpart';
+
+  @override
+  String get fixedAssetsCounterpartyPerson => 'Person (accounts payable)';
+
+  @override
+  String get fixedAssetsCounterpartyBank => 'Bank';
+
+  @override
+  String get fixedAssetsCounterpartyCash => 'Cash register';
+
+  @override
+  String get fixedAssetsCounterpartyPetty => 'Petty cash';
+
+  @override
+  String get fixedAssetsCounterpartyAccount => 'Leaf account';
+
+  @override
+  String get fixedAssetsCounterpartyId => 'Counterpart id';
+
+  @override
+  String get fixedAssetsSaved => 'Saved.';
+
+  @override
+  String get fixedAssetsCapitalized => 'Acquisition journal posted.';
+
+  @override
+  String get fixedAssetsNoAssets => 'No assets yet.';
+
+  @override
+  String get fixedAssetsNoClasses => 'No asset class is ready.';
+
+  @override
+  String get fixedAssetsNoRuns => 'No depreciation run yet.';
+
+  @override
+  String get fixedAssetsNewDepreciationRun => 'Compute monthly depreciation';
+
+  @override
+  String get fixedAssetsDepreciationGregorianHint =>
+      'Pick any day in the target month. The date follows the business calendar (Jalali or Gregorian).';
+
+  @override
+  String get fixedAssetsPeriodYear => 'Gregorian year';
+
+  @override
+  String get fixedAssetsPeriodMonth => 'Month';
+
+  @override
+  String get fixedAssetsRunCreated => 'Depreciation draft created.';
+
+  @override
+  String get fixedAssetsPostRun => 'Post depreciation journal';
+
+  @override
+  String get fixedAssetsRunPosted => 'Depreciation journal posted.';
+
+  @override
+  String get fixedAssetsNetBookValue => 'Net book value';
+
+  @override
+  String get fixedAssetsStatusDraft => 'Draft';
+
+  @override
+  String get fixedAssetsStatusCapitalized => 'Capitalized';
+
+  @override
+  String get fixedAssetsConventionHint =>
+      'Depreciation start: Standard 11 from ready-for-use date (first month prorated) or tax article 149 from the first of the next month.';
+
+  @override
+  String get fixedAssetsConventionFromReady =>
+      'From ready-for-use date (Standard 11)';
+
+  @override
+  String get fixedAssetsConventionNextMonth =>
+      'From the next month (article 149)';
+
+  @override
+  String get fixedAssetsClassesHint =>
+      'Default class mapping to the chart of accounts';
+
+  @override
+  String get fixedAssetsNotDepreciable => 'Not depreciable';
+
+  @override
+  String get fixedAssetsDispose => 'Sell / scrap';
+
+  @override
+  String get fixedAssetsSale => 'Sale';
+
+  @override
+  String get fixedAssetsScrap => 'Scrap (no proceeds)';
+
+  @override
+  String get fixedAssetsProceeds => 'Proceeds (exclusive of VAT)';
+
+  @override
+  String get fixedAssetsVatOutput => 'Output VAT';
+
+  @override
+  String get fixedAssetsDisposalDate => 'Disposal date';
+
+  @override
+  String get fixedAssetsDisposed => 'Disposal journal posted.';
+
+  @override
+  String get fixedAssetsMarkIdle => 'Mark idle';
+
+  @override
+  String get fixedAssetsIdleFrom => 'Idle from';
+
+  @override
+  String get fixedAssetsIdleHint =>
+      'Accounting depreciation continues in full. Tax preview applies a 30% reduction only after more than six idle months. A second tax book is not posted in this phase.';
+
+  @override
+  String get fixedAssetsResume => 'Return to use';
+
+  @override
+  String get fixedAssetsIdleSaved => 'Asset marked idle.';
+
+  @override
+  String get fixedAssetsResumed => 'Asset returned to use.';
+
+  @override
+  String get fixedAssetsSubsequent => 'Repair / subsequent cost';
+
+  @override
+  String get fixedAssetsRoutineRepair => 'Period repair (expense)';
+
+  @override
+  String get fixedAssetsMajorRepair => 'Major repair (add to cost)';
+
+  @override
+  String get fixedAssetsExpenditureAmount => 'Amount (exclusive of VAT)';
+
+  @override
+  String get fixedAssetsRemainingLife =>
+      'Remaining useful life (months) from effective date';
+
+  @override
+  String get fixedAssetsExpenditurePosted =>
+      'Subsequent expenditure journal posted.';
+
+  @override
+  String get fixedAssetsEstimateChange => 'Change method / remaining life';
+
+  @override
+  String get fixedAssetsEstimateHint =>
+      'Prospective only: posted accumulated depreciation is not rewritten. Straight-line monthly amount becomes remaining depreciable divided by remaining months.';
+
+  @override
+  String get fixedAssetsEstimateSaved => 'Estimate change saved.';
+
+  @override
+  String get fixedAssetsStatusIdle => 'Idle';
+
+  @override
+  String get fixedAssetsStatusDisposed => 'Disposed';
+
+  @override
+  String get fixedAssetsOpeningEquityAccount => 'Opening equity account id';
+
+  @override
+  String get fixedAssetsGainAccount =>
+      'Disposal gain account id (default 60206)';
+
+  @override
+  String get fixedAssetsLossAccount =>
+      'Disposal loss account id (default 70804)';
+
+  @override
+  String get fixedAssetsRepairAccount =>
+      'Repair expense account id (default 70404)';
+
+  @override
+  String get fixedAssetsVatOutputAccount =>
+      'Output VAT account id (default 20101)';
+
+  @override
+  String get fixedAssetsSaveAccounts => 'Save account mapping';
+
+  @override
+  String get businessSettingsFixedAssets => 'Fixed assets';
+
+  @override
+  String get businessSettingsFixedAssetsDescription =>
+      'Legal rules, chart mapping, idle tax factor, and depreciation convention';
+
+  @override
+  String get fixedAssetsSettingsPageTitle => 'Fixed asset settings';
+
+  @override
+  String get fixedAssetsLegalRules => 'Legal and standard rules';
+
+  @override
+  String get fixedAssetsLegalRulesHint =>
+      'These values default to Iranian Standard 11 and tax article 149. Change them here if the law or your accounting policy changes; posted journals are not rewritten.';
+
+  @override
+  String get fixedAssetsTaxIdleMonths =>
+      'Idle months before tax depreciation reduction';
+
+  @override
+  String get fixedAssetsTaxIdleReduction =>
+      'Tax depreciation reduction after idle threshold (%)';
+
+  @override
+  String get fixedAssetsAccountingIdleReduction =>
+      'Accounting depreciation reduction while idle (%) — Standard 11 default is 0';
+
+  @override
+  String get fixedAssetsVatInputAccount => 'Input VAT account';
+
+  @override
+  String get fixedAssetsEnabled => 'Enable fixed assets module';
+
+  @override
+  String get fixedAssetsEnabledHint =>
+      'Turns the register off for this business without removing posted journals.';
+
+  @override
+  String get fixedAssetsPlaquePrefix => 'Asset code prefix';
+
+  @override
+  String get fixedAssetsRequireCustodian =>
+      'Require a custodian before capitalization';
+
+  @override
+  String get fixedAssetsOpenFullSettings => 'Open full plugin settings';
+
+  @override
+  String get fixedAssetsClassCostAccount => 'Cost account';
+
+  @override
+  String get fixedAssetsClassAccumAccount => 'Accumulated depreciation account';
+
+  @override
+  String get fixedAssetsClassExpenseAccount => 'Depreciation expense account';
+
+  @override
+  String get fixedAssetsSearchHint => 'Search code, name, or serial';
+
+  @override
+  String get fixedAssetsStatusAll => 'All';
+
+  @override
+  String get fixedAssetsSectionIdentity => 'Identity';
+
+  @override
+  String get fixedAssetsSectionAmounts => 'Cost and useful life';
+
+  @override
+  String get fixedAssetsSectionAcquisition => 'Acquisition';
+
+  @override
+  String get fixedAssetsMethodStraight => 'Straight line';
+
+  @override
+  String get fixedAssetsMethodDeclining => 'Declining balance';
+
+  @override
+  String get fixedAssetsDecliningRate => 'Declining annual rate (e.g. 0.25)';
+
+  @override
+  String get fixedAssetsFromInvoice => 'From purchase invoice';
+
+  @override
+  String get fixedAssetsEmptyHint =>
+      'Add an asset from a capital purchase invoice line, or with New asset.';
+
+  @override
+  String get fixedAssetsLocation => 'Location';
+
+  @override
+  String get fixedAssetsEffectiveDate => 'Effective date';
+
+  @override
+  String get fixedAssetsRunDraft => 'Draft';
+
+  @override
+  String get fixedAssetsRunPostedStatus => 'Posted';
+
+  @override
+  String get fixedAssetsNewAssetHint =>
+      'For a vendor purchase, mark the purchase-invoice line as a fixed asset so inventory is not debited. Use this form only for opening balances or acquisitions without a vendor invoice.';
+
+  @override
+  String get fixedAssetsCounterpartyRequired => 'Select a counterpart.';
+
+  @override
+  String get fixedAssetsSerial => 'Serial number';
+
+  @override
+  String get fixedAssetsCustodian => 'Custodian';
+
+  @override
+  String get fixedAssetsNone => 'Not selected';
+
+  @override
+  String get fixedAssetsViewInvoice => 'Purchase invoice';
+
+  @override
+  String get fixedAssetsQuickActions => 'Actions';
+
+  @override
+  String get fixedAssetsClassesTab => 'Classes';
+
+  @override
+  String get fixedAssetsReportSection => 'Fixed assets';
+
+  @override
+  String get fixedAssetsReportFilters => 'Report filters';
+
+  @override
+  String get fixedAssetsReportKind => 'Report type';
+
+  @override
+  String get fixedAssetsReportRegister => 'Asset register';
+
+  @override
+  String get fixedAssetsReportRegisterHint =>
+      'Current asset cards with cost, accumulated depreciation, and net book value.';
+
+  @override
+  String get fixedAssetsReportRegisterSubtitle =>
+      'Code, class, location, cost, and net book value';
+
+  @override
+  String get fixedAssetsReportClassSummary => 'Class movement';
+
+  @override
+  String get fixedAssetsReportClassSummaryHint =>
+      'Standard 11 rollforward: opening, acquisitions, major repairs, depreciation, disposals, and closing by class.';
+
+  @override
+  String get fixedAssetsReportClassSummarySubtitle =>
+      'PPE movement note by class';
+
+  @override
+  String get fixedAssetsReportDepreciation => 'Period depreciation';
+
+  @override
+  String get fixedAssetsReportDepreciationHint =>
+      'Posted depreciation journal lines in the selected period, including tax idle preview.';
+
+  @override
+  String get fixedAssetsReportDepreciationSubtitle =>
+      'Posted monthly depreciation and tax preview';
+
+  @override
+  String get fixedAssetsReportAcquisitions => 'Period acquisitions';
+
+  @override
+  String get fixedAssetsReportAcquisitionsHint =>
+      'Assets acquired in the selected period. Vendor invoices are distinct from independent acquisitions.';
+
+  @override
+  String get fixedAssetsReportAcquisitionsSubtitle =>
+      'Capital purchases, independent acquisitions, and opening balances';
+
+  @override
+  String get fixedAssetsReportDisposals => 'Disposals';
+
+  @override
+  String get fixedAssetsReportDisposalsHint =>
+      'Sales and scrap in the period with net book value, proceeds, and gain or loss.';
+
+  @override
+  String get fixedAssetsReportDisposalsSubtitle =>
+      'Proceeds, net book value, and disposal gain or loss';
+
+  @override
+  String get fixedAssetsReportIdle => 'Idle assets';
+
+  @override
+  String get fixedAssetsReportIdleHint =>
+      'Idle assets. Accounting depreciation continues; the tax factor falls only after the settings threshold.';
+
+  @override
+  String get fixedAssetsReportIdleSubtitle =>
+      'Idle status and tax depreciation factor';
+
+  @override
+  String get fixedAssetsReportLocations => 'Location and custodian';
+
+  @override
+  String get fixedAssetsReportLocationsHint =>
+      'Physical control of assets in use by location and custodian.';
+
+  @override
+  String get fixedAssetsReportLocationsSubtitle =>
+      'Location and custodian of assets in use';
+
+  @override
+  String get fixedAssetsReportExpenditures => 'Subsequent expenditure';
+
+  @override
+  String get fixedAssetsReportExpendituresHint =>
+      'Period repairs (expense) and major repairs (added to cost) in the selected range.';
+
+  @override
+  String get fixedAssetsReportExpendituresSubtitle =>
+      'Routine and major repairs';
+
+  @override
+  String get fixedAssetsReportLiveCount => 'In use';
+
+  @override
+  String get fixedAssetsReportOpeningNbv => 'Opening NBV';
+
+  @override
+  String get fixedAssetsReportClosingNbv => 'Closing NBV';
+
+  @override
+  String get fixedAssetsReportAdditions => 'Period additions';
+
+  @override
+  String get fixedAssetsReportDisposalsNbv => 'Disposed NBV';
+
+  @override
+  String get fixedAssetsReportDepreciationAmount => 'Depreciation';
+
+  @override
+  String get fixedAssetsReportTaxPreview => 'Tax preview';
+
+  @override
+  String get fixedAssetsReportGainLoss => 'Disposal gain / loss';
+
+  @override
+  String get fixedAssetsReportTaxIdleFactor => 'Tax idle factor';
 
   @override
   String get businessSettingsPayroll => 'Payroll';
@@ -14196,6 +16475,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get windowsExitConfirmAction => 'Close';
 
   @override
+  String get windowsSoftphoneStayInTrayTitle => 'Softphone is online';
+
+  @override
+  String get windowsSoftphoneStayInTrayMessage =>
+      'The window will hide to the system tray so incoming calls can still ring.';
+
+  @override
+  String get windowsSoftphoneStayInTrayAction => 'Keep in tray';
+
+  @override
+  String get windowsSoftphoneExitAnywayAction => 'Exit';
+
+  @override
+  String get windowsTrayShow => 'Show Hesabix';
+
+  @override
+  String get windowsTrayExit => 'Exit';
+
+  @override
   String get windowsUpdateInstallWillCloseApp =>
       'The app will close after the installer starts so files can be replaced.';
 
@@ -14934,7 +17232,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmNotesBody => 'Content';
 
   @override
-  String get crmNotesLeadOptional => 'Lead (optional)';
+  String get crmNotesLeadOptional => 'Customer, lead, or deal';
 
   @override
   String get crmNotesClearLead => 'Clear lead';
@@ -15237,7 +17535,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmSectionDescription => 'Description';
 
   @override
-  String get crmSectionActivityLink => 'Customer or lead';
+  String get crmSectionActivityLink => 'Customer, lead, or deal';
 
   @override
   String get crmSectionActivityScheduling => 'Schedule';
@@ -15259,6 +17557,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmActivityClearLead => 'Clear lead';
+
+  @override
+  String get crmActivityPickDeal => 'Search & select deal';
+
+  @override
+  String get crmActivityClearDeal => 'Clear deal';
+
+  @override
+  String get crmActivityDealSearchHint => 'Title, code, or customer…';
+
+  @override
+  String get crmActivityDealSearchEmpty => 'No deal matches this search.';
 
   @override
   String get crmActivityTypeCall => 'Call';
@@ -17751,10 +20061,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmWebChatAssignTo => 'Assign to';
 
   @override
-  String get crmWebChatOptionalLeadId => 'Lead id (optional)';
+  String get crmWebChatOptionalLeadId => 'Search and select a lead (optional)';
 
   @override
-  String get crmWebChatOptionalPersonId => 'Person id (optional)';
+  String get crmWebChatOptionalPersonId =>
+      'Search and select a person (optional)';
+
+  @override
+  String get crmWebChatClearLead => 'Clear lead';
 
   @override
   String get crmWebChatUnassigned => '—';
@@ -18684,6 +20998,285 @@ class AppLocalizationsEn extends AppLocalizations {
       'Default gateway and public share link payment';
 
   @override
+  String get businessSettingsPayPage => 'Business pay link';
+
+  @override
+  String get businessSettingsPayPageDescription =>
+      'Unique username, public pay page, and incoming transfers';
+
+  @override
+  String get payPageEnabled => 'Enable public pay link';
+
+  @override
+  String get payPageEnabledHint =>
+      'When off, the public page is visible but payment is blocked';
+
+  @override
+  String get payPageUsername => 'Username';
+
+  @override
+  String get payPageUsernameHint =>
+      '3–30 characters: lowercase English letters, digits, hyphen';
+
+  @override
+  String get payPageUsernameAvailable => 'This username is available';
+
+  @override
+  String get payPageUsernameTaken => 'This username is already taken';
+
+  @override
+  String get payPageUsernameReserved => 'This username is reserved';
+
+  @override
+  String get payPageUsernameInvalid => 'Invalid username';
+
+  @override
+  String get payPageDisplayTitle => 'Page title';
+
+  @override
+  String get payPageDisplayTitleHint =>
+      'Shown as “Pay to …” at the top of the public page';
+
+  @override
+  String get payPageIntroText => 'Help text';
+
+  @override
+  String get payPageShowLogo => 'Show business logo';
+
+  @override
+  String get payPageGateway => 'Payment gateway';
+
+  @override
+  String get payPageGatewayRequired =>
+      'Select a payment gateway to enable the pay link';
+
+  @override
+  String get payPageMinAmount => 'Minimum amount';
+
+  @override
+  String get payPageMaxAmount => 'Maximum amount (optional)';
+
+  @override
+  String get payPageNotifyInApp =>
+      'In-app notification after successful payment';
+
+  @override
+  String get payPageNotifySms =>
+      'SMS to business owner after successful payment';
+
+  @override
+  String get payPageNotifyRequired =>
+      'At least in-app notification or SMS must stay on';
+
+  @override
+  String get payPageCopyLink => 'Copy link';
+
+  @override
+  String get payPageLinkCopied => 'Pay link copied';
+
+  @override
+  String get payPageOpenPreview => 'Open public page';
+
+  @override
+  String get payPagePrintPoster => 'Print poster';
+
+  @override
+  String get payPagePrintPosterHint =>
+      'Print a page with the QR code and payment address to hang at your store';
+
+  @override
+  String get payPagePosterScanTitle => 'Scan to pay';
+
+  @override
+  String get payPagePosterScanHint =>
+      'Point your camera at this code, or type the address below';
+
+  @override
+  String get payPagePosterUrlLabel => 'Payment address';
+
+  @override
+  String get payPagePosterFooter =>
+      'Scan the code or copy the address to pay online';
+
+  @override
+  String get payPagePrintNeedLink =>
+      'Save a username first so the pay link can be printed';
+
+  @override
+  String get payPagePrintFailed => 'Could not print the poster';
+
+  @override
+  String get payPagePaymentsTab => 'Incoming transfers';
+
+  @override
+  String get payPageSettingsTab => 'Settings';
+
+  @override
+  String get payPagePayerName => 'Payer name';
+
+  @override
+  String get payPagePayerMobile => 'Mobile';
+
+  @override
+  String get payPagePayerNote => 'Note';
+
+  @override
+  String get payPagePaidAt => 'Paid at';
+
+  @override
+  String payPagePayTo(String name) {
+    return 'Pay to $name';
+  }
+
+  @override
+  String get payPageAmount => 'Amount';
+
+  @override
+  String get payPageNameOptional => 'Name (optional)';
+
+  @override
+  String get payPageInvalidName =>
+      'Name may only contain letters (max 30 characters)';
+
+  @override
+  String get payPageMobileOptional => 'Mobile (optional)';
+
+  @override
+  String get payPageInvalidMobile =>
+      'Mobile must be 11 digits and start with 09';
+
+  @override
+  String get payPageNoteOptional => 'Short note (optional)';
+
+  @override
+  String get payPagePayButton => 'Pay';
+
+  @override
+  String get payPageDisabled => 'Online receiving is currently disabled';
+
+  @override
+  String get payPageNotFound => 'This pay page was not found';
+
+  @override
+  String get payPageReceiptTitle => 'Payment receipt';
+
+  @override
+  String get payPageReceiptSuccess => 'Payment completed successfully';
+
+  @override
+  String get payPageReceiptFailed =>
+      'Payment failed or was not confirmed by the bank';
+
+  @override
+  String get payPageTrackingRef => 'Tracking number';
+
+  @override
+  String payPageCurrencyHint(String currency) {
+    return 'Amount is in $currency';
+  }
+
+  @override
+  String get payPageNoGateway =>
+      'No active payment gateway is available for this business';
+
+  @override
+  String get walletTypePublicPayLink => 'Pay-link deposit';
+
+  @override
+  String get walletTypePublicInvoiceSharePay => 'Invoice-link payment';
+
+  @override
+  String get payPageAnonymousCustomer => 'Anonymous customer';
+
+  @override
+  String get payPageCustomer => 'Customer';
+
+  @override
+  String get payPageStatus => 'Status';
+
+  @override
+  String get payPageStatusSucceeded => 'Succeeded';
+
+  @override
+  String get payPageStatusFailed => 'Failed';
+
+  @override
+  String get payPageStatusPending => 'Pending';
+
+  @override
+  String get payPageMatchCustomer => 'Match existing customer by mobile';
+
+  @override
+  String get payPageMatchCustomerHint =>
+      'If a customer with this mobile already exists, the receipt is posted to their account';
+
+  @override
+  String get payPageCreateCustomer => 'Create customer when mobile is new';
+
+  @override
+  String get payPageUseAnonymous =>
+      'Use anonymous customer when mobile is empty';
+
+  @override
+  String get payPagePaymentDetails => 'Deposit details';
+
+  @override
+  String get payPageGatewayRef => 'Gateway reference';
+
+  @override
+  String get payPageFactorId => 'Gateway invoice number';
+
+  @override
+  String get payPageReceiptToken => 'Receipt code';
+
+  @override
+  String get payPageNoAccountingDocument =>
+      'No accounting document was recorded for this deposit';
+
+  @override
+  String get payPageMenu => 'Pay link';
+
+  @override
+  String get payPageSendLink => 'Send pay link';
+
+  @override
+  String get payPageSendLinkHint =>
+      'Fill in name, mobile and a note. If you enter an amount, the payer cannot change it.';
+
+  @override
+  String get payPageSendLinkAmountHint => 'Amount (optional)';
+
+  @override
+  String get payPageSendLinkAmountLockedHint =>
+      'If you enter an amount, it is locked on the link';
+
+  @override
+  String get payPageSendSms => 'Send SMS to customer';
+
+  @override
+  String get payPageShareLink => 'Share link';
+
+  @override
+  String get payPageRequestCreated => 'Pay link is ready';
+
+  @override
+  String get payPageSmsSent => 'SMS sent';
+
+  @override
+  String get payPageSmsNotSent => 'SMS was not sent';
+
+  @override
+  String get payPageMobileRequiredForSms => 'Enter a mobile number to send SMS';
+
+  @override
+  String get payPageSendLinkDisabled =>
+      'Enable the pay link in settings and set a username and gateway first';
+
+  @override
+  String get payPageAmountLocked =>
+      'The amount was set by the seller and cannot be changed';
+
+  @override
   String get businessSettingsTemplatesDescription =>
       'Design and manage PDF report and print templates';
 
@@ -18904,6 +21497,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelApplyQty => 'Apply';
+
+  @override
+  String get barcodeLabelQtyFromStock => 'Qty from stock';
+
+  @override
+  String get barcodeLabelQtyFromPurchase => 'Qty from purchase';
+
+  @override
+  String get barcodeLabelQtyNoneAvailable =>
+      'No row has a quantity for this source.';
+
+  @override
+  String get barcodeLabelPrintFromInvoice => 'Print barcodes';
+
+  @override
+  String get barcodeLabelPrintFromInvoiceEmpty =>
+      'Add at least one product line first.';
 
   @override
   String get barcodeLabelPrintItems => 'Print items';
@@ -19140,7 +21750,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelRollModeHint =>
-      'Set roll width, columns, label spacing and edge margins. Paper height follows the label count.';
+      'Set roll width, columns and margins. Each label row prints on its own page; page height is top margin + label height + bottom margin. If top and bottom are zero, the vertical gap is split equally above and below the label.';
 
   @override
   String get barcodeLabelRollWidth => 'Total roll width (mm)';
@@ -20463,4 +23073,3243 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get taxProviderSaveBeforeTest =>
       'Save the new broker credentials before testing the connection.';
+
+  @override
+  String get taxSubmissionMotamedAsa => 'Send through Motamed ASA';
+
+  @override
+  String get taxSubmissionMotamedAsaDescription =>
+      'Sign up on the Motamed ASA page; the trusted company signs and sends the invoices, so the business private key and memory ID are not needed here.';
+
+  @override
+  String get motamedAsaUnavailable =>
+      'The Motamed ASA connection has not been set up by the system administrator yet.';
+
+  @override
+  String get motamedAsaSandboxNote =>
+      'Sandbox mode is on: invoices go through Motamed ASA to the sandbox of the tax system and are not registered in the live tax system. The Sandbox fiscal memory ID of this business, issued in that sandbox, must be registered with Motamed ASA. Invoices registered in the live tax system are only inquired in this mode; correct, cancel or add payments to them after turning sandbox mode off.';
+
+  @override
+  String get motamedAsaEconomicCodeRequired =>
+      'Enter the 11 or 14 digit economic code of the business first.';
+
+  @override
+  String get motamedAsaConsentTitle => 'Send invoices through Motamed ASA';
+
+  @override
+  String get motamedAsaConsentDescription =>
+      'Motamed ASA is a trusted tax service provider. If you continue, the Motamed ASA sign-up page opens. There the business owner signs in with the one-time code of the tax system, accepts the Motamed ASA terms and allows the API key of this business to be handed to Hesabix.';
+
+  @override
+  String get motamedAsaSharedDataTitle =>
+      'What Hesabix shares with Motamed ASA';
+
+  @override
+  String get motamedAsaSharedDataSignup =>
+      'For sign-up: the economic code, the business name and the mobile number of the owner, to fill in the sign-up form.';
+
+  @override
+  String get motamedAsaSharedDataInvoices =>
+      'For every invoice you send: the data the tax system requires, including the buyer identifiers, items, amounts and payments.';
+
+  @override
+  String get motamedAsaSharedDataPurpose =>
+      'Motamed ASA uses this data to issue, send and follow up your invoices in the tax system, under its terms and privacy policy. Your choice is not limited: you can change the sending method at any time.';
+
+  @override
+  String get motamedAsaTermsLink => 'Motamed ASA terms';
+
+  @override
+  String get motamedAsaPrivacyLink => 'Motamed ASA privacy policy';
+
+  @override
+  String get motamedAsaConsentCheckbox =>
+      'I have read the above and agree that the data of this business is shared with Motamed ASA for sending invoices.';
+
+  @override
+  String get motamedAsaContinueButton => 'Continue on Motamed ASA';
+
+  @override
+  String get motamedAsaConnected =>
+      'This business is connected to Motamed ASA.';
+
+  @override
+  String get motamedAsaOnboarding =>
+      'Sign-up on Motamed ASA is in progress. When it is finished there, check the connection.';
+
+  @override
+  String get motamedAsaCredentialsRequired =>
+      'The API key of this business was not received. Enter the client ID and secret from the Motamed ASA panel.';
+
+  @override
+  String get motamedAsaNotConnected =>
+      'This business is not connected to Motamed ASA.';
+
+  @override
+  String get motamedAsaMemoryId => 'Fiscal memory ID';
+
+  @override
+  String get motamedAsaOpenSignup => 'Open the sign-up page';
+
+  @override
+  String get motamedAsaEnterCredentials => 'Enter API key';
+
+  @override
+  String get motamedAsaCheckConnection => 'Check connection';
+
+  @override
+  String get motamedAsaConnectedSuccess =>
+      'The business is connected to Motamed ASA and its invoices are sent through it.';
+
+  @override
+  String get motamedAsaSignupOpened =>
+      'The Motamed ASA sign-up page was opened. After finishing there, select Check connection.';
+
+  @override
+  String get motamedAsaLinkCopyHint =>
+      'The page did not open. Open this link in your browser:';
+
+  @override
+  String get motamedAsaSyncSuccess =>
+      'The Motamed ASA connection status was updated.';
+
+  @override
+  String get motamedAsaCredentialsTitle => 'Motamed ASA API key';
+
+  @override
+  String get motamedAsaCredentialsDescription =>
+      'In the Motamed ASA panel, open Business settings › API v2 and copy the client ID and client secret of this business.';
+
+  @override
+  String get motamedAsaClientId => 'Client ID';
+
+  @override
+  String get motamedAsaClientSecret => 'Client secret';
+
+  @override
+  String get motamedAsaClientIdInvalid =>
+      'The client ID looks like v2-customer-12345.';
+
+  @override
+  String get motamedAsaSaveCredentials => 'Connect';
+
+  @override
+  String get motamedAsaAdminTitle => 'Motamed ASA connection';
+
+  @override
+  String get motamedAsaAdminDescription =>
+      'Enter the partner client ID and secret that Motamed ASA issued for Hesabix in its API partners section. Businesses then sign up on the Motamed ASA page, and their API key is handed to Hesabix after the owner agrees.';
+
+  @override
+  String get motamedAsaBaseUrl => 'Motamed ASA API address';
+
+  @override
+  String get motamedAsaPartnerClientId => 'Partner client ID';
+
+  @override
+  String get motamedAsaPartnerClientIdInvalid =>
+      'The partner client ID starts with v2-partner-.';
+
+  @override
+  String get motamedAsaPartnerClientSecret => 'Partner client secret';
+
+  @override
+  String get motamedAsaKeepSecretHint => 'Leave empty to keep the saved value.';
+
+  @override
+  String get motamedAsaActivate => 'Allow sending through Motamed ASA';
+
+  @override
+  String get motamedAsaEnabledHint =>
+      'Businesses can select Motamed ASA as their sending method.';
+
+  @override
+  String get motamedAsaDisabledHint => 'Businesses cannot select Motamed ASA.';
+
+  @override
+  String get motamedAsaSave => 'Save Motamed ASA settings';
+
+  @override
+  String get motamedAsaSaved => 'Motamed ASA settings were saved.';
+
+  @override
+  String get motamedAsaNotConfigured =>
+      'The partner client ID and secret are not saved yet.';
+
+  @override
+  String get motamedAsaTestSuccess =>
+      'Hesabix signed in to Motamed ASA. No business or invoice was created.';
+
+  @override
+  String get motamedAsaHostedOnboarding => 'Sign-up link';
+
+  @override
+  String get motamedAsaCredentialHandover => 'API key handover';
+
+  @override
+  String get settingsMotamedAsa => 'Motamed ASA connection';
+
+  @override
+  String get settingsMotamedAsaDescription =>
+      'Partner credentials for the Motamed ASA trusted tax company';
+
+  @override
+  String get taxWorkspaceStatusColumn => 'Workspace status';
+
+  @override
+  String get taxWorkspaceStatusNoNeedReaction => 'No reaction needed';
+
+  @override
+  String get taxWorkspaceStatusAwaitingReaction => 'Awaiting buyer reaction';
+
+  @override
+  String get taxWorkspaceStatusApproved => 'Approved by buyer';
+
+  @override
+  String get taxWorkspaceStatusSystemicApproved => 'Systemically approved';
+
+  @override
+  String get taxWorkspaceStatusImpossibleReaction => 'Reaction not possible';
+
+  @override
+  String get taxWorkspaceStatusRejected => 'Rejected by buyer';
+
+  @override
+  String get taxWorkspaceStatusSystemicRejected => 'Systemically rejected';
+
+  @override
+  String get taxWorkspaceStatusCanceled => 'Cancelled';
+
+  @override
+  String get taxArticle6Column => 'Article 6';
+
+  @override
+  String get taxArticle6Violated => 'Limit exceeded';
+
+  @override
+  String get taxArticle6NotViolated => 'Within the limit';
+
+  @override
+  String get motamedAsaPaymentsAction => 'Payments in the tax workspace';
+
+  @override
+  String get motamedAsaPaymentsTitle => 'Payment table of invoice';
+
+  @override
+  String get motamedAsaPaymentsDescription =>
+      'Payments made after the invoice was sent are registered in the tax workspace through Motamed ASA. Enter the amount the buyer paid, including VAT; the tax workspace keeps the share without VAT. Rows held by the tax system cannot be edited or deleted.';
+
+  @override
+  String get motamedAsaPaymentsNotEligible =>
+      'New payments cannot be registered on this invoice.';
+
+  @override
+  String get motamedAsaPaymentsEmpty => 'No payment row yet.';
+
+  @override
+  String get motamedAsaPaymentsAddRow => 'Add payment';
+
+  @override
+  String get motamedAsaPaymentsRegister => 'Register in tax workspace';
+
+  @override
+  String get motamedAsaPaymentsRegistered =>
+      'The payments were sent for registration in the tax workspace.';
+
+  @override
+  String get motamedAsaPaymentsResultUnknown =>
+      'The answer did not arrive. The rows below are what Motamed ASA holds now; check them before sending anything again.';
+
+  @override
+  String get motamedAsaPaymentType => 'Payment method';
+
+  @override
+  String get motamedAsaPaymentDate => 'Payment date';
+
+  @override
+  String get motamedAsaPaymentAmount => 'Amount paid (rial, including VAT)';
+
+  @override
+  String get motamedAsaPaymentTraceNo => 'Trace number';
+
+  @override
+  String get motamedAsaPaymentTerminal => 'Terminal number';
+
+  @override
+  String get motamedAsaPaymentDescription => 'Description';
+
+  @override
+  String get motamedAsaPaymentRegisteredAmount => 'Registered amount';
+
+  @override
+  String get motamedAsaPaymentRemoveRow => 'Remove row';
+
+  @override
+  String get motamedAsaPaymentAmountInvalid =>
+      'Enter a whole rial amount greater than zero.';
+
+  @override
+  String get motamedAsaPaymentDigitsInvalid =>
+      'Digits only, within the allowed length.';
+
+  @override
+  String get motamedAsaPaymentDateRequired =>
+      'Choose the payment date of every row.';
+
+  @override
+  String get motamedAsaPaymentTypeCheque => 'Cheque';
+
+  @override
+  String get motamedAsaPaymentTypeBarter => 'Offset';
+
+  @override
+  String get motamedAsaPaymentTypeCash => 'Cash';
+
+  @override
+  String get motamedAsaPaymentTypePos => 'Card reader (POS)';
+
+  @override
+  String get motamedAsaPaymentTypeInternet => 'Payment gateway';
+
+  @override
+  String get motamedAsaPaymentTypeCard => 'Card to card';
+
+  @override
+  String get motamedAsaPaymentTypeTransfer => 'Bank transfer';
+
+  @override
+  String get motamedAsaPaymentTypeOther => 'Other';
+
+  @override
+  String get motamedAsaPaymentStatusRegistered => 'Registered';
+
+  @override
+  String get motamedAsaPaymentStatusSentWithInvoice => 'Sent with the invoice';
+
+  @override
+  String get motamedAsaPaymentStatusQueued => 'Queued for registration';
+
+  @override
+  String get motamedAsaPaymentStatusNotRegistered => 'Goes with the invoice';
+
+  @override
+  String get motamedAsaPaymentStatusUnknown => 'Result unknown';
+
+  @override
+  String get motamedAsaPaymentStatusRejected => 'Rejected';
+
+  @override
+  String get motamedAsaPaymentStatusFailed => 'Failed';
+
+  @override
+  String get motamedAsaPaymentStatusNotApplicable => 'Not sent';
+
+  @override
+  String get distributionLocationConsentTitle => 'Location sharing consent';
+
+  @override
+  String get distributionLocationConsentHint =>
+      'Allow live location so managers can see you on the team map. It is sent only during an open visit.';
+
+  @override
+  String get distributionLocationConsentAllow => 'Allow';
+
+  @override
+  String get distributionLocationConsentActive =>
+      'Live location is on for the team map.';
+
+  @override
+  String get distributionLocationConsentRevoke => 'Revoke';
+
+  @override
+  String get distributionPlanPublished => 'Today\'s plan is published';
+
+  @override
+  String get distributionPlanUnpublished =>
+      'Today\'s plan is not published yet';
+
+  @override
+  String get distributionPlanLockedHint =>
+      'Stop order is locked until a manager unlocks it.';
+
+  @override
+  String get distributionPlanPublishHint =>
+      'Publishing makes the plan official and can lock route order.';
+
+  @override
+  String get distributionPlanPublish => 'Publish plan';
+
+  @override
+  String get distributionPlanPublishAll => 'Publish all assigned';
+
+  @override
+  String get distributionPlanPublishAllHint =>
+      'Publishes this day\'s plan for every visitor assigned to a route.';
+
+  @override
+  String get distributionPlanPublishAllDone =>
+      'Assigned visitors\' plans were published.';
+
+  @override
+  String get distributionPlanPublishAllEmpty =>
+      'No assigned visitors for this day.';
+
+  @override
+  String get distributionPlanUnlock => 'Unlock';
+
+  @override
+  String get distributionRequireLocationConsent => 'Per-user GPS consent';
+
+  @override
+  String get distributionRequireLocationConsentHint =>
+      'Live location is stored only after the visitor consents.';
+
+  @override
+  String get distributionExclusiveAssignments => 'Exclusive route assignment';
+
+  @override
+  String get distributionExclusiveAssignmentsHint =>
+      'A route can be assigned to only one visitor in a date range.';
+
+  @override
+  String get distributionExclusiveTerritories => 'Exclusive territories';
+
+  @override
+  String get distributionExclusiveTerritoriesHint =>
+      'Only one active visitor per territory in a date range.';
+
+  @override
+  String get distributionExclusiveCustomerOwnership => 'Customer ownership';
+
+  @override
+  String get distributionExclusiveCustomerOwnershipHint =>
+      'Another visitor cannot visit a customer owned by a colleague.';
+
+  @override
+  String get distributionLockPublishedPlans => 'Lock plan after publish';
+
+  @override
+  String get distributionLockPublishedPlansHint =>
+      'After official publish, day-order optimization is locked.';
+
+  @override
+  String get distributionRequirePublishedPlan => 'Require published daily plan';
+
+  @override
+  String get distributionRequirePublishedPlanHint =>
+      'Visits can start only after today\'s plan is published.';
+
+  @override
+  String get distributionTerritoryParent => 'Parent territory';
+
+  @override
+  String get distributionTerritorySupervisor => 'Territory supervisor';
+
+  @override
+  String get distributionWorkspaceSupervisor =>
+      'Distribution — regional supervisor';
+
+  @override
+  String get distributionWorkspaceOffice => 'Distribution — office';
+
+  @override
+  String get repairShopMenu => 'Repair shop';
+
+  @override
+  String get repairShopTitle => 'Repair shop';
+
+  @override
+  String get repairShopNewOrder => 'New order';
+
+  @override
+  String get repairShopEmptyOrders => 'No repair orders yet';
+
+  @override
+  String get repairShopEmptyOrdersHint =>
+      'Use the button below to register the first repair order';
+
+  @override
+  String get repairShopCreateFirstOrder => 'Create repair order';
+
+  @override
+  String get repairShopSearchHint =>
+      'Search (code, customer, phone, product)...';
+
+  @override
+  String get repairShopDateFilter => 'Received date filter';
+
+  @override
+  String get repairShopDateFrom => 'From date';
+
+  @override
+  String get repairShopDateTo => 'To date';
+
+  @override
+  String repairShopDateRange(String from, String to) {
+    return 'From $from to $to';
+  }
+
+  @override
+  String get repairShopStatusFilter => 'Status filter';
+
+  @override
+  String repairShopTotalCount(int count) {
+    return 'Total: $count';
+  }
+
+  @override
+  String repairShopReceivedOn(String date) {
+    return 'Received: $date';
+  }
+
+  @override
+  String repairShopLoadOrdersError(String error) {
+    return 'Could not load orders: $error';
+  }
+
+  @override
+  String repairShopLoadOrderError(String error) {
+    return 'Could not load the order: $error';
+  }
+
+  @override
+  String repairShopLoadSettingsError(String error) {
+    return 'Could not load settings: $error';
+  }
+
+  @override
+  String repairShopLoadTechniciansError(String error) {
+    return 'Could not load technicians: $error';
+  }
+
+  @override
+  String repairShopSaveOrderError(String error) {
+    return 'Could not save the order: $error';
+  }
+
+  @override
+  String repairShopSaveSettingsError(String error) {
+    return 'Could not save settings: $error';
+  }
+
+  @override
+  String repairShopErrorWithDetails(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get repairShopStatusReceived => 'Received';
+
+  @override
+  String get repairShopStatusAssigned => 'Assigned';
+
+  @override
+  String get repairShopStatusInProgress => 'In repair';
+
+  @override
+  String get repairShopStatusWaitingParts => 'Waiting for parts';
+
+  @override
+  String get repairShopStatusTesting => 'Testing';
+
+  @override
+  String get repairShopStatusCompletedFixed => 'Repaired';
+
+  @override
+  String get repairShopStatusCompletedUnfixable => 'Unrepairable';
+
+  @override
+  String get repairShopStatusReadyForPickup => 'Ready for pickup';
+
+  @override
+  String get repairShopStatusDelivered => 'Delivered';
+
+  @override
+  String get repairShopStatusCancelled => 'Cancelled';
+
+  @override
+  String get repairShopNewOrderTitle => 'New repair order';
+
+  @override
+  String get repairShopEditOrderTitle => 'Edit order';
+
+  @override
+  String get repairShopCustomer => 'Customer';
+
+  @override
+  String get repairShopCustomerHint => 'Search and select a customer';
+
+  @override
+  String get repairShopCustomerSearchHint =>
+      'Search by name, phone, or email...';
+
+  @override
+  String get repairShopCustomerSubtitle => 'Order customer';
+
+  @override
+  String get repairShopSelectCustomer => 'Please select a customer';
+
+  @override
+  String get repairShopCatalogProduct => 'Catalog item (optional)';
+
+  @override
+  String get repairShopCatalogProductHint => 'Search products';
+
+  @override
+  String get repairShopProductName => 'Item / device name';
+
+  @override
+  String get repairShopProductNameHint =>
+      'If the item is not in the catalog, type the name';
+
+  @override
+  String get repairShopProductNameRequired => 'Item name is required';
+
+  @override
+  String get repairShopWarrantyCodeId => 'Warranty code ID (optional)';
+
+  @override
+  String get repairShopWarrantyCodeHelper =>
+      'If the device is under warranty, enter the warranty code ID';
+
+  @override
+  String get repairShopSerialOptional => 'Serial number (optional)';
+
+  @override
+  String get repairShopProblemDescription => 'Problem description';
+
+  @override
+  String get repairShopProblemRequired => 'Problem description is required';
+
+  @override
+  String get repairShopCustomerNotesOptional => 'Customer notes (optional)';
+
+  @override
+  String get repairShopTechnicianNotesOptional => 'Technician notes (optional)';
+
+  @override
+  String get repairShopEstimatedCostOptional => 'Estimated cost (optional)';
+
+  @override
+  String get repairShopEstimatedCostHelper =>
+      'In the business default currency';
+
+  @override
+  String get repairShopEstimatedDeliveryOptional =>
+      'Estimated delivery date (optional)';
+
+  @override
+  String get repairShopSaveChanges => 'Save changes';
+
+  @override
+  String get repairShopSubmitOrder => 'Submit order';
+
+  @override
+  String get repairShopOrderCreated => 'Repair order registered successfully';
+
+  @override
+  String get repairShopOrderUpdated => 'Order updated successfully';
+
+  @override
+  String get repairShopSelectNewStatus => 'Select new status';
+
+  @override
+  String get repairShopCancelOrder => 'Cancel order';
+
+  @override
+  String get repairShopCancelOrderConfirm =>
+      'Are you sure you want to cancel this order?';
+
+  @override
+  String get repairShopCancelYes => 'Yes, cancel';
+
+  @override
+  String get repairShopOrderCancelled => 'Order cancelled';
+
+  @override
+  String get repairShopNeedActiveTechnician =>
+      'Define an active technician first';
+
+  @override
+  String get repairShopTechnicianAssigned => 'Technician assigned';
+
+  @override
+  String repairShopChangeStatusTo(String status) {
+    return 'Change status to $status';
+  }
+
+  @override
+  String get repairShopStatusChanged => 'Status updated';
+
+  @override
+  String get repairShopCompleteFixedTitle => 'Complete as repaired';
+
+  @override
+  String get repairShopCompleteUnfixableTitle => 'Unrepairable';
+
+  @override
+  String get repairShopNotesHint => 'Notes...';
+
+  @override
+  String get repairShopRepairCompleted => 'Repair completed';
+
+  @override
+  String get repairShopDeliverToCustomer => 'Deliver item to customer';
+
+  @override
+  String get repairShopDeliveryNotesHint => 'Delivery note (optional)';
+
+  @override
+  String get repairShopItemDelivered => 'Item delivered';
+
+  @override
+  String get repairShopInvoiceRequiresCost =>
+      'Register labor or a part before issuing an invoice';
+
+  @override
+  String get repairShopIssueInvoice => 'Issue invoice';
+
+  @override
+  String repairShopIssueInvoiceConfirm(String amount) {
+    return 'A sales invoice for $amount will be issued. Continue?';
+  }
+
+  @override
+  String get repairShopIssueInvoiceYes => 'Yes, issue invoice';
+
+  @override
+  String get repairShopInvoiceIssued => 'Invoice issued successfully';
+
+  @override
+  String repairShopInvoiceIssuedWithCode(String code) {
+    return 'Invoice $code issued';
+  }
+
+  @override
+  String get repairShopPartAdded => 'Part added';
+
+  @override
+  String get repairShopDeletePart => 'Delete part';
+
+  @override
+  String repairShopDeletePartConfirm(String name) {
+    return 'Delete part “$name”?';
+  }
+
+  @override
+  String get repairShopPartDeleted => 'Part deleted';
+
+  @override
+  String get repairShopLaborSaved => 'Labor saved';
+
+  @override
+  String get repairShopAttachmentType => 'Attachment type';
+
+  @override
+  String get repairShopAttachmentBefore => 'Before repair';
+
+  @override
+  String get repairShopAttachmentDuring => 'During repair';
+
+  @override
+  String get repairShopAttachmentAfter => 'After repair';
+
+  @override
+  String get repairShopFileIdMissing => 'File ID was not returned after upload';
+
+  @override
+  String get repairShopAttachmentAdded => 'Attachment added';
+
+  @override
+  String get repairShopDeleteAttachment => 'Delete attachment';
+
+  @override
+  String repairShopDeleteAttachmentConfirm(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String get repairShopOrderDetails => 'Order details';
+
+  @override
+  String get repairShopEditOrder => 'Edit order';
+
+  @override
+  String get repairShopChangeStatus => 'Change status';
+
+  @override
+  String get repairShopOrderNotFound => 'Order not found';
+
+  @override
+  String repairShopInvoiceWithCode(String code) {
+    return 'Invoice $code';
+  }
+
+  @override
+  String get repairShopInvoiceIssuedLabel => 'Invoice issued';
+
+  @override
+  String get repairShopCustomerInfo => 'Customer details';
+
+  @override
+  String get repairShopName => 'Name';
+
+  @override
+  String get repairShopProductInfo => 'Item details';
+
+  @override
+  String get repairShopProductNameLabel => 'Item name';
+
+  @override
+  String get repairShopSerial => 'Serial';
+
+  @override
+  String get repairShopWarrantyCode => 'Warranty code';
+
+  @override
+  String get repairShopProblemSection => 'Problem description';
+
+  @override
+  String get repairShopCustomerNotesLabel => 'Customer notes:';
+
+  @override
+  String get repairShopTechnicianNotesLabel => 'Technician notes:';
+
+  @override
+  String get repairShopTechnician => 'Technician';
+
+  @override
+  String get repairShopNoTechnicianAssigned => 'No technician assigned yet';
+
+  @override
+  String get repairShopCosts => 'Costs';
+
+  @override
+  String get repairShopLabor => 'Labor';
+
+  @override
+  String get repairShopParts => 'Parts';
+
+  @override
+  String get repairShopTechnicianCommission => 'Technician commission';
+
+  @override
+  String get repairShopGrandTotal => 'Total';
+
+  @override
+  String get repairShopAttachments => 'Attachments';
+
+  @override
+  String get repairShopNoAttachments => 'No attachments yet';
+
+  @override
+  String get repairShopAddPhotoOrFile => 'Add photo or file';
+
+  @override
+  String get repairShopUsedParts => 'Parts used';
+
+  @override
+  String get repairShopNoParts => 'No parts recorded';
+
+  @override
+  String repairShopPartQtyPrice(String qty, String price) {
+    return 'Qty: $qty × $price';
+  }
+
+  @override
+  String get repairShopStatusHistory => 'Status history';
+
+  @override
+  String get repairShopDates => 'Dates';
+
+  @override
+  String get repairShopReceived => 'Received';
+
+  @override
+  String get repairShopEstimatedDelivery => 'Estimated delivery';
+
+  @override
+  String get repairShopCompletedAt => 'Repair completed';
+
+  @override
+  String get repairShopDeliveredAt => 'Delivered';
+
+  @override
+  String get repairShopAssignTechnician => 'Assign technician';
+
+  @override
+  String get repairShopChangeTechnician => 'Change technician';
+
+  @override
+  String get repairShopStartRepair => 'Start repair';
+
+  @override
+  String get repairShopAddPart => 'Add part';
+
+  @override
+  String get repairShopSetLabor => 'Set labor';
+
+  @override
+  String get repairShopWaitingPart => 'Waiting for part';
+
+  @override
+  String get repairShopTest => 'Test';
+
+  @override
+  String get repairShopContinueRepair => 'Continue repair';
+
+  @override
+  String get repairShopReadyForPickupAction => 'Ready for pickup';
+
+  @override
+  String get repairShopDeliverToCustomerAction => 'Deliver to customer';
+
+  @override
+  String get repairShopOptionalNoteHint => 'Note (optional)';
+
+  @override
+  String get repairShopSelectTechnician => 'Select technician';
+
+  @override
+  String get repairShopSearchNameOrCode => 'Search name or code...';
+
+  @override
+  String get repairShopNoTechnicianFound => 'No technician found';
+
+  @override
+  String get repairShopLaborTitle => 'Repair labor';
+
+  @override
+  String get repairShopLaborAmount => 'Labor amount';
+
+  @override
+  String get repairShopEnterValidAmount => 'Enter a valid amount';
+
+  @override
+  String get repairShopRegister => 'Save';
+
+  @override
+  String get repairShopAddPartTitle => 'Add part';
+
+  @override
+  String get repairShopPart => 'Part';
+
+  @override
+  String get repairShopSearchSelectPart => 'Search and select a part';
+
+  @override
+  String get repairShopUnitPrice => 'Unit price';
+
+  @override
+  String get repairShopSelectPart => 'Select a part';
+
+  @override
+  String get repairShopEnterValidQty => 'Enter a valid quantity';
+
+  @override
+  String get repairShopTechniciansTitle => 'Technicians';
+
+  @override
+  String get repairShopDeactivateTechnician => 'Deactivate technician';
+
+  @override
+  String repairShopDeactivateTechnicianConfirm(String name) {
+    return 'Are you sure you want to deactivate “$name”?';
+  }
+
+  @override
+  String get repairShopDeactivateYes => 'Yes, deactivate';
+
+  @override
+  String get repairShopTechnicianDeactivated => 'Technician deactivated';
+
+  @override
+  String get repairShopHideInactive => 'Hide inactive';
+
+  @override
+  String get repairShopShowInactive => 'Show inactive';
+
+  @override
+  String get repairShopNoTechnicians => 'No technicians yet';
+
+  @override
+  String get repairShopAddTechnician => 'Add technician';
+
+  @override
+  String get repairShopNewTechnician => 'New technician';
+
+  @override
+  String get repairShopEditTechnician => 'Edit technician';
+
+  @override
+  String repairShopCodeWithValue(String code) {
+    return 'Code: $code';
+  }
+
+  @override
+  String get repairShopSelectPerson => 'Please select a person';
+
+  @override
+  String get repairShopPersonHint => 'Search and select a person';
+
+  @override
+  String get repairShopTechnicianCodeOptional => 'Technician code (optional)';
+
+  @override
+  String get repairShopTechnicianCodeHelper =>
+      'If empty, a code is generated automatically';
+
+  @override
+  String get repairShopCommissionType => 'Commission type';
+
+  @override
+  String get repairShopCommissionFixed => 'Fixed amount';
+
+  @override
+  String get repairShopCommissionPercentage => 'Percentage';
+
+  @override
+  String get repairShopCommissionCaseByCase => 'Case by case';
+
+  @override
+  String get repairShopCommissionPercentValue => 'Commission percent';
+
+  @override
+  String get repairShopCommissionFixedValue => 'Commission amount';
+
+  @override
+  String get repairShopCommissionPercentHelper => 'Percent of repair labor';
+
+  @override
+  String get repairShopCommissionFixedHelper =>
+      'Fixed amount in the business default currency';
+
+  @override
+  String get repairShopValueRequired => 'Value is required';
+
+  @override
+  String get repairShopEnterValidNumber => 'Enter a valid number';
+
+  @override
+  String get repairShopTechnicianActive =>
+      'Active technician available for assignment';
+
+  @override
+  String get repairShopSettingsSaved => 'Settings saved';
+
+  @override
+  String get repairShopNumberingSection => 'Order numbering';
+
+  @override
+  String get repairShopNumberingFormat => 'Numbering format';
+
+  @override
+  String get repairShopNumberingFormatHelper =>
+      'Sequential: REC-2025-0001 | Random: REC-A7B3C9';
+
+  @override
+  String get repairShopSequential => 'Sequential';
+
+  @override
+  String get repairShopRandom => 'Random';
+
+  @override
+  String get repairShopCodePrefix => 'Code prefix';
+
+  @override
+  String get repairShopCodePrefixHelper => 'Example: REC, REP, REPAIR';
+
+  @override
+  String get repairShopPrefixRequired => 'Prefix is required';
+
+  @override
+  String get repairShopPrefixMaxLength => 'Maximum 10 characters';
+
+  @override
+  String get repairShopInvoiceWarehouseSection =>
+      'Invoice and warehouse defaults';
+
+  @override
+  String get repairShopServiceProduct => 'Repair service product';
+
+  @override
+  String get repairShopServiceProductHint =>
+      'Default service for the labor invoice line';
+
+  @override
+  String get repairShopDefaultPartsWarehouse => 'Default parts warehouse';
+
+  @override
+  String get repairShopDefaultPartsWarehouseHint => 'Warehouse for parts issue';
+
+  @override
+  String get repairShopServiceProductAutoCreate =>
+      'If no service product is selected, the system creates a “Repair service” item when issuing the invoice.';
+
+  @override
+  String get repairShopAutoNotifications => 'Automatic notifications';
+
+  @override
+  String get repairShopSmsOnReceive => 'SMS on order receipt';
+
+  @override
+  String get repairShopSmsOnReceiveHint =>
+      'Send an SMS automatically when a new order is received';
+
+  @override
+  String get repairShopSmsOnStatus => 'SMS on status change';
+
+  @override
+  String get repairShopSmsOnStatusHint =>
+      'Send an SMS automatically when the status changes';
+
+  @override
+  String get repairShopEmailOnReceive => 'Email on order receipt';
+
+  @override
+  String get repairShopEmailOnReceiveHint =>
+      'Send an email automatically when a new order is received';
+
+  @override
+  String get repairShopEmailOnStatus => 'Email on status change';
+
+  @override
+  String get repairShopEmailOnStatusHint =>
+      'Send an email automatically when the status changes';
+
+  @override
+  String get repairShopHelp => 'Help';
+
+  @override
+  String get repairShopHelpSequentialTitle => 'Sequential format';
+
+  @override
+  String get repairShopHelpSequentialBody =>
+      'Codes are generated as REC-2025-0001, REC-2025-0002, and so on';
+
+  @override
+  String get repairShopHelpRandomTitle => 'Random format';
+
+  @override
+  String get repairShopHelpRandomBody =>
+      'Codes are generated as REC-A7B3C9, REC-XY4K2L, and so on';
+
+  @override
+  String get repairShopHelpNotifyTitle => 'Automatic notifications';
+
+  @override
+  String get repairShopHelpNotifyBody =>
+      'To use this, enable SMS and email settings in general settings first';
+
+  @override
+  String get repairShopSaveSettings => 'Save settings';
+
+  @override
+  String get telephonyMenu => 'Telephony';
+
+  @override
+  String get telephonySubtitle =>
+      'Issabel/Asterisk · Screen Pop · Click-to-Call';
+
+  @override
+  String get telephonyDialer => 'Dialer';
+
+  @override
+  String get telephonyLive => 'Live';
+
+  @override
+  String get telephonyReports => 'Reports';
+
+  @override
+  String get telephonyInboundToday => 'Inbound today';
+
+  @override
+  String get telephonyOutboundToday => 'Outbound today';
+
+  @override
+  String get telephonyAnswered => 'Answered';
+
+  @override
+  String get telephonyMissed => 'Missed';
+
+  @override
+  String get telephonyActiveCall => 'Active call';
+
+  @override
+  String get telephonyMyMissed => 'My missed';
+
+  @override
+  String get telephonyPbxStatusTitle => 'PBX status';
+
+  @override
+  String get telephonyNoPbxConnected => 'No phone system is connected yet.';
+
+  @override
+  String get telephonyConnectIssabel => 'Connect Issabel';
+
+  @override
+  String get telephonyAskAdminMapExt =>
+      'Ask the telephony admin to connect the PBX and assign your extension.';
+
+  @override
+  String get telephonyOnline => 'Online';
+
+  @override
+  String get telephonyOffline => 'Offline';
+
+  @override
+  String get telephonyCallHistoryTitle => 'Call history';
+
+  @override
+  String get telephonyCallHistoryShort => 'Call history';
+
+  @override
+  String get telephonySearchNumberOrNote => 'Search number or note';
+
+  @override
+  String get telephonyFilterSuccessful => 'Successful';
+
+  @override
+  String get telephonyCallDetails => 'Call details';
+
+  @override
+  String get telephonyNote => 'Note';
+
+  @override
+  String get telephonyCategoryHint => 'Category (sales/support/finance)';
+
+  @override
+  String get telephonyDefaultPbxName => 'Main PBX';
+
+  @override
+  String get telephonyAddPbx => 'Add PBX';
+
+  @override
+  String get telephonyPbxName => 'Name';
+
+  @override
+  String get telephonyCreatePbxFirst => 'Create a PBX first';
+
+  @override
+  String get telephonyAddExtension => 'Add extension';
+
+  @override
+  String get telephonyPbx => 'PBX';
+
+  @override
+  String get telephonyExtensionNumber => 'Extension number';
+
+  @override
+  String get telephonyDisplayName => 'Display name';
+
+  @override
+  String get telephonyTeamCode => 'Team/queue code';
+
+  @override
+  String get telephonyTeamCodeHint => 'e.g. sales';
+
+  @override
+  String get telephonyAllowSharedExt => 'Allow shared extension';
+
+  @override
+  String get telephonyAllowSharedExtHint =>
+      'Off = each extension belongs to one user';
+
+  @override
+  String get telephonyCreateExtFirst => 'Define an extension first';
+
+  @override
+  String get telephonyMapExtSoftphone => 'Map extension / Softphone';
+
+  @override
+  String get telephonyEditSoftphoneMapping => 'Edit Softphone mapping';
+
+  @override
+  String get telephonyBusinessUser => 'Business user';
+
+  @override
+  String get telephonyExtension => 'Extension';
+
+  @override
+  String get telephonyEndpointMode => 'Endpoint mode';
+
+  @override
+  String get telephonyEndpointModeHint =>
+      'relay = in-app Softphone · desk = desk phone · direct = PJSIP/WebRTC';
+
+  @override
+  String get telephonyEndpointRelay => 'Relay (Softphone inside Hesabix)';
+
+  @override
+  String get telephonyEndpointDesk => 'Desk (external SIP phone)';
+
+  @override
+  String get telephonyEndpointDirect => 'Direct (optional direct register)';
+
+  @override
+  String get telephonyAllowFallback => 'Allow fallback';
+
+  @override
+  String get telephonyAllowFallbackHint =>
+      'If the primary mode is unavailable, use the alternate mode';
+
+  @override
+  String get telephonyPrimaryExtension => 'Primary extension';
+
+  @override
+  String get telephonyTeamSupervisor => 'Team supervisor for this extension';
+
+  @override
+  String get telephonyTeamSupervisorHint =>
+      'If the extension has a team code, this user sees that team live and reports';
+
+  @override
+  String get telephonyDirectSipHint => 'Optional — for direct provision';
+
+  @override
+  String get telephonySoftphoneRelayEnabled => 'Relay enabled';
+
+  @override
+  String get telephonySoftphoneRelayHint =>
+      'Audio via Connector without exposing the PBX';
+
+  @override
+  String get telephonySoftphoneDirectEnabled => 'Direct enabled';
+
+  @override
+  String get telephonySoftphoneDirectHint =>
+      'Direct WebRTC/PJSIP register (needs network access to PBX)';
+
+  @override
+  String get telephonyMaxSoftphoneSessions =>
+      'Max concurrent Softphone sessions';
+
+  @override
+  String get telephonyAudiosocketPort => 'Local Connector AudioSocket port';
+
+  @override
+  String get telephonySoftphoneSettingsSaved => 'Softphone settings saved';
+
+  @override
+  String get telephonySettingsTitle => 'Telephony settings';
+
+  @override
+  String get telephonyManageOnlyHint =>
+      'Only the telephony admin can manage the connection, extensions, and assignments.';
+
+  @override
+  String get telephonyConnectorTokenOnce => 'Connector token (shown only once)';
+
+  @override
+  String get telephonyCopyToken => 'Copy token';
+
+  @override
+  String get telephonySetupStepsTitle => 'Setup steps';
+
+  @override
+  String get telephonySetupSteps =>
+      '1) Create a PBX and copy the token\n2) Run the install command on the Issabel/Asterisk server\n3) Define extensions and assign them to users\n4) For in-app Softphone: set endpoint mode to Relay';
+
+  @override
+  String get telephonyRelaySetupTitle => 'Softphone Relay setup';
+
+  @override
+  String get telephonyRelaySetupBody =>
+      'After installing the Connector, on the phone server:\n• pip install -r requirements-softphone.txt\n• MEDIA_TUNNEL_ENABLED=1 and AUDIOSOCKET_PORT=9092 in .env\n• hesabix-pbx restart\nThen set the user mapping to Relay and go online from the Softphone page.';
+
+  @override
+  String get telephonyOpenSoftphone => 'Open Softphone';
+
+  @override
+  String get telephonyOneLineIssabelInstall => 'One-line install on Issabel';
+
+  @override
+  String get telephonyInstallCommandHelp =>
+      'This command installs the Connector from the Hesabix repository and creates the hesabix-pbx command. In the wizard enter only the API key (Profile → API keys); then pick the business and PBX from the list.';
+
+  @override
+  String get telephonyInstallCopied => 'Install command copied';
+
+  @override
+  String get telephonyCopyInstallCommand => 'Copy install command';
+
+  @override
+  String get telephonyManageCommandsCopied => 'Management commands copied';
+
+  @override
+  String get telephonyCopyManageCommands => 'Copy management commands';
+
+  @override
+  String get telephonyAfterInstallHint =>
+      'After install: hesabix-pbx test  ·  update: hesabix-pbx update';
+
+  @override
+  String get telephonyScreenPopHint => 'Show caller info when ringing';
+
+  @override
+  String get telephonyAutoCrmActivity => 'Auto-create CRM activity';
+
+  @override
+  String get telephonyAutoCrmActivityHint =>
+      'Log a call activity after the conversation ends';
+
+  @override
+  String get telephonyForcePostCallForm => 'Required post-call form';
+
+  @override
+  String get telephonyForcePostCallFormHint =>
+      'The operator must record the call outcome';
+
+  @override
+  String get telephonyMissedCallTask => 'Task for missed calls';
+
+  @override
+  String get telephonyMissedCallTaskHint =>
+      'Create a follow-up task after an unanswered call';
+
+  @override
+  String get telephonyFollowUpMinutes => 'Follow-up due (minutes)';
+
+  @override
+  String get telephonyRecordingAccess => 'Call recording access';
+
+  @override
+  String get telephonyRecordingAccessAllOperatorsHint =>
+      'Operators only hear in-scope own/team recordings';
+
+  @override
+  String get telephonyRecordingAccessOwnerHint =>
+      'Call owner and supervisor/manager';
+
+  @override
+  String get telephonyRecordingAccessPermissionHint =>
+      'listen_recordings permission within allowed scope';
+
+  @override
+  String get telephonyRecordingAccessPermissionBased => 'Permission-based';
+
+  @override
+  String get telephonyRecordingAccessOwnerManagers => 'Owner and managers';
+
+  @override
+  String get telephonyRecordingAccessAllowedOps => 'Allowed operators';
+
+  @override
+  String get telephonyMultiPbx => 'Multiple PBXs';
+
+  @override
+  String get telephonyMultiPbxHint =>
+      'If off, only one PBX is allowed for the business';
+
+  @override
+  String get telephonyPbxs => 'Phone systems';
+
+  @override
+  String get telephonyNewToken => 'New token';
+
+  @override
+  String get telephonyExtensions => 'Extensions';
+
+  @override
+  String get telephonyExtensionsHint =>
+      'The Connector syncs the extension list on heartbeat. Each extension is exclusive by default.';
+
+  @override
+  String get telephonyShareable => 'Shareable';
+
+  @override
+  String get telephonyExclusive => 'Exclusive';
+
+  @override
+  String get telephonyUserExtMapping => 'User ↔ extension / Softphone mapping';
+
+  @override
+  String get telephonyUserExtMappingHint =>
+      'Each extension belongs to one user by default. Pick a business user from the list.';
+
+  @override
+  String get telephonyAssignExtension => 'Assign extension';
+
+  @override
+  String get telephonyPrimary => 'Primary';
+
+  @override
+  String get telephonySecondary => 'Secondary';
+
+  @override
+  String get telephonyNoFallback => 'no fallback';
+
+  @override
+  String get telephonyEditMapping => 'Edit mapping';
+
+  @override
+  String get telephonyOpsHealth => 'Operations and health';
+
+  @override
+  String get telephonyOpsHealthHint => 'Connector metrics and error queue';
+
+  @override
+  String get telephonyMetrics => 'Metrics';
+
+  @override
+  String get telephonyResolved => 'Resolved';
+
+  @override
+  String get telephonyStatusMissed => 'Missed';
+
+  @override
+  String get telephonyStatusCompleted => 'Completed';
+
+  @override
+  String get telephonyStatusAnswered => 'Answered';
+
+  @override
+  String get telephonyStatusRinging => 'Ringing';
+
+  @override
+  String get telephonyStatusBusy => 'Busy';
+
+  @override
+  String get telephonyStatusFailed => 'Failed';
+
+  @override
+  String get telephonyStatusActive => 'Active';
+
+  @override
+  String get telephonyReportsTitle => 'Call reports';
+
+  @override
+  String get telephonyReportsShort => 'Call report';
+
+  @override
+  String get telephonyReportsForbidden =>
+      'You do not have call-report permission for your own/team scope.';
+
+  @override
+  String get telephonyOperators => 'Operators';
+
+  @override
+  String get telephonyTotal => 'Total';
+
+  @override
+  String get telephonyInbound => 'Inbound';
+
+  @override
+  String get telephonyOutbound => 'Outbound';
+
+  @override
+  String get telephonyAnswer => 'Answer';
+
+  @override
+  String get telephonyAnswerRate => 'Answer rate';
+
+  @override
+  String get telephonyAvgTalk => 'Avg talk time';
+
+  @override
+  String get telephonyHourlyDistribution => 'Hourly distribution';
+
+  @override
+  String get telephonyLiveDashboardTitle => 'Live call dashboard';
+
+  @override
+  String get telephonyLiveForbidden =>
+      'You do not have live-monitor permission for your own/team scope.';
+
+  @override
+  String get telephonyLiveHeadline => 'Telephony — live';
+
+  @override
+  String get telephonyRefreshEvery3s => 'Refresh every 3 seconds';
+
+  @override
+  String get telephonyWaiting => 'Waiting';
+
+  @override
+  String get telephonyTalking => 'In conversation';
+
+  @override
+  String get telephonyMissedToday => 'Missed today';
+
+  @override
+  String get telephonyOperatorsOnline => 'Operators online';
+
+  @override
+  String get telephonyBlfTitle => 'Extension status (BLF)';
+
+  @override
+  String get telephonyActiveCalls => 'Active calls';
+
+  @override
+  String get telephonyNoActiveCalls => 'No call in progress';
+
+  @override
+  String get telephonyHold => 'Hold';
+
+  @override
+  String get telephonyResume => 'Resume';
+
+  @override
+  String get telephonyHangup => 'Hang up';
+
+  @override
+  String get telephonyTransfer => 'Transfer';
+
+  @override
+  String get telephonyTransferCall => 'Transfer call';
+
+  @override
+  String get telephonyDestExtension => 'Destination extension';
+
+  @override
+  String get telephonyQueues => 'Queues';
+
+  @override
+  String get telephonySoftphoneTitle => 'Softphone';
+
+  @override
+  String get telephonySoftphoneBranded => 'Hesabix Softphone';
+
+  @override
+  String get telephonySoftphoneHelp =>
+      'Media is relayed through the Connector add-on; you do not need to expose PBX ports to the internet. Microphone and playback are enabled on this page.';
+
+  @override
+  String get telephonyMode => 'Mode';
+
+  @override
+  String get telephonyMediaTunnel => 'Media tunnel';
+
+  @override
+  String get telephonyDisconnected => 'Disconnected';
+
+  @override
+  String get telephonyAudioBridge => 'Audio bridge';
+
+  @override
+  String get telephonyLocalAudio => 'Local audio';
+
+  @override
+  String get telephonyReady => 'Ready';
+
+  @override
+  String get telephonyOff => 'Off';
+
+  @override
+  String get telephonyInactive => 'Inactive';
+
+  @override
+  String get telephonyDisconnectSoftphone => 'Disconnect Softphone';
+
+  @override
+  String get telephonyGoOnlineRelay => 'Go online (Relay)';
+
+  @override
+  String get telephonyDestinationNumber => 'Destination number';
+
+  @override
+  String get telephonyCallAction => 'Call';
+
+  @override
+  String get telephonyAnswerAction => 'Answer';
+
+  @override
+  String get telephonyMute => 'Mute';
+
+  @override
+  String get telephonyMicrophone => 'Microphone';
+
+  @override
+  String get telephonyDeskDialer => 'Click-to-Call dialer (Desk mode)';
+
+  @override
+  String get telephonyConfigureExtSoftphone =>
+      'Configure extension / Softphone mode';
+
+  @override
+  String get telephonyBackToHub => 'Back to telephony';
+
+  @override
+  String get telephonyConnIdle => 'Offline';
+
+  @override
+  String get telephonyConnConnecting => 'Connecting…';
+
+  @override
+  String get telephonyConnRegistered => 'Ready to answer';
+
+  @override
+  String get telephonyConnRinging => 'Ringing';
+
+  @override
+  String get telephonyConnInCall => 'In a call';
+
+  @override
+  String get telephonyConnReconnecting => 'Reconnecting…';
+
+  @override
+  String get telephonyConnError => 'Error';
+
+  @override
+  String get telephonyConnEnded => 'Session ended';
+
+  @override
+  String get telephonyBarConnecting => 'Softphone connecting';
+
+  @override
+  String get telephonyBarReady => 'Softphone ready';
+
+  @override
+  String get telephonyBarRinging => 'Softphone: ringing';
+
+  @override
+  String get telephonyBarInCall => 'Softphone: in call';
+
+  @override
+  String get telephonyBarReconnecting => 'Softphone: reconnecting';
+
+  @override
+  String get telephonyBarError => 'Softphone: error';
+
+  @override
+  String get telephonyPresenceRinging => 'Ringing';
+
+  @override
+  String get telephonyPresenceTalking => 'In a call';
+
+  @override
+  String get telephonyPresenceOffline => 'Disconnected from PBX';
+
+  @override
+  String get telephonyPresenceNoExt => 'No extension';
+
+  @override
+  String get telephonyPresenceIdle => 'Idle';
+
+  @override
+  String get telephonyPresenceUnknown => 'Unknown';
+
+  @override
+  String get telephonyConfigureExtension => 'Set up extension';
+
+  @override
+  String get telephonyAnswerSoftphone => 'Answer Softphone';
+
+  @override
+  String get telephonyDeclineCall => 'Decline';
+
+  @override
+  String get telephonyUnmute => 'Unmute';
+
+  @override
+  String get telephonySoftphoneOnline => 'Softphone is online';
+
+  @override
+  String get telephonyPluginInactiveTitle =>
+      'The Asterisk/Issabel connector add-on is not active';
+
+  @override
+  String get telephonyPluginInactiveBody =>
+      'Activate this add-on from the plugin marketplace for Screen Pop, Click-to-Call, and call history.';
+
+  @override
+  String get telephonyIncomingCall => 'Incoming call';
+
+  @override
+  String get telephonyInConversation => 'In conversation';
+
+  @override
+  String get telephonyCallEnded => 'Call ended';
+
+  @override
+  String get telephonyCallMissed => 'Missed call';
+
+  @override
+  String get telephonyUnknownNumber => 'Unknown number';
+
+  @override
+  String get telephonyAmbiguousCaller => 'Multiple contacts';
+
+  @override
+  String get telephonyCallsTab => 'Calls';
+
+  @override
+  String get telephonyNoCalls => 'No calls yet';
+
+  @override
+  String get telephonyLeadCreated => 'Lead created';
+
+  @override
+  String get telephonyContactCreated => 'Contact created';
+
+  @override
+  String get telephonyNoteSaved => 'Note saved';
+
+  @override
+  String get telephonyHangupSent => 'Hangup command sent';
+
+  @override
+  String get telephonyOverdueChecks => 'Due/overdue checks';
+
+  @override
+  String get telephonyOpenDeals => 'Open deals';
+
+  @override
+  String get telephonyRecentDocuments => 'Recent documents';
+
+  @override
+  String get telephonyQuickNote => 'Quick note';
+
+  @override
+  String get telephonyCreateLead => 'Create lead';
+
+  @override
+  String get telephonyCreateContact => 'Create contact';
+
+  @override
+  String get telephonyCustomerFile => 'Customer file';
+
+  @override
+  String get telephonyLeadFile => 'Lead file';
+
+  @override
+  String get telephonySaveNote => 'Save note';
+
+  @override
+  String get telephonyHangupCall => 'Hang up call';
+
+  @override
+  String get telephonyRecordingUnavailable => 'Recording file is not available';
+
+  @override
+  String get telephonyPlayRecording => 'Play recording';
+
+  @override
+  String get telephonyPlayingRecording => 'Playing…';
+
+  @override
+  String get telephonyPlayCallRecording => 'Play call recording';
+
+  @override
+  String get telephonyPlacingCall => 'Placing call…';
+
+  @override
+  String get telephonyIncomingSoftphone => 'Incoming Softphone call';
+
+  @override
+  String get telephonyRingingNow => 'Ringing…';
+
+  @override
+  String get telephonyDecline => 'Decline';
+
+  @override
+  String get telephonyPostCallTitle => 'Record call outcome';
+
+  @override
+  String get telephonyCategory => 'Category';
+
+  @override
+  String get telephonyOutcome => 'Outcome';
+
+  @override
+  String get telephonySaveAndClose => 'Save and close';
+
+  @override
+  String get telephonyLater => 'Later';
+
+  @override
+  String get telephonyCategorySales => 'Sales';
+
+  @override
+  String get telephonyCategorySupport => 'Support';
+
+  @override
+  String get telephonyCategoryFinance => 'Finance';
+
+  @override
+  String get telephonyCategoryOther => 'Other';
+
+  @override
+  String get telephonyOutcomeCompleted => 'Successful';
+
+  @override
+  String get telephonyOutcomeCallback => 'Needs callback';
+
+  @override
+  String get telephonyOutcomeNoAnswer => 'No answer';
+
+  @override
+  String get telephonyOutcomeWrongNumber => 'Wrong number';
+
+  @override
+  String get telephonyEnterNumber => 'Enter a number';
+
+  @override
+  String get telephonyAudioReady => 'Audio ready';
+
+  @override
+  String get telephonyBridgeActive => 'Bridge active';
+
+  @override
+  String get telephonyApiKeyMissing => 'API key not found';
+
+  @override
+  String get telephonyIncompleteSession =>
+      'Incomplete Softphone session returned';
+
+  @override
+  String get telephonyGoOnlineFirst => 'Go online with Softphone first';
+
+  @override
+  String get telephonyChannelNotConnected =>
+      'Softphone channel is not connected; go online again';
+
+  @override
+  String get telephonyNoSession => 'There is no Softphone session';
+
+  @override
+  String get telephonyShowHesabix => 'Show Hesabix';
+
+  @override
+  String get telephonyExit => 'Exit';
+
+  @override
+  String get telephonySoftphoneOnlineTooltip => 'Softphone online';
+
+  @override
+  String get telephonyIncomingChannelName => 'Incoming Softphone call';
+
+  @override
+  String get telephonyIncomingChannelDesc =>
+      'Full-screen incoming-call notification while Softphone is online';
+
+  @override
+  String get telephonyMicDenied => 'Microphone access was not granted';
+
+  @override
+  String get telephonyAudioContextMissing => 'AudioContext is not ready';
+
+  @override
+  String get telephonyPermView => 'View own telephony';
+
+  @override
+  String get telephonyPermManage => 'Manage PBX and extensions';
+
+  @override
+  String get telephonyPermViewAll => 'View all business calls';
+
+  @override
+  String get telephonyPermSupervise => 'Supervise team/queue';
+
+  @override
+  String get telephonyPermClickToCall => 'Click to call';
+
+  @override
+  String get telephonyPermSoftphone => 'In-app softphone';
+
+  @override
+  String get telephonyPermSoftphoneManage => 'Manage softphone media modes';
+
+  @override
+  String get telephonyPermSoftphoneQuality => 'View softphone quality';
+
+  @override
+  String get telephonyPermListen => 'Listen to in-scope recordings';
+
+  @override
+  String get telephonyPermLive => 'Live monitor (own/team)';
+
+  @override
+  String get telephonyPermReports => 'Call reports in scope';
+
+  @override
+  String get telephonyPermControl => 'Control in-scope calls';
+
+  @override
+  String telephonyErrorWithDetails(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String telephonyCallListSubtitle(
+    String status,
+    String extension,
+    String seconds,
+  ) {
+    return '$status · ext $extension · $seconds sec';
+  }
+
+  @override
+  String telephonyMappingSaved(String mode) {
+    return 'Mapping saved ($mode)';
+  }
+
+  @override
+  String telephonyUserId(String id) {
+    return 'User $id';
+  }
+
+  @override
+  String telephonyCommandSent(String action) {
+    return 'Command $action sent';
+  }
+
+  @override
+  String telephonyIncomingExt(String extension) {
+    return 'Incoming call · ext $extension';
+  }
+
+  @override
+  String telephonySoftphoneExt(String ext) {
+    return 'Softphone · ext $ext';
+  }
+
+  @override
+  String telephonyRingFrom(String from) {
+    return 'Ringing from $from';
+  }
+
+  @override
+  String telephonyAnswerFailed(String error) {
+    return 'Answer failed: $error';
+  }
+
+  @override
+  String telephonyMediaFailed(String error) {
+    return 'Media failed to start: $error';
+  }
+
+  @override
+  String telephonyMicFallback(String error) {
+    return 'Microphone: $error — sending silence temporarily';
+  }
+
+  @override
+  String telephonyHourCount(String hour, String count) {
+    return 'Hour $hour: $count';
+  }
+
+  @override
+  String telephonyOperatorStats(
+    String total,
+    String answered,
+    String missed,
+    String outbound,
+  ) {
+    return 'Total $total · answered $answered · missed $missed · outbound $outbound';
+  }
+
+  @override
+  String telephonyQueueWaitTalk(String waiting, String talking) {
+    return 'Waiting: $waiting · talking: $talking';
+  }
+
+  @override
+  String telephonyMediaFrames(String incoming, String outgoing) {
+    return 'Media frames: in $incoming / out $outgoing';
+  }
+
+  @override
+  String telephonyExtensionValue(String extension) {
+    return 'Ext $extension';
+  }
+
+  @override
+  String telephonyTeamValue(String team) {
+    return 'Team $team';
+  }
+
+  @override
+  String telephonyUserToExtension(String user, String extension) {
+    return '$user → ext $extension';
+  }
+
+  @override
+  String telephonyOpenDlq(String count) {
+    return 'Open DLQ: $count';
+  }
+
+  @override
+  String telephonyMinutesValue(String minutes) {
+    return '$minutes minutes';
+  }
+
+  @override
+  String telephonyBalanceRemain(String amount, String status) {
+    return 'Remaining: $amount · $status';
+  }
+
+  @override
+  String telephonyCheckNumber(String number) {
+    return 'Check $number';
+  }
+
+  @override
+  String telephonyMappingLine(
+    String role,
+    String mode,
+    String team,
+    String fallback,
+  ) {
+    return '$role · mode $mode$team$fallback';
+  }
+
+  @override
+  String telephonySoftphoneForPbx(String name) {
+    return 'Softphone — $name';
+  }
+
+  @override
+  String get documentTypeManual => 'Manual document';
+
+  @override
+  String get documentTypeExpense => 'Expense';
+
+  @override
+  String get documentTypeIncome => 'Income';
+
+  @override
+  String get documentTypeReceipt => 'Receipt';
+
+  @override
+  String get documentTypePayment => 'Payment';
+
+  @override
+  String get documentTypeTransfer => 'Transfer';
+
+  @override
+  String get documentTypeInvoice => 'Invoice';
+
+  @override
+  String get documentTypeSales => 'Sales';
+
+  @override
+  String get documentTypeSalesReturn => 'Sales return';
+
+  @override
+  String get documentTypePurchase => 'Purchase';
+
+  @override
+  String get documentTypePurchaseReturn => 'Purchase return';
+
+  @override
+  String get documentTypeDirectConsumption => 'Direct consumption';
+
+  @override
+  String get documentTypeProduction => 'Production';
+
+  @override
+  String get documentTypeWaste => 'Waste';
+
+  @override
+  String get documentTypeOpeningBalance => 'Opening balance';
+
+  @override
+  String get documentTypeCheck => 'Check';
+
+  @override
+  String get documentStatusDraft => 'Draft';
+
+  @override
+  String get documentStatusFinal => 'Posted';
+
+  @override
+  String get documentProject => 'Project';
+
+  @override
+  String documentProjectValue(String id) {
+    return 'Project: $id';
+  }
+
+  @override
+  String get documentAllPersons => 'All persons';
+
+  @override
+  String get documentSearchPersons => 'Search persons...';
+
+  @override
+  String get documentSelectedCurrency => 'Selected currency';
+
+  @override
+  String get documentDefaultCurrency => 'IRR';
+
+  @override
+  String get documentOnlyManualEditable =>
+      'Only manual documents can be edited';
+
+  @override
+  String get documentOnlyManualDeletable =>
+      'Only manual documents can be deleted';
+
+  @override
+  String documentLoadError(String error) {
+    return 'Error loading document: $error';
+  }
+
+  @override
+  String documentDeleteError(String error) {
+    return 'Error deleting document: $error';
+  }
+
+  @override
+  String documentBulkDeleteError(String error) {
+    return 'Error in bulk delete: $error';
+  }
+
+  @override
+  String get documentDeleted => 'Document deleted';
+
+  @override
+  String documentDeletedCount(String count) {
+    return '$count document(s) deleted';
+  }
+
+  @override
+  String documentSkippedAutoCount(String count) {
+    return '$count automatic document(s) skipped';
+  }
+
+  @override
+  String get documentConfirmDeleteTitle => 'Confirm delete';
+
+  @override
+  String documentConfirmDeleteBody(String code) {
+    return 'Delete document $code?';
+  }
+
+  @override
+  String get documentConfirmBulkDeleteTitle => 'Confirm bulk delete';
+
+  @override
+  String documentConfirmBulkDeleteBody(String count) {
+    return 'Delete $count selected document(s)?\n\nNote: only manual documents will be deleted.';
+  }
+
+  @override
+  String documentDeleteSelectedCount(String count) {
+    return 'Delete ($count)';
+  }
+
+  @override
+  String get documentNeedMinLines => 'The document must have at least 2 lines';
+
+  @override
+  String documentLineNeedAmount(String n) {
+    return 'Line $n must have a debit or credit amount';
+  }
+
+  @override
+  String documentLineBothSides(String n) {
+    return 'Line $n cannot be both debit and credit';
+  }
+
+  @override
+  String documentUnbalancedDiff(String diff) {
+    return 'Document is not balanced. Difference: $diff';
+  }
+
+  @override
+  String get documentCreateFailed => 'Failed to create document';
+
+  @override
+  String get documentUpdateFailed => 'Failed to update document';
+
+  @override
+  String get documentUnbalanced => 'Document is not balanced';
+
+  @override
+  String get documentSearchCodeDesc =>
+      'Search document number and description…';
+
+  @override
+  String get documentEndOfList => 'End of list';
+
+  @override
+  String documentLoadListError(String error) {
+    return 'Error loading: $error';
+  }
+
+  @override
+  String documentSelectedCount(String count) {
+    return '$count selected';
+  }
+
+  @override
+  String documentCodeValue(String code) {
+    return 'Document $code';
+  }
+
+  @override
+  String documentTypeFilterValue(String type) {
+    return 'Type: $type';
+  }
+
+  @override
+  String get documentCancelSelection => 'Clear selection';
+
+  @override
+  String get documentDateOutsideFiscalYear =>
+      'Document date is outside the current fiscal year';
+
+  @override
+  String get documentCurrencyRequired => 'Currency is required';
+
+  @override
+  String documentLineNeedAccount(String n) {
+    return 'Line $n must have an account';
+  }
+
+  @override
+  String get documentLoadingFiscalYear => 'Loading the current fiscal year...';
+
+  @override
+  String get documentCurrentFiscalYearMissing =>
+      'Current fiscal year was not found';
+
+  @override
+  String get documentFiscalYearLoadError =>
+      'Failed to load the current fiscal year';
+
+  @override
+  String get documentDateRequired => 'Document date is required';
+
+  @override
+  String get digipayMenuTitle => 'DigiPay credit';
+
+  @override
+  String get digipayPluginNotActive =>
+      'The DigiPay credit plugin is not active for this business.';
+
+  @override
+  String get digipaySettingsTab => 'Settings';
+
+  @override
+  String get digipayPurchasesTab => 'Purchases';
+
+  @override
+  String get digipaySettlementsTab => 'Settlements';
+
+  @override
+  String get digipaySettingsIntro =>
+      'Store your DigiPay UPG credentials. The sale posts a receivable to the DigiPay person (10401); the bank is not debited until settlement.';
+
+  @override
+  String get digipayPersonLabel => 'DigiPay person';
+
+  @override
+  String get digipayEnvironmentLabel => 'Environment';
+
+  @override
+  String get digipayEnvironmentSandbox => 'Sandbox';
+
+  @override
+  String get digipayEnvironmentLive => 'Live';
+
+  @override
+  String get digipayUsernameLabel => 'UPG username';
+
+  @override
+  String get digipayClientIdLabel => 'Client ID';
+
+  @override
+  String get digipayClientSecretLabel => 'Client secret';
+
+  @override
+  String get digipaySellerIdLabel => 'Seller ID';
+
+  @override
+  String get digipayCommissionPercentLabel => 'Commission percent';
+
+  @override
+  String get digipayVatOnCommissionLabel => 'VAT on commission percent';
+
+  @override
+  String get digipaySettlementBankLabel => 'Settlement bank account';
+
+  @override
+  String get digipayAutoDeliverLabel =>
+      'Auto-deliver in-store credit purchases';
+
+  @override
+  String get digipaySettingsSaved => 'DigiPay settings saved';
+
+  @override
+  String get digipayConnectionOk => 'DigiPay login succeeded';
+
+  @override
+  String get digipayTestConnection => 'Test connection';
+
+  @override
+  String get digipayPayButton => 'DigiPay';
+
+  @override
+  String get digipayPaymentHelp =>
+      'The sale amount is recorded as a DigiPay receivable. The store bank is not charged until the later settlement.';
+
+  @override
+  String get digipayChannelUpg => 'Online ticket';
+
+  @override
+  String get digipayChannelManual => 'QR / POS';
+
+  @override
+  String get digipayAmountLabel => 'Amount';
+
+  @override
+  String get digipayMobileLabel => 'Customer mobile';
+
+  @override
+  String get digipayMobileRequired =>
+      'Customer mobile number is required for an online ticket.';
+
+  @override
+  String get digipayTrackingCodeLabel => 'Tracking code (optional)';
+
+  @override
+  String get digipayConfirmPayment => 'Continue';
+
+  @override
+  String get digipayWaitingForPayment => 'Waiting for DigiPay confirmation…';
+
+  @override
+  String get digipayPaymentFailed => 'DigiPay payment failed';
+
+  @override
+  String get digipayPaymentTimeout =>
+      'Timed out waiting for DigiPay confirmation';
+
+  @override
+  String get digipayStatusFilter => 'Status';
+
+  @override
+  String get digipayStatusAll => 'All';
+
+  @override
+  String get digipayStatusPending => 'Pending';
+
+  @override
+  String get digipayStatusPaid => 'Paid';
+
+  @override
+  String get digipayStatusVerified => 'Verified';
+
+  @override
+  String get digipayStatusDelivered => 'Delivered';
+
+  @override
+  String get digipayStatusSettled => 'Settled';
+
+  @override
+  String get digipayStatusFailed => 'Failed';
+
+  @override
+  String get digipayStatusRefunded => 'Refunded';
+
+  @override
+  String get digipayDateFrom => 'From date';
+
+  @override
+  String get digipayDateTo => 'To date';
+
+  @override
+  String get digipayDeliverAction => 'Notify delivery';
+
+  @override
+  String get digipayRefundAction => 'Refund';
+
+  @override
+  String get digipaySettlementHelp =>
+      'When DigiPay deposits the net amount, register settlement: Dr bank (10203) + commission (70902) + input VAT (10104), Cr DigiPay receivable (10401).';
+
+  @override
+  String get digipayGrossAmount => 'Gross';
+
+  @override
+  String get digipayCommissionAmount => 'Commission';
+
+  @override
+  String get digipayVatAmount => 'VAT on commission';
+
+  @override
+  String get digipayNetAmount => 'Net deposit';
+
+  @override
+  String get digipayAccountsHint =>
+      'Accounts: 10401 receivable, 10203 bank, 70902 fee, 10104 input VAT';
+
+  @override
+  String get digipaySettlementDate => 'Settlement date';
+
+  @override
+  String get digipayRegisterSettlement => 'Register settlement';
+
+  @override
+  String get digipaySettlementSaved => 'DigiPay settlement registered';
+
+  @override
+  String get digipaySettlementHistory => 'Settlement history';
+
+  @override
+  String get digipayPermissionView => 'View DigiPay credit payments';
+
+  @override
+  String get digipayPermissionOperate =>
+      'Create DigiPay tickets and record QR/POS payments';
+
+  @override
+  String get digipayPermissionManage =>
+      'Manage DigiPay settings and settlements';
+
+  @override
+  String get settingsDigipayTitle => 'DigiPay credit';
+
+  @override
+  String get settingsDigipaySubtitle =>
+      'UPG credentials, DigiPay receivable person, and delayed settlement';
+
+  @override
+  String get productVariantInventorySplit => 'Split inventory';
+
+  @override
+  String get productVariantInventorySplitHint =>
+      'Stock for this attribute is kept separately in the warehouse. Maximum two attributes.';
+
+  @override
+  String get productVariantCombinations => 'Actual product combinations';
+
+  @override
+  String get productVariantAddCombination => 'Add combination';
+
+  @override
+  String get productVariantCode => 'Combination code';
+
+  @override
+  String get productVariantBarcode => 'Combination barcode';
+
+  @override
+  String get productVariantSalesPrice => 'Combination sales price';
+
+  @override
+  String get productVariantPurchasePrice => 'Combination purchase price';
+
+  @override
+  String get productVariantActive => 'Active';
+
+  @override
+  String get productVariantDeactivate => 'Deactivate';
+
+  @override
+  String get productVariantEnableInventory => 'Enable inventory split';
+
+  @override
+  String get productVariantEnableWizardTitle =>
+      'Allocate current stock to combinations';
+
+  @override
+  String get productVariantEnableWizardHelp =>
+      'Allocated quantities must equal physical warehouse stock. The document date uses the business calendar.';
+
+  @override
+  String get productVariantSplitQuantity => 'Quantity';
+
+  @override
+  String get productVariantSelectCombination => 'Select attribute combination';
+
+  @override
+  String get productVariantAllocations => 'Inventory attribute allocation';
+
+  @override
+  String get productVariantDimensionLimit =>
+      'At most two attributes can split inventory';
+
+  @override
+  String get productVariantSaveThenCombine =>
+      'Save the product first, then create combinations';
+
+  @override
+  String get productVariantNoCombinations => 'No combinations yet';
+
+  @override
+  String get productVariantAllocatedQty => 'Allocated quantity';
+
+  @override
+  String get productVariantPhysicalStock => 'Physical stock';
+
+  @override
+  String get productVariantEnableSuccess => 'Inventory split enabled';
+
+  @override
+  String get productVariantRequired =>
+      'An inventory combination is required for this product';
+
+  @override
+  String get productVariantAllocationMismatch =>
+      'Allocated quantities must equal the line quantity';
+
+  @override
+  String get advancedProductionMenu => 'Advanced production';
+
+  @override
+  String get advancedProductionTitle => 'Advanced production add-on';
+
+  @override
+  String get advancedProductionDashboard => 'Dashboard';
+
+  @override
+  String get advancedProductionReports => 'Reports';
+
+  @override
+  String get advancedProductionSettings => 'Settings';
+
+  @override
+  String get advancedProductionValuationNote =>
+      'Without a variance account, the costing method is for reports only. When a finished-goods, WIP, or variance account is set, the next production invoice posts to those accounts and stays balanced. A positive variance is above standard.';
+
+  @override
+  String get advancedProductionReportScrap => 'Scrap';
+
+  @override
+  String get advancedProductionReportScrapProduct => 'Scrap by product';
+
+  @override
+  String get advancedProductionReportScrapRate => 'Scrap rate';
+
+  @override
+  String get advancedProductionReportFinished => 'Finished output';
+
+  @override
+  String get advancedProductionReportFinishedProduct => 'Output by product';
+
+  @override
+  String get advancedProductionReportUnplanned => 'Production without an order';
+
+  @override
+  String get advancedProductionReportOee => 'Equipment effectiveness';
+
+  @override
+  String get advancedProductionReportDowntime => 'Line downtime';
+
+  @override
+  String get advancedProductionReportQc => 'Quality inspections';
+
+  @override
+  String get advancedProductionRecords => 'Records';
+
+  @override
+  String get advancedProductionRecordsHelp =>
+      'Record work centers, lines, downtime, line output, quality checks, and maintenance here. Repair cost does not create an accounting document.';
+
+  @override
+  String get advancedProductionRecordKind => 'Record type';
+
+  @override
+  String get advancedProductionWorkCenter => 'Work center';
+
+  @override
+  String get advancedProductionLine => 'Production line';
+
+  @override
+  String get advancedProductionMachine => 'Machine';
+
+  @override
+  String get advancedProductionShift => 'Shift';
+
+  @override
+  String get advancedProductionNominalRate => 'Nominal units per hour';
+
+  @override
+  String get advancedProductionStartTime => 'Start time';
+
+  @override
+  String get advancedProductionEndTime => 'End time';
+
+  @override
+  String get advancedProductionOutput => 'Line output';
+
+  @override
+  String get advancedProductionMaintenance => 'Maintenance';
+
+  @override
+  String get advancedProductionCode => 'Code';
+
+  @override
+  String get advancedProductionName => 'Name';
+
+  @override
+  String get advancedProductionMinutes => 'Minutes';
+
+  @override
+  String get advancedProductionGoodQuantity => 'Good quantity';
+
+  @override
+  String get advancedProductionScrapQuantity => 'Scrap quantity';
+
+  @override
+  String get advancedProductionCheckedQuantity => 'Quantity checked';
+
+  @override
+  String get advancedProductionRejectedQuantity => 'Quantity rejected';
+
+  @override
+  String get advancedProductionCostAmount => 'Repair cost';
+
+  @override
+  String get advancedProductionReportMaintenance => 'Maintenance history';
+
+  @override
+  String get advancedProductionReportReliability => 'Time between failures';
+
+  @override
+  String get advancedProductionReportProfit => 'Product profitability';
+
+  @override
+  String get advancedProductionReportCostShare => 'Cost composition';
+
+  @override
+  String get advancedProductionReportPassRate => 'Quality acceptance rate';
+
+  @override
+  String get advancedProductionReportDaily => 'Daily output';
+
+  @override
+  String get advancedProductionReportLine => 'Line output';
+
+  @override
+  String get advancedProductionReportShift => 'Shift output';
+
+  @override
+  String get advancedProductionReportWipAge => 'Open order age';
+
+  @override
+  String get advancedProductionReportCenter => 'Work center output';
+
+  @override
+  String get advancedProductionReportCapacity => 'Nominal and actual capacity';
+
+  @override
+  String get advancedProductionReportRejects => 'Quality rejects';
+
+  @override
+  String get advancedProductionReportPeriodCost => 'Period production cost';
+
+  @override
+  String get advancedProductionReportOperator => 'Operator output';
+
+  @override
+  String get advancedProductionReportSetup => 'Setup time';
+
+  @override
+  String get advancedProductionReportLot => 'Lot trace';
+
+  @override
+  String get advancedProductionReportYield => 'Production yield';
+
+  @override
+  String get advancedProductionReportUnused => 'Unused capacity';
+
+  @override
+  String get advancedProductionReportBreakEven => 'Break-even';
+
+  @override
+  String get advancedProductionLotCode => 'Lot code';
+
+  @override
+  String get advancedProductionFixedCost => 'Product fixed cost';
+
+  @override
+  String get advancedProductionReportMonthly => 'Monthly comparison';
+
+  @override
+  String get advancedProductionReportFlow => 'Material flow';
+
+  @override
+  String get advancedProductionPurchased => 'Purchased';
+
+  @override
+  String get advancedProductionReturned => 'Purchase return';
+
+  @override
+  String get advancedProductionConsumed => 'Production consumption';
+
+  @override
+  String get advancedProductionPeriodNet => 'Period net';
+
+  @override
+  String get advancedProductionReportByLot => 'Production by lot';
+
+  @override
+  String get advancedProductionReportConversion => 'Conversion efficiency';
+
+  @override
+  String get advancedProductionReportLowYield => 'Low-yield products';
+
+  @override
+  String get advancedProductionReportLineCost => 'Line maintenance cost';
+
+  @override
+  String get advancedProductionReportPriceVariance => 'Material price variance';
+
+  @override
+  String get advancedProductionReportProductCost => 'Product cost';
+
+  @override
+  String get advancedProductionReportWip => 'WIP balance';
+
+  @override
+  String get advancedProductionReportOperationVariance => 'Operation variance';
+
+  @override
+  String get advancedProductionUsageVariance => 'Usage variance';
+
+  @override
+  String get advancedProductionPriceVariance => 'Price variance';
+
+  @override
+  String get advancedProductionTransferred => 'Transferred to finished goods';
+
+  @override
+  String get advancedProductionRemainingWip => 'Remaining WIP';
+
+  @override
+  String get advancedProductionUnitCost => 'Unit cost';
+
+  @override
+  String get advancedProductionScrapReason => 'Scrap reason';
+
+  @override
+  String get advancedProductionScrapEvent => 'Scrap event';
+
+  @override
+  String get advancedProductionRecyclable => 'Recyclable';
+
+  @override
+  String get advancedProductionRecyclableYes => 'Yes';
+
+  @override
+  String get advancedProductionRecyclableNo => 'No';
+
+  @override
+  String get advancedProductionReportScrapReason => 'Scrap reasons';
+
+  @override
+  String get advancedProductionReportRecyclable => 'Recyclable scrap';
+
+  @override
+  String get advancedProductionReportNonrecyclable => 'Non-recyclable scrap';
+
+  @override
+  String get advancedProductionReportQcCause => 'Nonconformance causes';
+
+  @override
+  String get advancedProductionReportMachine => 'Machine productivity';
+
+  @override
+  String get advancedProductionReportDowntimeCost => 'Downtime cost';
+
+  @override
+  String get advancedProductionReportHeld => 'Held orders';
+
+  @override
+  String get advancedProductionOrderId => 'Order id';
+
+  @override
+  String get advancedProductionHoldReason => 'Hold reason';
+
+  @override
+  String get advancedProductionHoldId => 'Hold id to release';
+
+  @override
+  String get advancedProductionReportConsumption => 'Material consumption';
+
+  @override
+  String get advancedProductionReportCapacityNeed => 'Required capacity';
+
+  @override
+  String get advancedProductionReportWipCount => 'WIP count variance';
+
+  @override
+  String get advancedProductionReportRework => 'Rework';
+
+  @override
+  String get advancedProductionReportLineReturn => 'Return to line';
+
+  @override
+  String get advancedProductionRequiredHours => 'Required hours';
+
+  @override
+  String get advancedProductionCountedQuantity => 'Counted quantity';
+
+  @override
+  String get advancedProductionReportWipCenter => 'WIP by center';
+
+  @override
+  String get advancedProductionReportMaterialScrap => 'Material scrap';
+
+  @override
+  String get advancedProductionReportIdle => 'Idle materials';
+
+  @override
+  String get advancedProductionReportTransfer => 'Line transfer';
+
+  @override
+  String get advancedProductionIdleDays => 'Days without movement';
+
+  @override
+  String get advancedProductionCurrentStock => 'Current stock';
+
+  @override
+  String get advancedProductionReportWage => 'Wage variance';
+
+  @override
+  String get advancedProductionActualHours => 'Actual hours';
+
+  @override
+  String get advancedProductionStandardHours => 'Standard hours';
+
+  @override
+  String get advancedProductionStandardRate => 'Standard hourly rate';
+
+  @override
+  String get advancedProductionActualRate => 'Actual hourly rate';
+
+  @override
+  String get advancedProductionWipAccount => 'Work-in-process account';
+
+  @override
+  String get advancedProductionFinishedAccount => 'Finished goods account';
+
+  @override
+  String get advancedProductionScrapAccount => 'Scrap expense account';
+
+  @override
+  String get advancedProductionVarianceAccount => 'Cost variance account';
+
+  @override
+  String get advancedProductionLedgerNext =>
+      'With these accounts, the next production invoice changes the general ledger. Standard or weighted-average costing also needs the variance account.';
+
+  @override
+  String get advancedProductionLedgerUnchanged =>
+      'Until a WIP, finished-goods, or variance account is chosen, production invoices keep the current ledger posting.';
+
+  @override
+  String get advancedProductionScrapLedger =>
+      'The scrap account changes only the expense line of the next waste invoice. Inventory stays the credit.';
+
+  @override
+  String get advancedProductionWeekOutput => 'Output of the last seven days';
+
+  @override
+  String get advancedProductionPlanAchievement => 'Plan achievement';
+
+  @override
+  String get advancedProductionScrapPercent => 'Scrap percent';
+
+  @override
+  String get advancedProductionWeekCost => 'Completed cost, last seven days';
+
+  @override
+  String get advancedProductionNoFigure => 'None';
+
+  @override
+  String get advancedProductionStandardMaterials => 'Standard materials';
+
+  @override
+  String get advancedProductionActualMaterials => 'Actual materials';
+
+  @override
+  String get advancedProductionStandardOperations => 'Standard operations';
+
+  @override
+  String get advancedProductionActualOperations => 'Actual operations';
+
+  @override
+  String get advancedProductionFromLine => 'From line';
+
+  @override
+  String get advancedProductionToLine => 'To line';
+
+  @override
+  String get advancedProductionPeriod => 'Period';
+
+  @override
+  String get advancedProductionStage => 'Stage';
+
+  @override
+  String get advancedProductionStageIncoming => 'Incoming material';
+
+  @override
+  String get advancedProductionStageInProcess => 'In process';
+
+  @override
+  String get advancedProductionStageFinal => 'Finished goods';
+
+  @override
+  String get advancedProductionResult => 'Result';
+
+  @override
+  String get advancedProductionResultPass => 'Pass';
+
+  @override
+  String get advancedProductionRoleMaterial => 'Material';
+
+  @override
+  String get advancedProductionRoleOutput => 'Output';
+
+  @override
+  String get advancedProductionResultFail => 'Fail';
+
+  @override
+  String get advancedProductionMaintenanceBreakdown => 'Breakdown';
+
+  @override
+  String get advancedProductionMaintenancePreventive => 'Preventive';
+
+  @override
+  String get advancedProductionAgeDays => 'Age in days';
+
+  @override
+  String get advancedProductionOperator => 'Operator id';
+
+  @override
+  String get advancedProductionReason => 'Downtime reason';
+
+  @override
+  String get advancedProductionCostingMethod => 'Report costing method';
+
+  @override
+  String get advancedProductionCostingActual => 'Actual';
+
+  @override
+  String get advancedProductionCostingStandard => 'Standard';
+
+  @override
+  String get advancedProductionCostingAverage => 'Weighted average';
+
+  @override
+  String get advancedProductionOpenOrders => 'Open orders';
+
+  @override
+  String get advancedProductionOverdue => 'Overdue';
+
+  @override
+  String get advancedProductionInProgress => 'In progress';
+
+  @override
+  String get advancedProductionCompletedToday => 'Completed today';
+
+  @override
+  String get advancedProductionOutputToday => 'Output today';
+
+  @override
+  String get advancedProductionShortageLines => 'Material shortage lines';
+
+  @override
+  String get advancedProductionSave => 'Save settings';
+
+  @override
+  String get advancedProductionSaved => 'Settings saved';
+
+  @override
+  String get advancedProductionPluginRequired =>
+      'Advanced production is not active';
+
+  @override
+  String get advancedProductionPluginRequiredBody =>
+      'Activate the add-on from the marketplace to open the industrial dashboard and reports.';
+
+  @override
+  String get advancedProductionOpenMarketplace => 'Plugin marketplace';
+
+  @override
+  String get advancedProductionPermissionManage =>
+      'Manage advanced production settings';
+
+  @override
+  String get advancedProductionPermissionOperate =>
+      'Operate advanced production';
+
+  @override
+  String get advancedProductionPermissionCost =>
+      'Run advanced production costing';
+
+  @override
+  String get advancedProductionPermissionPost =>
+      'Post advanced production documents';
+
+  @override
+  String get advancedProductionStatusDraft => 'Draft';
+
+  @override
+  String get advancedProductionStatusReleased => 'Released';
+
+  @override
+  String get advancedProductionStatusInProgress => 'In progress';
+
+  @override
+  String get advancedProductionStatusCompleted => 'Completed';
+
+  @override
+  String get advancedProductionStatusCancelled => 'Cancelled';
+
+  @override
+  String get advancedProductionReportOrders => 'Production orders';
+
+  @override
+  String get advancedProductionReportProgress => 'Production progress';
+
+  @override
+  String get advancedProductionReportOverdue => 'Overdue production';
+
+  @override
+  String get advancedProductionReportSchedule => 'Production schedule';
+
+  @override
+  String get advancedProductionReportPlan => 'Plan achievement';
+
+  @override
+  String get advancedProductionReportOpen => 'Open orders';
+
+  @override
+  String get advancedProductionReportCycle => 'Cycle time';
+
+  @override
+  String get advancedProductionReportCost => 'Order cost';
+
+  @override
+  String get advancedProductionReportMaterials => 'Material requirements';
+
+  @override
+  String get advancedProductionReportShortage => 'Material shortage';
+
+  @override
+  String get advancedProductionReportVariance => 'Usage variance';
+
+  @override
+  String get advancedProductionColOrder => 'Order code';
+
+  @override
+  String get advancedProductionColProduct => 'Product';
+
+  @override
+  String get advancedProductionColStatus => 'Status';
+
+  @override
+  String get advancedProductionColPlanned => 'Planned';
+
+  @override
+  String get advancedProductionColProduced => 'Produced';
+
+  @override
+  String get advancedProductionColRemaining => 'Remaining';
+
+  @override
+  String get advancedProductionColDue => 'Due date';
+
+  @override
+  String get advancedProductionColProgress => 'Progress %';
+
+  @override
+  String get advancedProductionColStart => 'Planned start';
+
+  @override
+  String get advancedProductionColVarianceQty => 'Quantity variance';
+
+  @override
+  String get advancedProductionColCycle => 'Cycle hours';
+
+  @override
+  String get advancedProductionColStandard => 'Standard cost';
+
+  @override
+  String get advancedProductionColActual => 'Actual cost';
+
+  @override
+  String get advancedProductionColValued => 'Report value';
+
+  @override
+  String get advancedProductionColVarianceCost => 'Cost variance';
+
+  @override
+  String get advancedProductionColWarehouse => 'Warehouse';
+
+  @override
+  String get advancedProductionColRequired => 'Required';
+
+  @override
+  String get advancedProductionColFree => 'Free';
+
+  @override
+  String get advancedProductionColShortage => 'Shortage';
+
+  @override
+  String get advancedProductionColIssued => 'Issued';
+
+  @override
+  String get advancedProductionFromDate => 'From date';
+
+  @override
+  String get advancedProductionToDate => 'To date';
+
+  @override
+  String get systemAdminQuickAccessTitle => 'Quick access';
+
+  @override
+  String get systemAdminQuickAccessDescription =>
+      'Tasks system administrators use most often';
+
+  @override
+  String get systemAdminSuperAdminRole => 'Super admin';
+
+  @override
+  String get systemAdminLimitedRole => 'Limited access';
+
+  @override
+  String get settingsCategoryMaintenance => 'Sensitive maintenance';
+
+  @override
+  String get settingsCategoryMaintenanceDescription =>
+      'Backup, import, and scripts — open only when needed';
+
+  @override
+  String get settingsSupportPlans => 'Support plans';
+
+  @override
+  String get settingsSupportPlansDescription =>
+      'Price and duration of user support subscriptions';
+
+  @override
+  String get settingsSupportBillingStats => 'Paid support stats';
+
+  @override
+  String get settingsSupportBillingStatsDescription =>
+      'Revenue, active subscriptions, and support invoices';
+
+  @override
+  String get settingsNotificationEventDefaults => 'Default business templates';
+
+  @override
+  String get settingsNotificationEventDefaultsDescription =>
+      'Default SMS and email text when a business has no template';
+
+  @override
+  String get settingsLegacyDatabaseImport => 'Legacy database import';
+
+  @override
+  String get settingsLegacyDatabaseImportDescription =>
+      'Move data from an old Hesabix MySQL dump';
+
+  @override
+  String get settingsAIEval => 'AI quality evaluation';
+
+  @override
+  String get settingsAIEvalDescription =>
+      'Regression scenarios and scheduled response checks';
+
+  @override
+  String get settingsZohalStatistics => 'Zohal statistics';
+
+  @override
+  String get settingsZohalStatisticsDescription =>
+      'Usage and inquiry statistics for Zohal';
 }

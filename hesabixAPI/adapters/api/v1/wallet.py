@@ -33,7 +33,7 @@ router = APIRouter(prefix="/businesses/{business_id}/wallet", tags=["کیف پو
 @router.get(
 	"",
 	summary="خلاصه کیف‌پول کسب‌وکار",
-	description="نمایش مانده‌ها و ارز پایه",
+	description="ابزار MCP: `get_wallet_overview`.",
 )
 def get_wallet_overview_endpoint(
 	request: Request,
@@ -48,7 +48,7 @@ def get_wallet_overview_endpoint(
 @router.post(
 	"/top-up",
 	summary="ایجاد درخواست افزایش اعتبار",
-	description="ایجاد top-up و بازگشت شناسه تراکنش برای هدایت به درگاه",
+	description="ایجاد تراکنش pending و لینک درگاه پرداخت. amount و gateway_id الزامی است. ابزار MCP: `create_wallet_top_up`.",
 )
 def create_top_up_endpoint(
 	request: Request,
@@ -65,7 +65,7 @@ def create_top_up_endpoint(
 @router.get(
 	"/transactions",
 	summary="لیست تراکنش‌های کیف‌پول",
-	description="نمایش تراکنش‌ها به ترتیب نزولی",
+	description="ابزار MCP: `list_wallet_transactions`.",
 )
 def list_wallet_transactions_endpoint(
 	request: Request,
@@ -95,7 +95,7 @@ def list_wallet_transactions_endpoint(
 @router.post(
 	"/transactions/table",
 	summary="لیست تراکنش‌ها برای جدول عمومی (پگینیشن استاندارد)",
-	description="سازگار با DataTableWidget: ورودی QueryInfo و خروجی items/total/page/limit",
+	description="ابزار MCP: `list_wallet_transactions`.",
 )
 def list_wallet_transactions_table_endpoint(
 	request: Request,
@@ -155,6 +155,7 @@ def list_wallet_transactions_table_endpoint(
 @router.get(
 	"/transactions/export",
 	summary="خروجی CSV تراکنش‌های کیف‌پول",
+	description="خروجی باینری CSV است و در MCP ثبت نشده. JSON: `list_wallet_transactions`.",
 )
 def export_wallet_transactions_csv_endpoint(
 	request: Request,
@@ -192,6 +193,7 @@ def export_wallet_transactions_csv_endpoint(
 @router.get(
 	"/metrics/export",
 	summary="خروجی CSV خلاصه کیف‌پول",
+	description="خروجی باینری CSV است و در MCP ثبت نشده. JSON: `get_wallet_metrics`.",
 )
 def export_wallet_metrics_csv_endpoint(
 	request: Request,
@@ -236,7 +238,7 @@ def export_wallet_metrics_csv_endpoint(
 @router.post(
 	"/payouts",
 	summary="ایجاد درخواست تسویه",
-	description="ایجاد درخواست تسویه به حساب بانکی مشخص",
+	description="مبلغ از مانده قابل برداشت قفل می‌شود. amount و bank_account_id الزامی است. ابزار MCP: `create_wallet_payout`.",
 )
 def create_payout_request_endpoint(
 	request: Request,
@@ -253,7 +255,7 @@ def create_payout_request_endpoint(
 @router.get(
 	"/payouts",
 	summary="لیست درخواست‌های تسویه کسب‌وکار",
-	description="درخواست‌های تسویه به‌ترتیب نزولی شناسه",
+	description="فقط تسویه‌های همین کسب‌وکار. ابزار MCP: `list_wallet_payouts`.",
 )
 def list_business_wallet_payouts_endpoint(
 	request: Request,
@@ -271,7 +273,7 @@ def list_business_wallet_payouts_endpoint(
 @router.get(
 	"/metrics",
 	summary="گزارش خلاصه کیف‌پول (metrics)",
-	description="مبالغ ورودی/خروجی/کارمزد و مانده‌ها در بازه زمانی",
+	description="ابزار MCP: `get_wallet_metrics`.",
 )
 def get_wallet_metrics_endpoint(
 	request: Request,
@@ -299,6 +301,7 @@ def get_wallet_metrics_endpoint(
 @router.get(
 	"/settings",
 	summary="تنظیمات کیف‌پول کسب‌وکار",
+	description="حالت تسویه، آستانه و حساب بانکی پیش‌فرض. ابزار MCP: `get_wallet_settings`.",
 )
 def get_wallet_settings_business_endpoint(
 	request: Request,
@@ -314,6 +317,7 @@ def get_wallet_settings_business_endpoint(
 @router.put(
 	"/settings",
 	summary="ویرایش تنظیمات کیف‌پول کسب‌وکار",
+	description="حالت manual/auto، آستانه و حساب پیش‌فرض. ابزار MCP: `update_wallet_settings`.",
 )
 def update_wallet_settings_business_endpoint(
 	request: Request,
@@ -330,6 +334,7 @@ def update_wallet_settings_business_endpoint(
 @router.post(
 	"/auto-settle/run",
 	summary="اجرای تسویه خودکار (برای cron/job)",
+	description="اگر mode=auto و آستانه برقرار باشد به حساب پیش‌فرض تسویه می‌کند. ابزار MCP: `run_wallet_auto_settle`.",
 )
 def run_auto_settle_endpoint(
 	request: Request,
@@ -344,7 +349,7 @@ def run_auto_settle_endpoint(
 @router.put(
 	"/payouts/{payout_id}/approve",
 	summary="تایید درخواست تسویه",
-	description="تایید توسط کاربر مجاز",
+	description="فقط درخواست متعلق به همین کسب‌وکار. ابزار MCP: `approve_wallet_payout`.",
 )
 def approve_payout_request_endpoint(
 	request: Request,
@@ -367,7 +372,7 @@ def approve_payout_request_endpoint(
 @router.put(
 	"/payouts/{payout_id}/cancel",
 	summary="لغو درخواست تسویه",
-	description="لغو و بازگردانی مبلغ به مانده قابل برداشت",
+	description="لغو و بازگشت مبلغ به مانده قابل برداشت. ابزار MCP: `cancel_wallet_payout`.",
 )
 def cancel_payout_request_endpoint(
 	request: Request,

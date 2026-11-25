@@ -53,6 +53,7 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
@@ -97,8 +98,12 @@
     <Compile Include="Services\BalanceProofService.vb" />
     <Compile Include="Services\E2eOpeningRunner.vb" />
     <Compile Include="Services\HolooSqlService.vb" />
+    <Compile Include="Services\FingerprintUtil.vb" />
+    <Compile Include="Services\LiveSyncService.vb" />
     <Compile Include="Services\MigrationSession.vb" />
     <Compile Include="Services\PreflightService.vb" />
+    <Compile Include="Services\SyncProfileStore.vb" />
+    <Compile Include="Services\WindowsTaskSync.vb" />
     <Compile Include="UI\AppTheme.vb" />
     <Compile Include="UI\UiPrimitives.vb" />
     <Compile Include="UI\HesabixConnectPanel.vb">

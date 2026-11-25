@@ -148,6 +148,7 @@ class CrmChatService {
       '/api/v1/crm/businesses/$businessId/chat/conversations',
       query: {
         if (status != null && status.isNotEmpty) 'status': status,
+        if (status == null || status.isEmpty) 'confirm_all': 'true',
       },
     );
     final d = _extractData(res.data);
@@ -214,12 +215,27 @@ class CrmChatService {
     int? assignedToUserId,
     int? leadId,
     int? personId,
+    bool clearLead = false,
+    bool clearPerson = false,
+    bool clearAssignee = false,
   }) async {
     final body = <String, dynamic>{};
     if (status != null) body['status'] = status;
-    if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
-    if (leadId != null) body['lead_id'] = leadId;
-    if (personId != null) body['person_id'] = personId;
+    if (clearAssignee) {
+      body['clear_assignee'] = true;
+    } else if (assignedToUserId != null) {
+      body['assigned_to_user_id'] = assignedToUserId;
+    }
+    if (clearLead) {
+      body['clear_lead'] = true;
+    } else if (leadId != null) {
+      body['lead_id'] = leadId;
+    }
+    if (clearPerson) {
+      body['clear_person'] = true;
+    } else if (personId != null) {
+      body['person_id'] = personId;
+    }
     final res = await _apiClient.patch<dynamic>(
       '/api/v1/crm/businesses/$businessId/chat/conversations/$conversationId',
       data: body,

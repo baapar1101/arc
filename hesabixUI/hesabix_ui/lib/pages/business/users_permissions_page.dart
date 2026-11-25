@@ -7,7 +7,9 @@ import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../services/business_user_service.dart';
+import '../../services/marketplace_service.dart';
 import '../../models/business_user_model.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
@@ -1047,18 +1049,68 @@ class _PermissionsDialog extends StatefulWidget {
 }
 
 class _PermissionsDialogState extends State<_PermissionsDialog> {
+  static const _pluginPermissionSections = <String, String>{
+    'warranty': 'product_warranty',
+    'barcode_labels': 'barcode_label_studio',
+    'customer_club': 'customer_club',
+    'distribution': 'distribution',
+    'payroll': 'payroll',
+    'procurement': 'procurement',
+    'advanced_production': 'advanced_production',
+    'office_automation': 'office_automation',
+    'fixed_assets': 'fixed_assets',
+    'telephony': 'asterisk_issabel_connector',
+    'basalam': 'basalam_connector',
+    'woocommerce': 'woocommerce_hesabix',
+    'moadian': 'moadian_tax_integration',
+    'digipay': 'digipay_credit',
+    'currency_revaluation': kAdvancedAccountingPluginCode,
+  };
+
   late Map<String, dynamic> _currentPermissions;
   bool _permissionsInitialized = false;
   bool _isUpdating = false;
   late bool _membershipUnlimited;
   DateTime? _membershipEndDate;
   bool _membershipTouched = false;
+  bool _marketplacePluginsResolved = false;
+  final Set<String> _activeMarketplacePluginCodes = <String>{};
+  final MarketplaceService _marketplaceService = MarketplaceService();
 
   @override
   void initState() {
     super.initState();
     _membershipEndDate = widget.user.membershipExpiresAt;
     _membershipUnlimited = widget.user.membershipUnlimited;
+    _loadMarketplacePlugins();
+  }
+
+  Future<void> _loadMarketplacePlugins() async {
+    try {
+      final list = await _marketplaceService.listBusinessPlugins(
+        businessId: int.parse(widget.businessId),
+      );
+      if (!mounted) return;
+      setState(() {
+        _activeMarketplacePluginCodes
+          ..clear()
+          ..addAll(activeMarketplacePluginCodes(list));
+        _marketplacePluginsResolved = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _activeMarketplacePluginCodes.clear();
+        _marketplacePluginsResolved = true;
+      });
+    }
+  }
+
+  bool _permissionSectionVisible(String sectionKey) {
+    final pluginCode = _pluginPermissionSections[sectionKey];
+    if (pluginCode == null) return true;
+    return _marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains(pluginCode);
   }
 
   @override
@@ -1161,6 +1213,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'draft': '${t.draft} ${t.invoices}',
         'export': '${t.export} ${t.invoices}',
         'change_unit_price': t.permissionInvoiceChangeUnitPrice,
+        'confirm_expired_sale': t.permissionInvoiceConfirmExpiredSale,
       },
       'quick_sales': {
         'create_customer': 'ثبت سریع مشتری در فروش سریع',
@@ -1336,19 +1389,52 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
       },
-      for (final specialist in ['fixed_assets','contracting','payroll_calendar_tax','conditional_pricing','inventory_trace_cost'])
+      for (final specialist in ['contracting','payroll_calendar_tax','conditional_pricing','inventory_trace_cost'])
         specialist: {'view':'مشاهده','write':'ثبت و ویرایش و پیش‌نویس مالی','settings':'تنظیمات و ردپای تغییرات','approve':'تأیید مدیر، صدور و برگشت سند مالی'},
+      'procurement': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده تدارکات' : 'View procurement',
+        'operate': t.localeName.startsWith('fa') ? 'ثبت عملیات خرید' : 'Operate procurement',
+        'approve': t.localeName.startsWith('fa') ? 'تأیید خرید' : 'Approve procurement',
+        'manage': t.localeName.startsWith('fa') ? 'تنظیم تدارکات' : 'Manage procurement',
+        'admin': t.localeName.startsWith('fa') ? 'مدیریت کامل تدارکات' : 'Administer procurement',
+      },
+      'advanced_production': {
+        'view': '${t.view} ${t.advancedProductionMenu}',
+        'manage': t.advancedProductionPermissionManage,
+        'operate': t.advancedProductionPermissionOperate,
+        'cost': t.advancedProductionPermissionCost,
+        'post': t.advancedProductionPermissionPost,
+      },
+      'office_automation': {
+        'view': '${t.view} ${t.oaMenu}',
+        'compose': t.oaPermissionCompose,
+        'refer': t.oaPermissionRefer,
+        'secretariat': t.oaPermissionSecretariat,
+        'archive': t.oaPermissionArchive,
+        'admin': t.oaPermissionAdmin,
+      },
+      'fixed_assets': {
+        'write': 'ثبت و ویرایش و پیش‌نویس مالی',
+        'settings': 'تنظیمات و ردپای تغییرات',
+        'approve': 'تأیید مدیر، صدور و برگشت سند مالی',
+        'view': '${t.view} ${t.fixedAssetsMenu}',
+        'manage': t.fixedAssetsPermissionManage,
+        'operate': t.fixedAssetsPermissionOperate,
+        'post': t.fixedAssetsPermissionPost,
+      },
       'telephony': {
-        'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
-        'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
-        'click_to_call': t.localeName.startsWith('fa') ? 'Click-to-Call' : 'Click to call',
-        'softphone': t.localeName.startsWith('fa') ? 'Softphone داخل‌برنامه' : 'In-app softphone',
-        'softphone_manage': t.localeName.startsWith('fa') ? 'مدیریت Softphone و حالت رسانه' : 'Manage softphone media modes',
-        'softphone_quality': t.localeName.startsWith('fa') ? 'مشاهده کیفیت Softphone' : 'View softphone quality',
-        'listen_recordings': t.localeName.startsWith('fa') ? 'پخش ضبط مکالمات' : 'Listen to recordings',
-        'live_monitor': t.localeName.startsWith('fa') ? 'مانیتورینگ زنده' : 'Live monitor',
-        'reports': t.localeName.startsWith('fa') ? 'گزارش‌های تماس' : 'Call reports',
-        'control_calls': t.localeName.startsWith('fa') ? 'کنترل تماس از CRM' : 'Control calls from CRM',
+        'view': t.telephonyPermView,
+        'manage': t.telephonyPermManage,
+        'view_all_calls': t.telephonyPermViewAll,
+        'supervise': t.telephonyPermSupervise,
+        'click_to_call': t.telephonyPermClickToCall,
+        'softphone': t.telephonyPermSoftphone,
+        'softphone_manage': t.telephonyPermSoftphoneManage,
+        'softphone_quality': t.telephonyPermSoftphoneQuality,
+        'listen_recordings': t.telephonyPermListen,
+        'live_monitor': t.telephonyPermLive,
+        'reports': t.telephonyPermReports,
+        'control_calls': t.telephonyPermControl,
       },
       'basalam': {
         'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ اتصال باسلام' : 'View Basalam integration',
@@ -1358,6 +1444,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'woocommerce': {
         'view': t.permissionWooCommerceView,
         'manage': t.permissionWooCommerceManage,
+      },
+      'digipay': {
+        'view': t.digipayPermissionView,
+        'operate': t.digipayPermissionOperate,
+        'manage': t.digipayPermissionManage,
       },
       'moadian': {
         'view': t.moadianPermissionView,
@@ -1948,14 +2039,34 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['fixed_assets','contracting','payroll_calendar_tax','conditional_pricing','inventory_trace_cost'],
       },
       {
-        'title': t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony',
+        'title': t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement',
+        'icon': Icons.shopping_cart_outlined,
+        'sections': ['procurement'],
+      },
+      {
+        'title': t.advancedProductionMenu,
+        'icon': Icons.precision_manufacturing_outlined,
+        'sections': ['advanced_production'],
+      },
+      {
+        'title': t.oaMenu,
+        'icon': Icons.mark_email_unread_outlined,
+        'sections': ['office_automation'],
+      },
+      {
+        'title': t.fixedAssetsMenu,
+        'icon': Icons.chair_alt_outlined,
+        'sections': ['fixed_assets'],
+      },
+      {
+        'title': t.telephonyMenu,
         'icon': Icons.phone_in_talk_outlined,
         'sections': ['telephony'],
       },
       {
         'title': t.localeName.startsWith('fa') ? 'اتصال فروشگاه' : 'Store integrations',
         'icon': Icons.store_mall_directory_outlined,
-        'sections': ['basalam', 'woocommerce'],
+        'sections': ['basalam', 'woocommerce', 'digipay'],
       },
       {
         'title': t.moadianMenuSection,
@@ -1970,6 +2081,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       
       // ساخت گروه‌های دسترسی برای هر بخش
       for (final sectionKey in config['sections'] as List<String>) {
+        if (!_permissionSectionVisible(sectionKey)) continue;
         final allPermissions = _getAllPermissions(t);
         if (allPermissions.containsKey(sectionKey)) {
           final sectionPermissions = allPermissions[sectionKey]!;
@@ -2010,6 +2122,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         }
       }
 
+      if (sectionWidgets.isEmpty) continue;
       final hintKey = config['permissionHintKey'] as String?;
       final String? hintText = hintKey == 'warehouse_inventory_bridge'
           ? t.permissionsWarehouseInventoryHint
@@ -2118,17 +2231,26 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
-      case 'fixed_assets': return 'دارایی ثابت و استهلاک';
       case 'contracting': return 'پیمانکاری و صورت‌وضعیت';
       case 'payroll_calendar_tax': return 'تقویم حقوق و مالیات تاریخ‌دار';
       case 'conditional_pricing': return 'قیمت‌گذاری شرطی';
       case 'inventory_trace_cost': return 'ردیابی بچ و بهای لایه‌ای';
+      case 'procurement':
+        return t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement';
+      case 'advanced_production':
+        return t.advancedProductionMenu;
+      case 'office_automation':
+        return t.oaMenu;
+      case 'fixed_assets':
+        return t.fixedAssetsMenu;
       case 'telephony':
-        return t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony';
+        return t.telephonyMenu;
       case 'basalam':
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':
         return t.permissionSectionWooCommerce;
+      case 'digipay':
+        return t.digipayMenuTitle;
       case 'moadian':
         return t.moadianMenuSection;
       case 'crm':
@@ -2175,6 +2297,15 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'allocate':
         return 'تخصیص حساب';
       case 'post':
+        if (sectionKey == 'advanced_production') {
+          return t.advancedProductionPermissionPost;
+        }
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionPost;
+        }
+        if (sectionKey == 'payroll') {
+          return t.payrollPermissionPost;
+        }
         return 'قطعی‌سازی';
       case 'cancel':
         return 'ابطال';
@@ -2223,11 +2354,29 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.export;
       case 'change_unit_price':
         return t.permissionInvoiceChangeUnitPrice;
+      case 'confirm_expired_sale':
+        return t.permissionInvoiceConfirmExpiredSale;
       case 'manage':
+        if (sectionKey == 'advanced_production') {
+          return t.advancedProductionPermissionManage;
+        }
         if (sectionKey == 'payroll') {
           return t.payrollPermissionManage;
         }
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionManage;
+        }
         return t.manage;
+      case 'compose':
+        return t.oaPermissionCompose;
+      case 'refer':
+        return t.oaPermissionRefer;
+      case 'secretariat':
+        return t.oaPermissionSecretariat;
+      case 'archive':
+        return sectionKey == 'office_automation' ? t.oaPermissionArchive : action;
+      case 'admin':
+        return sectionKey == 'office_automation' ? t.oaPermissionAdmin : action;
       case 'design':
         return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
       case 'print':
@@ -2245,12 +2394,18 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'delete_messages':
         return t.permissionCrmWebChatDeleteMessages;
       case 'operate':
+        if (sectionKey == 'advanced_production') {
+          return t.advancedProductionPermissionOperate;
+        }
         if (sectionKey == 'payroll') {
           return t.payrollPermissionOperate;
         }
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionOperate;
+        }
         return t.distributionPermissionOperate;
-      case 'post':
-        return t.payrollPermissionPost;
+      case 'cost':
+        return t.advancedProductionPermissionCost;
       case 'approve':
         return t.payrollPermissionApprove;
       case 'sync':

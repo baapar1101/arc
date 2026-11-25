@@ -113,6 +113,7 @@ class LeadCreate(BaseModel):
     extra_info: Optional[dict] = None
     custom_fields: Optional[Dict[str, object]] = Field(None, description="مقادیر فیلدهای سفارشی")
     tag_ids: Optional[List[int]] = Field(None, description="شناسه برچسب‌ها")
+    allow_similar: bool = Field(False, description="ادامه با وجود سرنخ یا شخص مشابه")
 
 
 class LeadUpdate(BaseModel):
@@ -126,10 +127,13 @@ class LeadUpdate(BaseModel):
     email: Optional[str] = None
     description: Optional[str] = None
     assigned_to_user_id: Optional[int] = None
+    clear_assigned_to: bool = False
     next_follow_up_at: Optional[datetime] = None
+    clear_next_follow_up: bool = False
     extra_info: Optional[dict] = None
     custom_fields: Optional[Dict[str, object]] = None
     tag_ids: Optional[List[int]] = None
+    allow_similar: bool = False
 
 
 class LeadConvertDealOption(BaseModel):
@@ -208,6 +212,7 @@ class DealCreate(BaseModel):
 
 class DealUpdate(BaseModel):
     """به‌روزرسانی فرصت فروش"""
+    person_id: Optional[int] = Field(None, gt=0)
     stage_id: Optional[int] = Field(None, gt=0)
     code: Optional[str] = Field(None, max_length=50)
     title: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -215,7 +220,9 @@ class DealUpdate(BaseModel):
     currency_id: Optional[int] = None
     probability_percent: Optional[int] = Field(None, ge=0, le=100)
     expected_close_date: Optional[date] = None
+    clear_expected_close_date: bool = False
     next_follow_up_at: Optional[datetime] = None
+    clear_next_follow_up: bool = False
     document_id: Optional[int] = None
     assigned_to_user_id: Optional[int] = None
     description: Optional[str] = None
@@ -300,6 +307,7 @@ class CrmActivityUpdate(BaseModel):
     description: Optional[str] = None
     activity_date: Optional[datetime] = None
     deal_id: Optional[int] = None
+    clear_deal: bool = False
     extra_info: Optional[dict] = None
     is_task: Optional[bool] = None
     due_at: Optional[datetime] = None
@@ -369,6 +377,8 @@ class CrmNoteCreate(BaseModel):
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
     lead_id: Optional[int] = Field(None, gt=0)
+    person_id: Optional[int] = Field(None, gt=0)
+    deal_id: Optional[int] = Field(None, gt=0)
     shared_user_ids: Optional[List[int]] = Field(
         default=None,
         description="برای visibility=shared: شناسه کاربران عضو کسب‌وکار (غیر از سازنده)",
@@ -385,6 +395,10 @@ class CrmNoteUpdate(BaseModel):
     ends_at: Optional[datetime] = None
     lead_id: Optional[int] = None
     clear_lead: bool = False
+    person_id: Optional[int] = None
+    clear_person: bool = False
+    deal_id: Optional[int] = None
+    clear_deal: bool = False
     status: Optional[str] = Field(None, max_length=20)
     shared_user_ids: Optional[List[int]] = None
 
@@ -484,6 +498,9 @@ class CrmSequenceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     is_active: bool = True
+    sms_daily_cap: Optional[int] = Field(None, ge=0, le=10000)
+    stop_on_reply: bool = True
+    stop_on_close: bool = True
     steps: Optional[List[CrmSequenceStepInput]] = Field(default_factory=list)
 
 
@@ -491,7 +508,20 @@ class CrmSequenceUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     is_active: Optional[bool] = None
+    sms_daily_cap: Optional[int] = Field(None, ge=0, le=10000)
+    clear_sms_daily_cap: bool = False
+    stop_on_reply: Optional[bool] = None
+    stop_on_close: Optional[bool] = None
     steps: Optional[List[CrmSequenceStepInput]] = None
+
+
+class CrmSequenceDryRunRequest(BaseModel):
+    entity_type: Optional[str] = Field(None, description="lead | deal")
+    entity_id: Optional[int] = Field(None, gt=0)
+
+
+class CrmDiscountApprovalTemplateRequest(BaseModel):
+    threshold: float = Field(default=0, ge=0)
 
 
 class CrmSequenceEnrollRequest(BaseModel):
@@ -519,3 +549,15 @@ class CrmAutomationSettingsUpdate(BaseModel):
     follow_up_notify_enabled: Optional[bool] = None
     stale_deal_days: Optional[int] = Field(None, ge=0)
     score_rules: Optional[dict] = None
+
+
+class CrmDealDocumentLinkRequest(BaseModel):
+    document_id: int = Field(..., gt=0)
+    role: Optional[str] = Field(None, description="proforma | invoice | receipt")
+
+
+class CrmSavedViewCreate(BaseModel):
+    entity_type: str = Field(..., description="lead | deal", max_length=20)
+    name: str = Field(..., min_length=1, max_length=80)
+    filters: dict = Field(default_factory=dict)
+    is_shared: bool = False

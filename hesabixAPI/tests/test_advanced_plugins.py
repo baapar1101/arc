@@ -256,6 +256,7 @@ def test_payroll_date_change_requires_recalculation_for_dated_tax(monkeypatch):
     monkeypatch.setattr(svc,'_ensure_plugin',lambda *a:None)
     monkeypatch.setattr(svc,'_get_or_create_settings',lambda *a:None)
     monkeypatch.setattr(svc,'_get_run_row',lambda *a:run)
+    monkeypatch.setattr(svc,'lock_context',lambda *a:(None,run))
     monkeypatch.setattr(svc,'_ensure_run_editable',lambda *a:None)
     monkeypatch.setattr(svc,'_run_to_dict',lambda *a:{})
     monkeypatch.setattr('app.services.advanced_plugin_service.settings_row',lambda *a:None)

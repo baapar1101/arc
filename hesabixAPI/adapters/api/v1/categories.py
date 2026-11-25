@@ -24,7 +24,11 @@ def _category_label_from_request_body(body: Dict[str, Any]) -> str:
 router = APIRouter(prefix="/categories", tags=["محصولات و کالاها"])
 
 
-@router.post("/business/{business_id}/tree")
+@router.post(
+    "/business/{business_id}/tree",
+    summary="درخت دسته‌بندی کالا",
+    description="درخت کامل دسته‌های کالا. ابزار MCP: `get_category_tree`.",
+)
 @require_business_access("business_id")
 def get_categories_tree(
     request: Request,
@@ -56,7 +60,11 @@ def get_categories_tree(
     return success_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد دسته کالا",
+    description="ایجاد دسته با برچسب. ابزار MCP: `create_product_category` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_category(
     request: Request,
@@ -87,7 +95,11 @@ def create_category(
     return success_response({"item": item}, request)
 
 
-@router.post("/business/{business_id}/update")
+@router.post(
+    "/business/{business_id}/update",
+    summary="ویرایش دسته کالا",
+    description="ویرایش برچسب/شرح/والد. ابزار MCP: `update_product_category` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_category(
     request: Request,
@@ -153,7 +165,11 @@ def update_category(
     return success_response({"item": item}, request)
 
 
-@router.post("/business/{business_id}/move")
+@router.post(
+    "/business/{business_id}/move",
+    summary="جابه‌جایی دسته کالا",
+    description="تغییر والد دسته. ابزار MCP: `move_product_category` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def move_category(
     request: Request,
@@ -181,7 +197,11 @@ def move_category(
     return success_response({"item": item}, request)
 
 
-@router.post("/business/{business_id}/delete")
+@router.post(
+    "/business/{business_id}/delete",
+    summary="حذف دسته کالا",
+    description="حذف دسته. ابزار MCP: `delete_product_category` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_category(
     request: Request,
@@ -198,7 +218,11 @@ def delete_category(
 
 
 # Server-side search categories with breadcrumb path
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="جستجوی دسته کالا با مسیر",
+    description="جستجوی برچسب دسته با breadcrumb. ابزار MCP: `search_categories`.",
+)
 @require_business_access("business_id")
 def search_categories(
     request: Request,

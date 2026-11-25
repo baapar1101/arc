@@ -28,6 +28,22 @@ class Hesabix_V2_Sync_Service
 	private $db;
 
 	/**
+	 * @return Hesabix_V2_Api
+	 */
+	public function api_client()
+	{
+		return $this->api;
+	}
+
+	/**
+	 * @return Hesabix_V2_DB_Service
+	 */
+	public function db_client()
+	{
+		return $this->db;
+	}
+
+	/**
 	 * پیش از فراخوانی API؛ انبار خطوط حل نشده باشد تا زمان اصلاح تنظیمات نباید دوباره به صف رود.
 	 */
 	const ERR_INVOICE_WAREHOUSE_PREFLIGHT = 94001;
@@ -159,6 +175,9 @@ class Hesabix_V2_Sync_Service
 				}
 			}
 			if ($probe && $probe->is_type('variable')) {
+				if (class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::should_sync_parent_as_native($product_id, $this->db)) {
+					return Hesabix_V2_Native_Variation_Sync::sync($this, $product_id, null, $wc_currency_override);
+				}
 				return $this->sync_variable_product_children($product_id, $wc_currency_override);
 			}
 		}
@@ -176,6 +195,11 @@ class Hesabix_V2_Sync_Service
 			$guard_key = $product_id . ':' . $variation_id;
 			if (isset(self::$variation_sync_guard[ $guard_key ])) {
 				return self::$variation_sync_guard[ $guard_key ];
+			}
+
+			if (class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::should_sync_parent_as_native($product_id, $this->db)) {
+				$result = Hesabix_V2_Native_Variation_Sync::sync($this, $product_id, $variation_id, $wc_currency_override);
+				return $this->remember_variation_sync_result($product_id, $variation_id, $result);
 			}
 		}
 
@@ -321,6 +345,27 @@ class Hesabix_V2_Sync_Service
 				$api_last_result = $this->api->create_product($product_data);
 			}
 
+			if (self::is_duplicate_barcode_api_result($api_last_result) && isset($product_data['barcode']) && $product_data['barcode'] !== null && $product_data['barcode'] !== '') {
+				if (!$existing_mapping) {
+					$linked_id = $this->find_hesabix_product_id_by_barcode((string) $product_data['barcode']);
+					if ($linked_id > 0) {
+						$api_last_result = array(
+							'success' => true,
+							'data' => array('id' => $linked_id),
+							'_linked_by_barcode' => true,
+						);
+					}
+				}
+				if (empty($api_last_result['success'])) {
+					unset($product_data['barcode']);
+					if ($existing_mapping) {
+						$api_last_result = $this->api->update_product($existing_mapping['hesabix_id'], $product_data);
+					} else {
+						$api_last_result = $this->api->create_product($product_data);
+					}
+				}
+			}
+
 			if (isset($api_last_result['success']) && $api_last_result['success']) {
 				$hesabix_id = $api_last_result['data']['id'];
 
@@ -382,7 +427,8 @@ class Hesabix_V2_Sync_Service
 			Hesabix_V2_Log_Service::error('Product sync failed', $elog);
 
 			$msg = $e->getMessage();
-			if (strpos($msg, __('محصول یافت نشد', 'hesabix-v2')) === false) {
+			$non_retryable = self::is_duplicate_barcode_api_result($api_last_result) || self::message_is_duplicate_barcode($msg);
+			if (!$non_retryable && strpos($msg, __('محصول یافت نشد', 'hesabix-v2')) === false) {
 				$qid = $variation_id ? (int) $variation_id : (int) $product_id;
 				$qpayload = $variation_id ? array('parent_id' => (int) $product_id) : null;
 				Hesabix_V2_Queue_Service::enqueue('product', $qid, 'sync_product', $qpayload);
@@ -391,8 +437,151 @@ class Hesabix_V2_Sync_Service
 			return array(
 				'success' => false,
 				'message' => $e->getMessage(),
+				'non_retryable' => $non_retryable,
 			);
 		}
+	}
+
+	/**
+	 * اگر SKU ووکامرس همان بارکد کالای موجود در حسابیکس باشد، همان کالا را برمی‌گرداند.
+	 *
+	 * @param string $barcode
+	 * @return int
+	 */
+	private function find_hesabix_product_id_by_barcode($barcode)
+	{
+		$barcode = trim((string) $barcode);
+		if ($barcode === '') {
+			return 0;
+		}
+
+		$search = $this->api->search_products(
+			array(
+				'search' => $barcode,
+				'search_fields' => array('barcode'),
+				'take' => 10,
+				'skip' => 0,
+			)
+		);
+		if (empty($search['success']) || empty($search['data'])) {
+			return 0;
+		}
+
+		$items = array();
+		if (isset($search['data']['items']) && is_array($search['data']['items'])) {
+			$items = $search['data']['items'];
+		} elseif (isset($search['data']['results']) && is_array($search['data']['results'])) {
+			$items = $search['data']['results'];
+		} elseif (is_array($search['data']) && isset($search['data'][0])) {
+			$items = $search['data'];
+		}
+
+		$needle = function_exists('mb_strtolower') ? mb_strtolower($barcode) : strtolower($barcode);
+		$found = 0;
+		foreach ($items as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+			$hid = isset($item['id']) ? absint($item['id']) : 0;
+			if ($hid < 1) {
+				continue;
+			}
+
+			$tokens = array();
+			if (!empty($item['barcode'])) {
+				$tokens[] = (string) $item['barcode'];
+			}
+			if (!empty($item['general_barcodes'])) {
+				foreach (preg_split('/[,\s]+/', (string) $item['general_barcodes']) as $token) {
+					$token = trim($token);
+					if ($token !== '') {
+						$tokens[] = $token;
+					}
+				}
+			}
+
+			$matched = false;
+			foreach ($tokens as $token) {
+				$cmp = function_exists('mb_strtolower') ? mb_strtolower($token) : strtolower($token);
+				if ($cmp === $needle) {
+					$matched = true;
+					break;
+				}
+			}
+			if (!$matched) {
+				continue;
+			}
+			if ($found > 0 && $found !== $hid) {
+				return 0;
+			}
+			$found = $hid;
+		}
+
+		return $found;
+	}
+
+	/**
+	 * خطای یکتایی بارکد از API حسابیکس — retry بدون بارکد، بدون صف‌کردن تکراری.
+	 *
+	 * @param string $message
+	 * @return bool
+	 */
+	public static function message_is_duplicate_barcode($message)
+	{
+		$msg = trim((string) $message);
+		if ($msg === '') {
+			return false;
+		}
+
+		$fa_barcode = (function_exists('mb_stripos') ? mb_stripos($msg, 'بارکد') : strpos($msg, 'بارکد')) !== false;
+		$fa_taken = (function_exists('mb_stripos') ? mb_stripos($msg, 'قبلاً') : strpos($msg, 'قبلاً')) !== false
+			|| (function_exists('mb_stripos') ? mb_stripos($msg, 'تکراری') : strpos($msg, 'تکراری')) !== false
+			|| (function_exists('mb_stripos') ? mb_stripos($msg, 'دیگری') : strpos($msg, 'دیگری')) !== false;
+
+		if ($fa_barcode && $fa_taken) {
+			return true;
+		}
+
+		$en = strtolower($msg);
+		return strpos($en, 'barcode') !== false
+			&& (strpos($en, 'already') !== false || strpos($en, 'duplicate') !== false);
+	}
+
+	/**
+	 * @param mixed $result
+	 * @return bool
+	 */
+	private static function is_duplicate_barcode_api_result($result)
+	{
+		if (!is_array($result)) {
+			return false;
+		}
+
+		$code = '';
+		if (!empty($result['error']['code']) && is_string($result['error']['code'])) {
+			$code = $result['error']['code'];
+		} elseif (!empty($result['error_code']) && is_string($result['error_code'])) {
+			$code = $result['error_code'];
+		}
+
+		$codes = array(
+			'DUPLICATE_GENERAL_BARCODE',
+			'DUPLICATE_BARCODE',
+			'GENERAL_BARCODE_CONFLICTS_WITH_UNIQUE_INSTANCE',
+			'GENERAL_BARCODE_CONFLICTS_WITH_VARIANT',
+		);
+		if ($code !== '' && in_array($code, $codes, true)) {
+			return true;
+		}
+
+		$msg = '';
+		if (!empty($result['message']) && is_string($result['message'])) {
+			$msg = $result['message'];
+		} elseif (!empty($result['error']['message']) && is_string($result['error']['message'])) {
+			$msg = $result['error']['message'];
+		}
+
+		return self::message_is_duplicate_barcode($msg);
 	}
 
 	/**
@@ -832,7 +1021,13 @@ class Hesabix_V2_Sync_Service
 			Hesabix_V2_Log_Service::error('Guest customer creation failed', $elog);
 
 			if ($order_id > 0 && strpos($e->getMessage(), __('سفارش یافت نشد', 'hesabix-v2')) === false) {
-				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+				Hesabix_V2_Queue_Service::enqueue(
+					'order',
+					$order_id,
+					'sync_order',
+					null,
+					Hesabix_V2_Queue_Service::PRIORITY_ORDER
+				);
 			}
 
 			return array(
@@ -869,7 +1064,7 @@ class Hesabix_V2_Sync_Service
 	 * @param int $order_id
 	 * @return array{success?:bool,message?:string,order_id?:int,order?:WC_Order,person_id?:mixed,invoice_data?:array,is_new_invoice?:bool,hesabix_invoice_id?:int|null,fiscal_note?:string}
 	 */
-	private function prepare_order_bulk_invoice_without_api($order_id)
+	private function prepare_order_bulk_invoice($order_id)
 	{
 		$order = wc_get_order($order_id);
 		if (!$order) {
@@ -877,6 +1072,24 @@ class Hesabix_V2_Sync_Service
 				'success' => false,
 				'message' => __('سفارش یافت نشد', 'hesabix-v2'),
 			);
+		}
+
+		try {
+			$existing_mapping = $this->db->get_mapping('order', $order_id);
+			$hid = absint($existing_mapping['hesabix_id'] ?? 0);
+			$saved = $hid > 0 ? null : $this->db->get_or_start_invoice_create($order_id);
+			if ($saved !== null) {
+				return array(
+					'success' => true,
+					'order_id' => (int) $order_id,
+					'order' => $order,
+					'invoice_data' => $saved,
+					'is_new_invoice' => true,
+					'hesabix_invoice_id' => null,
+				);
+			}
+		} catch (RuntimeException $e) {
+			return array('success' => false, 'message' => $e->getMessage());
 		}
 
 		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $order->get_currency());
@@ -959,18 +1172,13 @@ class Hesabix_V2_Sync_Service
 					$person_id,
 					$gate['factor'],
 					$gate['currency_id'],
-					$fiscal_dates ? $fiscal_dates : null
+					$fiscal_dates ? $fiscal_dates : null,
+					$hid === 0
 				),
 				$order
 			);
 
 			self::assert_invoice_lines_have_warehouse_when_required($order, $invoice_data);
-
-			$existing_mapping = $this->db->get_mapping('order', $order_id);
-			$hid = null;
-			if ($existing_mapping && !empty($existing_mapping['hesabix_id'])) {
-				$hid = absint($existing_mapping['hesabix_id']);
-			}
 
 			return array(
 				'success' => true,
@@ -978,8 +1186,8 @@ class Hesabix_V2_Sync_Service
 				'order' => $order,
 				'person_id' => $person_id,
 				'invoice_data' => $invoice_data,
-				'is_new_invoice' => !$existing_mapping,
-				'hesabix_invoice_id' => $hid && $hid > 0 ? $hid : null,
+				'is_new_invoice' => $hid === 0,
+				'hesabix_invoice_id' => $hid > 0 ? $hid : null,
 				'fiscal_note' => isset($fiscal['note']) ? (string) $fiscal['note'] : '',
 			);
 		} catch (Exception $e) {
@@ -1020,7 +1228,7 @@ class Hesabix_V2_Sync_Service
 
 		$queued = array();
 		foreach ($order_ids as $oid) {
-			$p = $this->prepare_order_bulk_invoice_without_api((int) $oid);
+			$p = $this->prepare_order_bulk_invoice((int) $oid);
 			if (empty($p['success'])) {
 				$res['failed']++;
 				$res['errors'][] = array(
@@ -1032,6 +1240,15 @@ class Hesabix_V2_Sync_Service
 					'message' => isset($p['message']) ? (string) $p['message'] : '',
 				);
 
+				continue;
+			}
+
+			if (class_exists('Hesabix_V2_Sales_Return_Service') && Hesabix_V2_Sales_Return_Service::order_has_returns((int) $oid)) {
+				$res['per_order'][ (int) $oid ] = array(
+					'success' => false,
+					'skipped_sales_return' => true,
+					'message' => Hesabix_V2_Sales_Return_Service::sale_sync_blocked_message(),
+				);
 				continue;
 			}
 
@@ -1057,6 +1274,18 @@ class Hesabix_V2_Sync_Service
 				$hid_prepare = (!empty($prep['hesabix_invoice_id']) && absint($prep['hesabix_invoice_id']) > 0)
 					? absint($prep['hesabix_invoice_id'])
 					: 0;
+
+				if ($hid_prepare < 1) {
+					try {
+						$prep['invoice_data'] = $this->db->get_or_start_invoice_create($prep['order_id'], $prep['invoice_data']);
+					} catch (RuntimeException $e) {
+						$res['failed']++;
+						$failure = array('success' => false, 'message' => $e->getMessage());
+						$res['per_order'][$prep['order_id']] = $failure;
+						$res['errors'][] = array('order_id' => (int) $prep['order_id'], 'message' => $e->getMessage());
+						continue;
+					}
+				}
 
 				$rp_gate_b = array(
 					'had_positive_rp' => false,
@@ -1199,7 +1428,7 @@ class Hesabix_V2_Sync_Service
 	 * @param    int    $order_id
 	 * @return   array
 	 */
-	public function sync_order($order_id)
+	public function sync_order($order_id, $allow_new_create = true, $retry_create = false)
 	{
 		$start_time = microtime(true);
 
@@ -1208,6 +1437,19 @@ class Hesabix_V2_Sync_Service
 			return array(
 				'success' => false,
 				'message' => __('سفارش یافت نشد', 'hesabix-v2'),
+			);
+		}
+
+		if (class_exists('Hesabix_V2_Sales_Return_Service') && Hesabix_V2_Sales_Return_Service::order_has_returns((int) $order_id)) {
+			$msg = Hesabix_V2_Sales_Return_Service::sale_sync_blocked_message();
+			if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+				Hesabix_V2_Order_Sync_Meta::set_or_update_order_system_note($order, $msg);
+			}
+
+			return array(
+				'success' => true,
+				'skipped_sales_return' => true,
+				'message' => $msg,
 			);
 		}
 
@@ -1284,71 +1526,82 @@ class Hesabix_V2_Sync_Service
 		$api_last_result = null;
 
 		try {
-
-			// Get or create customer (با توجه به تنظیم create_customer_on_order)
-			$create_customer_on_order = !empty($sync_settings['create_customer_on_order']);
-			$customer_id = $order->get_customer_id();
-			$person_id = null;
-
-			if ($customer_id) {
-				// Registered customer
-				$person_id = $this->db->get_hesabix_id('customer', $customer_id);
-
-				if (!$person_id) {
-					if (!$create_customer_on_order) {
-						throw new Exception(__('مشتری در حسابیکس وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+			$existing_mapping = $this->db->get_mapping('order', $order_id);
+			if ($retry_create && $existing_mapping) {
+				return array('success' => true, 'hesabix_id' => (int) $existing_mapping['hesabix_id']);
+			}
+			$saved_create = $existing_mapping ? null : $this->db->get_or_start_invoice_create($order_id);
+			$invoice_data = $saved_create;
+			$person_id = $saved_create['extra_info']['person_id'] ?? null;
+			if (!$existing_mapping && !$invoice_data && !$allow_new_create) {
+				return array(
+					'success' => false,
+					'non_retryable' => true,
+					'message' => __('درخواست قدیمی کلید صدور ندارد. پیش از ارسال دوباره، فاکتور را در حسابیکس تطبیق دهید.', 'hesabix-v2'),
+				);
+			}
+			if ($invoice_data === null) {
+				// Get or create customer (با توجه به تنظیم create_customer_on_order)
+				$create_customer_on_order = !empty($sync_settings['create_customer_on_order']);
+				$customer_id = $order->get_customer_id();
+				$person_id = null;
+				if ($customer_id) {
+					// Registered customer
+					$person_id = $this->db->get_hesabix_id('customer', $customer_id);
+					if (!$person_id) {
+						if (!$create_customer_on_order) {
+							throw new Exception(__('مشتری در حسابیکس وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+						}
+						// Sync customer first
+						$customer_result = $this->sync_customer($customer_id, $order_id);
+						if ($customer_result['success']) {
+							$person_id = $customer_result['hesabix_id'];
+						} else {
+							$msg = isset($customer_result['message']) ? (string) $customer_result['message'] : __('خطا در همگام‌سازی مشتری', 'hesabix-v2');
+							throw new Exception($msg);
+						}
 					}
-					// Sync customer first
-					$customer_result = $this->sync_customer($customer_id, $order_id);
-					if ($customer_result['success']) {
-						$person_id = $customer_result['hesabix_id'];
+				} else {
+					// Guest customer
+					if (!$create_customer_on_order) {
+						throw new Exception(__('برای ثبت سفارش مهمان، گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+					}
+					$guest_result = $this->sync_guest_customer($order_id);
+					if ($guest_result['success']) {
+						$person_id = $guest_result['hesabix_id'];
 					} else {
-						$msg = isset($customer_result['message']) ? (string) $customer_result['message'] : __('خطا در همگام‌سازی مشتری', 'hesabix-v2');
+						$msg = isset($guest_result['message']) ? (string) $guest_result['message'] : __('خطا در ایجاد مشتری مهمان', 'hesabix-v2');
 						throw new Exception($msg);
 					}
 				}
-			} else {
-				// Guest customer
-				if (!$create_customer_on_order) {
-					throw new Exception(__('برای ثبت سفارش مهمان، گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+				// Prepare invoice data
+				$fiscal_dates = array();
+				if (!empty($fiscal['document_date'])) {
+					$fiscal_dates['document_date'] = $fiscal['document_date'];
 				}
-				$guest_result = $this->sync_guest_customer($order_id);
-				if ($guest_result['success']) {
-					$person_id = $guest_result['hesabix_id'];
-				} else {
-					$msg = isset($guest_result['message']) ? (string) $guest_result['message'] : __('خطا در ایجاد مشتری مهمان', 'hesabix-v2');
-					throw new Exception($msg);
+				if (!empty($fiscal['payment_date_ymd'])) {
+					$fiscal_dates['payment_date_ymd'] = $fiscal['payment_date_ymd'];
 				}
+				$invoice_data = apply_filters(
+					'hesabix_v2_invoice_data',
+					Hesabix_V2_Mapper::wc_order_to_invoice(
+						$order,
+						$person_id,
+						$gate['factor'],
+						$gate['currency_id'],
+						$fiscal_dates ? $fiscal_dates : null,
+						!$existing_mapping
+					),
+					$order
+				);
+				$wc_payload_for_log = $invoice_data;
+				self::assert_invoice_lines_have_warehouse_when_required($order, $invoice_data);
 			}
-
-			// Prepare invoice data
-			$fiscal_dates = array();
-			if (!empty($fiscal['document_date'])) {
-				$fiscal_dates['document_date'] = $fiscal['document_date'];
-			}
-			if (!empty($fiscal['payment_date_ymd'])) {
-				$fiscal_dates['payment_date_ymd'] = $fiscal['payment_date_ymd'];
-			}
-
-			$invoice_data = apply_filters(
-				'hesabix_v2_invoice_data',
-				Hesabix_V2_Mapper::wc_order_to_invoice(
-					$order,
-					$person_id,
-					$gate['factor'],
-					$gate['currency_id'],
-					$fiscal_dates ? $fiscal_dates : null
-				),
-				$order
-			);
-
-			$wc_payload_for_log = $invoice_data;
-
-			self::assert_invoice_lines_have_warehouse_when_required($order, $invoice_data);
-
-			// Check if already synced
-			$existing_mapping = $this->db->get_mapping('order', $order_id);
 			$is_new_invoice = !$existing_mapping;
+			if ($is_new_invoice) {
+				$invoice_data = $saved_create ?? $this->db->get_or_start_invoice_create($order_id, $invoice_data);
+				$wc_payload_for_log = $invoice_data;
+			}
 
 			$rp_gate = array(
 				'had_positive_rp' => false,
@@ -1490,8 +1743,14 @@ class Hesabix_V2_Sync_Service
 				$should_queue = false;
 			}
 
-			if ($should_queue) {
-				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+			if ($should_queue && ($allow_new_create || !empty($existing_mapping) || !empty($invoice_data['woo_create_key']))) {
+				Hesabix_V2_Queue_Service::enqueue(
+					'order',
+					$order_id,
+					'sync_order',
+					array('retry_create' => !empty($invoice_data['woo_create_key'])),
+					Hesabix_V2_Queue_Service::PRIORITY_ORDER
+				);
 			}
 
 			return array(
@@ -1644,6 +1903,9 @@ class Hesabix_V2_Sync_Service
 		if (strpos($m, __('محصول یافت نشد', 'hesabix-v2')) !== false) {
 			return;
 		}
+		if (self::message_is_duplicate_barcode($m)) {
+			return;
+		}
 
 		$qpayload = ((int) $wc_parent_id) > 0
 			? array('parent_id' => (int) $wc_parent_id)
@@ -1678,6 +1940,15 @@ class Hesabix_V2_Sync_Service
 			}
 
 			if ($product->is_type('variable')) {
+				if (class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::should_sync_parent_as_native($product_id, $this->db)) {
+					$list[] = array(
+						'kind' => 'native_variable',
+						'parent_id' => $product_id,
+						'variation_id' => null,
+					);
+					continue;
+				}
+
 				$variation_ids = $product->get_children();
 				if (empty($variation_ids)) {
 					$list[] = array(
@@ -1870,17 +2141,27 @@ class Hesabix_V2_Sync_Service
 					continue;
 				}
 
-				if (($pl['kind'] ?? '') === 'empty_variable') {
-					$results['failed']++;
-					$results['errors'][] = array(
-						'product_id' => (int) ($pl['product_id'] ?? 0),
-						'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
-					);
-					continue;
-				}
+			if (($pl['kind'] ?? '') === 'empty_variable') {
+				$results['failed']++;
+				$results['errors'][] = array(
+					'product_id' => (int) ($pl['product_id'] ?? 0),
+					'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
+				);
+				continue;
+			}
 
+			if (($pl['kind'] ?? '') === 'native_variable') {
 				$parent_id = (int) ($pl['parent_id'] ?? 0);
-				$vid = isset($pl['variation_id']) ? (int) $pl['variation_id'] : 0;
+				$results['failed']++;
+				$results['errors'][] = array(
+					'product_id' => $parent_id,
+					'message' => $gmsg,
+				);
+				continue;
+			}
+
+			$parent_id = (int) ($pl['parent_id'] ?? 0);
+			$vid = isset($pl['variation_id']) ? (int) $pl['variation_id'] : 0;
 
 				$row_err = array('message' => $gmsg);
 				if ($vid > 0) {
@@ -1915,6 +2196,21 @@ class Hesabix_V2_Sync_Service
 					'product_id' => (int) ($pl['product_id'] ?? 0),
 					'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
 				);
+				continue;
+			}
+
+			if (($pl['kind'] ?? '') === 'native_variable') {
+				$parent_id = (int) ($pl['parent_id'] ?? 0);
+				$native_res = Hesabix_V2_Native_Variation_Sync::sync($this, $parent_id, null, null);
+				if (!empty($native_res['success'])) {
+					$results['success']++;
+				} else {
+					$results['failed']++;
+					$results['errors'][] = array(
+						'product_id' => $parent_id,
+						'message' => isset($native_res['message']) ? (string) $native_res['message'] : __('همگام‌سازی Native ناموفق بود.', 'hesabix-v2'),
+					);
+				}
 				continue;
 			}
 

@@ -32,7 +32,11 @@ router = APIRouter(prefix="/businesses/{business_id}/zohal", tags=["یکپارچ
 @router.get(
 	"/services",
 	summary="لیست سرویس‌های استعلامات زحل",
-	description="دریافت لیست سرویس‌های فعال زحل برای کسب‌وکار",
+	description=(
+		"سرویس‌های فعال زحل به‌همراه schema درخواست/پاسخ، قیمت پایه، موجودی کیف‌پول کسب‌وکار و هشدار موجودی کم. "
+		"قبل از POST /inquiry/{service_code} فیلدهای request_schema همان سرویس را بخوانید. "
+		"ابزار MCP متناظر: list_zohal_services."
+	),
 )
 @require_business_access("business_id")
 def list_zohal_services_for_business(
@@ -73,7 +77,10 @@ class InquiryRequest(BaseModel):
 @router.post(
 	"/inquiry/{service_code}",
 	summary="اجرای استعلام زحل",
-	description="ارسال درخواست استعلام به سرویس زحل",
+	description=(
+		"اجرای استعلام پولی زحل: بررسی فعال بودن سرویس، کسر از کیف‌پول، فراخوانی API، ثبت سند حسابداری و لاگ. "
+		"بدنه JSON باید مطابق request_schema سرویس باشد. ابزار MCP: execute_zohal_inquiry (نیاز به تأیید)."
+	),
 )
 @require_business_access("business_id")
 def execute_inquiry(
@@ -100,7 +107,10 @@ def execute_inquiry(
 @router.get(
 	"/logs",
 	summary="تاریخچه استفاده از سرویس‌های زحل",
-	description="دریافت لیست لاگ‌های استفاده از سرویس‌های زحل",
+	description=(
+		"لاگ استعلام‌های همین کسب‌وکار با فیلتر service_id و بازه تاریخ ISO. صفحه‌بندی limit/skip حداکثر ۱۰۰. "
+		"ابزار MCP: list_zohal_inquiry_logs."
+	),
 )
 @require_business_access("business_id")
 def list_inquiry_logs(
@@ -129,8 +139,8 @@ def list_inquiry_logs(
 
 @router.get(
 	"/logs/{log_id}",
-	summary="جزئیات یک لاگ",
-	description="دریافت جزئیات یک لاگ استفاده از سرویس زحل",
+	summary="جزئیات یک لاگ استعلام زحل",
+	description="جزئیات یک لاگ متعلق به همین کسب‌وکار شامل ورودی/خروجی و مبلغ کسرشده. ابزار MCP: get_zohal_inquiry_log.",
 )
 @require_business_access("business_id")
 def get_inquiry_log(

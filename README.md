@@ -1,14 +1,23 @@
 # Hesabix - Comprehensive Accounting System
 
-Hesabix is a complete and modern accounting system designed for small and medium businesses. It includes a powerful API backend (FastAPI + PostgreSQL) and a beautiful web interface (Flutter Web).
+Hesabix is a complete and modern accounting system for businesses of every size: a neighborhood shop, a growing SME, and a large industrial complex. The core stays simple for everyday operations; plugins add the extra capabilities that larger or more specialized organizations need. It includes a powerful API backend (FastAPI + PostgreSQL) and a beautiful web interface (Flutter Web).
 
 ## About Hesabix
 
-Hesabix is an open-source accounting software that provides comprehensive financial management capabilities. The system is built with modern technologies to ensure high performance, scalability, and ease of use.
+Hesabix is an open-source accounting software that provides comprehensive financial management capabilities. One installation can serve a small store with basic sales and books, a mid-size company with several users and warehouses, or a very large industrial site with production, payroll, fixed assets, and integrations. That range comes from a plugin marketplace: you start with core accounting, then enable only the add-ons your business actually needs.
+
+The system is built with modern technologies to ensure high performance, scalability, and ease of use.
+
+### Who it is for
+
+- **Small businesses**: retail shops, workshops, and service offices that need invoices, inventory, and cash without extra complexity
+- **Medium businesses**: multi-user companies that grow with CRM, distribution, tax filing, e-commerce connectors, and similar plugins
+- **Large and industrial operations**: factories and large complexes that add advanced accounting, production, payroll, fixed assets, office automation, and other enterprise plugins on the same platform
 
 ### Key Features
 
 - **Complete Accounting System**: Manage all aspects of your business finances
+- **Scales with plugins**: Enable marketplace add-ons (advanced accounting, production, payroll, telephony, tax, e-commerce, AI, and more) instead of switching software as you grow
 - **Modern Architecture**: Built with FastAPI and PostgreSQL for high performance
 - **Beautiful Web Interface**: Responsive Flutter Web application
 - **Multi-user Support**: Support for multiple users and businesses
@@ -361,4 +370,4 @@ For development setup and contribution guidelines, please refer to the developme
 
 ---
 
-**Hesabix** - Modern Accounting System for Your Business
+**Hesabix** — accounting from a small shop to a large industrial complex, extended with plugins

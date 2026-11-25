@@ -14,8 +14,18 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 0
 fi
 
+if [[ -z "${API_DOMAIN:-}" && -f "${APP_ROOT}/.deploy_env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "${APP_ROOT}/.deploy_env"
+  set +a
+fi
+
 export MERGE_ENV_PATH="${ENV_FILE}"
 export MERGE_DB_PASSWORD_FILE="${APP_ROOT}/.db_password"
+if [[ -n "${API_DOMAIN:-}" ]]; then
+  export MERGE_MCP_PUBLIC_BASE_URL="https://${API_DOMAIN}"
+fi
 
 result="$(python3 <<'PY'
 import os
@@ -94,6 +104,11 @@ if db_pw_file and os.path.isfile(db_pw_file):
     if db_pw and current.get("DB_PASSWORD", "").strip() in INSECURE:
         updates["DB_PASSWORD"] = db_pw
         generated.append("DB_PASSWORD")
+
+mcp_url = (os.environ.get("MERGE_MCP_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+if mcp_url and not (current.get("MCP_PUBLIC_BASE_URL") or "").strip():
+    updates["MCP_PUBLIC_BASE_URL"] = mcp_url
+    generated.append("MCP_PUBLIC_BASE_URL")
 
 if not updates:
     print("ok")

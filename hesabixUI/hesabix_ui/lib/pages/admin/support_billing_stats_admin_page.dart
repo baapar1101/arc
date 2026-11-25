@@ -7,6 +7,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
 
 class SupportBillingStatsAdminPage extends StatefulWidget {
   const SupportBillingStatsAdminPage({super.key});
@@ -28,7 +29,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
   String? _invoiceStatus;
   final TextEditingController _searchCtrl = TextEditingController();
 
-  static const _statusLabels = <String, String>{
+  static const _statusFa = <String, String>{
     'draft': 'پیش‌نویس',
     'awaiting_payment': 'در انتظار پرداخت',
     'paid': 'پرداخت‌شده',
@@ -38,11 +39,28 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     'refunded': 'بازگشت وجه',
   };
 
-  static const _invoiceTypes = <String, String>{
+  static const _statusEn = <String, String>{
+    'draft': 'Draft',
+    'awaiting_payment': 'Awaiting payment',
+    'paid': 'Paid',
+    'failed': 'Failed',
+    'expired': 'Expired',
+    'void': 'Voided',
+    'refunded': 'Refunded',
+  };
+
+  static const _invoiceTypeFa = <String, String>{
     'purchase': 'خرید',
     'renewal': 'تمدید',
     'upgrade': 'ارتقاء',
     'trial': 'آزمایشی',
+  };
+
+  static const _invoiceTypeEn = <String, String>{
+    'purchase': 'Purchase',
+    'renewal': 'Renewal',
+    'upgrade': 'Upgrade',
+    'trial': 'Trial',
   };
 
   @override
@@ -133,7 +151,19 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     }
   }
 
-  String _statusLabel(String? status) => _statusLabels[status] ?? (status ?? '—');
+  String _statusLabel(String? status) {
+    final fa = _statusFa[status];
+    final en = _statusEn[status];
+    if (fa == null || en == null) return status ?? '—';
+    return adminTx(context, fa, en);
+  }
+
+  String _invoiceTypeLabel(String? type) {
+    final fa = _invoiceTypeFa[type];
+    final en = _invoiceTypeEn[type];
+    if (fa == null || en == null) return type ?? '—';
+    return adminTx(context, fa, en);
+  }
 
   Future<void> _pickCustomRange() async {
     final now = DateTime.now();
@@ -143,9 +173,9 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
       lastDate: now,
       initialDateRange: _customRange ??
           DateTimeRange(start: now.subtract(const Duration(days: 30)), end: now),
-      helpText: 'بازه گزارش',
-      cancelText: 'انصراف',
-      confirmText: 'اعمال',
+      helpText: adminTx(context, 'بازه گزارش', 'Report range'),
+      cancelText: adminTx(context, 'انصراف', 'Cancel'),
+      confirmText: adminTx(context, 'اعمال', 'Apply'),
     );
     if (picked == null) return;
     setState(() {
@@ -165,11 +195,11 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
         money: _money,
         formatDate: _fmtDate,
         statusLabel: _statusLabel,
-        invoiceTypeLabel: (t) => _invoiceTypes[t] ?? (t ?? '—'),
+        invoiceTypeLabel: _invoiceTypeLabel,
       ),
     );
     if (result == 'voided' && mounted) {
-      SnackBarHelper.showSuccess(context, message: 'صورت‌حساب ابطال شد');
+      SnackBarHelper.showSuccess(context, message: adminTx(context, 'صورت‌حساب ابطال شد', 'Invoice voided'));
       await _load();
     }
   }
@@ -185,7 +215,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
         content: SizedBox(
           width: 420,
           child: rows.isEmpty
-              ? const Text('داده‌ای وجود ندارد')
+              ? Text(adminTx(context, 'داده‌ای وجود ندارد', 'No data'))
               : ListView.separated(
                   shrinkWrap: true,
                   itemCount: rows.length,
@@ -202,7 +232,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                 ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(adminTx(context, 'بستن', 'Close'))),
         ],
       ),
     );
@@ -215,11 +245,11 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('اشتراک‌های در شرف انقضا'),
+        title: Text(adminTx(context, 'اشتراک‌های در شرف انقضا', 'Subscriptions about to expire')),
         content: SizedBox(
           width: 480,
           child: list.isEmpty
-              ? const Text('موردی در ۷ روز آینده نیست')
+              ? Text(adminTx(context, 'موردی در ۷ روز آینده نیست', 'Nothing expires in the next 7 days'))
               : ListView.separated(
                   shrinkWrap: true,
                   itemCount: list.length,
@@ -230,14 +260,14 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.schedule, size: 20),
-                      title: Text(s['plan_name']?.toString() ?? 'پلن'),
-                      subtitle: Text('کاربر #${s['user_id']} · ${_fmtDate(s['ends_at'])}'),
+                      title: Text(s['plan_name']?.toString() ?? adminTx(context, 'پلن', 'Plan')),
+                      subtitle: Text(adminTx(context, 'کاربر #${s['user_id']} · ${_fmtDate(s['ends_at'])}', 'User #${s['user_id']} · ${_fmtDate(s['ends_at'])}')),
                     );
                   },
                 ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(adminTx(context, 'بستن', 'Close'))),
         ],
       ),
     );
@@ -324,15 +354,18 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     final rangeLabel = _customRange != null
         ? '${_customRange!.start.year}/${_customRange!.start.month}/${_customRange!.start.day} – '
             '${_customRange!.end.year}/${_customRange!.end.month}/${_customRange!.end.day}'
-        : '$_rangeDays روز اخیر';
+        : adminTx(context, '$_rangeDays روز اخیر', 'Last $_rangeDays days');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('آمار پشتیبانی غیر رایگان'),
-        actions: [
-          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'درآمد پشتیبانی', 'Support revenue'),
+      subtitle: adminTx(context, 'آمار پشتیبانی غیررایگان', 'Paid support statistics'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          onPressed: _loading ? null : _load,
+          icon: const Icon(Icons.refresh, size: 20),
+        ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -344,7 +377,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                       children: [
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 12),
-                        FilledButton(onPressed: _load, child: const Text('تلاش مجدد')),
+                        FilledButton(onPressed: _load, child: Text(adminTx(context, 'تلاش مجدد', 'Retry'))),
                       ],
                     ),
                   ),
@@ -361,7 +394,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('بازه گزارش: $rangeLabel', style: theme.textTheme.titleSmall),
+                              Text(adminTx(context, 'بازه گزارش: $rangeLabel', 'Range: $rangeLabel'), style: theme.textTheme.titleSmall),
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
@@ -369,7 +402,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                 children: [
                                   for (final days in [7, 30, 90])
                                     ChoiceChip(
-                                      label: Text('$days روز'),
+                                      label: Text(adminTx(context, '$days روز', '$days days')),
                                       selected: _customRange == null && _rangeDays == days,
                                       onSelected: (_) {
                                         setState(() {
@@ -381,7 +414,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                     ),
                                   ActionChip(
                                     avatar: Icon(Icons.date_range, size: 16),
-                                    label: Text('بازه سفارشی'),
+                                    label: Text(adminTx(context, 'بازه سفارشی', 'Custom range')),
                                     onPressed: _pickCustomRange,
                                   ),
                                 ],
@@ -400,23 +433,23 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'درآمد دوره',
-                              value: '${_money(s?['revenue'])} ریال',
+                              title: adminTx(context, 'درآمد دوره', 'Period revenue'),
+                              value: adminTx(context, '${_money(s?['revenue'])} ریال', '${_money(s?['revenue'])} IRR'),
                               icon: Icons.payments,
                             ),
                           ),
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'MRR تقریبی',
-                              value: '${_money(s?['approximate_mrr'])} ریال',
+                              title: adminTx(context, 'MRR تقریبی', 'Approximate MRR'),
+                              value: adminTx(context, '${_money(s?['approximate_mrr'])} ریال', '${_money(s?['approximate_mrr'])} IRR'),
                               icon: Icons.trending_up,
                             ),
                           ),
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'پرداخت موفق',
+                              title: adminTx(context, 'پرداخت موفق', 'Successful payments'),
                               value: '${s?['paid_count'] ?? 0}',
                               icon: Icons.check_circle,
                               color: SemanticColorResolver.positive(context),
@@ -425,7 +458,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'پرداخت ناموفق',
+                              title: adminTx(context, 'پرداخت ناموفق', 'Failed payments'),
                               value: '${s?['failed_count'] ?? 0}',
                               icon: Icons.error_outline,
                               color: theme.colorScheme.error,
@@ -434,7 +467,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'نرخ موفقیت پرداخت',
+                              title: adminTx(context, 'نرخ موفقیت پرداخت', 'Payment success rate'),
                               value: s?['success_rate_pct'] == null
                                   ? '—'
                                   : '${s?['success_rate_pct']}%',
@@ -444,7 +477,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'در انتظار پرداخت',
+                              title: adminTx(context, 'در انتظار پرداخت', 'Awaiting payment'),
                               value: '${s?['awaiting_payment_count'] ?? 0}',
                               icon: Icons.hourglass_empty,
                               color: SemanticColorResolver.warning(context),
@@ -453,16 +486,16 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'اشتراک فعال',
+                              title: adminTx(context, 'اشتراک فعال', 'Active subscriptions'),
                               value:
-                                  '${s?['active_subscriptions'] ?? 0} (فعال ${s?['active_only'] ?? 0} · مهلت ${s?['grace_subscriptions'] ?? 0})',
+                                  adminTx(context, '${s?['active_subscriptions'] ?? 0} (فعال ${s?['active_only'] ?? 0} · مهلت ${s?['grace_subscriptions'] ?? 0})', '${s?['active_subscriptions'] ?? 0} (active ${s?['active_only'] ?? 0} · grace ${s?['grace_subscriptions'] ?? 0})'),
                               icon: Icons.workspace_premium,
                             ),
                           ),
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'در شرف انقضا (۷ روز)',
+                              title: adminTx(context, 'در شرف انقضا (۷ روز)', 'Expiring in 7 days'),
                               value: '${s?['expiring_in_7_days'] ?? 0}',
                               icon: Icons.schedule,
                               color: Colors.deepOrange,
@@ -472,7 +505,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'انقضاشده در دوره',
+                              title: adminTx(context, 'انقضاشده در دوره', 'Expired in period'),
                               value: '${s?['expired_in_period'] ?? 0}',
                               icon: Icons.event_busy,
                             ),
@@ -480,7 +513,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           SizedBox(
                             width: 280,
                             child: _kpi(
-                              title: 'تیکت به‌ازای مشترک',
+                              title: adminTx(context, 'تیکت به‌ازای مشترک', 'Tickets per subscriber'),
                               value: '${s?['tickets_per_subscriber'] ?? 0}',
                               icon: Icons.confirmation_number_outlined,
                             ),
@@ -489,7 +522,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                       ),
 
                       // نمودار درآمد
-                      _sectionTitle('روند درآمد روزانه'),
+                      _sectionTitle(adminTx(context, 'روند درآمد روزانه', 'Daily revenue')),
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
@@ -499,25 +532,25 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
 
                       // تفکیک پلن و درآمد
                       _sectionTitle(
-                        'تفکیک اشتراک و درآمد',
-                        actionLabel: 'جزئیات',
+                        adminTx(context, 'تفکیک اشتراک و درآمد', 'Subscriptions and revenue'),
+                        actionLabel: adminTx(context, 'جزئیات', 'Details'),
                         onAction: () {
                           final rows = <(String, String)>[
                             ...byPlan.map(
                               (p) => (
-                                '${p['plan_name']} (${p['period_months']} ماهه)',
-                                '${p['count']} اشتراک',
+                                adminTx(context, '${p['plan_name']} (${p['period_months']} ماهه)', '${p['plan_name']} (${p['period_months']} mo)'),
+                                adminTx(context, '${p['count']} اشتراک', '${p['count']} subscriptions'),
                               ),
                             ),
                             if (revenueByPlan.isNotEmpty) ('—', '—'),
                             ...revenueByPlan.map(
                               (p) => (
-                                'درآمد ${p['plan_name']}',
-                                '${_money(p['revenue'])} (${p['paid_count']} پرداخت)',
+                                adminTx(context, 'درآمد ${p['plan_name']}', 'Revenue ${p['plan_name']}'),
+                                adminTx(context, '${_money(p['revenue'])} (${p['paid_count']} پرداخت)', '${_money(p['revenue'])} (${p['paid_count']} payments)'),
                               ),
                             ),
                           ];
-                          _showBreakdownDialog(title: 'تفکیک پلن‌ها', rows: rows);
+                          _showBreakdownDialog(title: adminTx(context, 'تفکیک پلن‌ها', 'By plan'), rows: rows);
                         },
                       ),
                       Card(
@@ -526,7 +559,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           child: Column(
                             children: [
                               if (byPlan.isEmpty)
-                                const ListTile(title: Text('اشتراک فعالی نیست'))
+                                ListTile(title: Text(adminTx(context, 'اشتراک فعالی نیست', 'No active subscriptions')))
                               else
                                 ...byPlan.map((p) {
                                   final maxCnt = byPlan
@@ -542,7 +575,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                '${p['plan_name']} · ${p['period_months']} ماهه',
+                                                adminTx(context, '${p['plan_name']} · ${p['period_months']} ماهه', '${p['plan_name']} · ${p['period_months']} mo'),
                                                 style: theme.textTheme.bodyMedium,
                                               ),
                                             ),
@@ -568,7 +601,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                 const Divider(),
                                 Align(
                                   alignment: Alignment.centerRight,
-                                  child: Text('درآمد بر اساس درگاه', style: theme.textTheme.titleSmall),
+                                  child: Text(adminTx(context, 'درآمد بر اساس درگاه', 'Revenue by gateway'), style: theme.textTheme.titleSmall),
                                 ),
                                 const SizedBox(height: 6),
                                 Wrap(
@@ -590,7 +623,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                 const Divider(),
                                 Align(
                                   alignment: Alignment.centerRight,
-                                  child: Text('وضعیت صورت‌حساب‌ها در بازه', style: theme.textTheme.titleSmall),
+                                  child: Text(adminTx(context, 'وضعیت صورت‌حساب‌ها در بازه', 'Invoice status in range'), style: theme.textTheme.titleSmall),
                                 ),
                                 const SizedBox(height: 6),
                                 Wrap(
@@ -616,7 +649,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                       ),
 
                       // CSAT و hybrid
-                      _sectionTitle('کیفیت و سهمیه'),
+                      _sectionTitle(adminTx(context, 'کیفیت و سهمیه', 'Quality and quota')),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -626,11 +659,11 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                             child: Card(
                               child: ListTile(
                                 leading: const Icon(Icons.star_rate_rounded),
-                                title: const Text('میانگین CSAT مشترکان'),
+                                title: Text(adminTx(context, 'میانگین CSAT مشترکان', 'Subscriber CSAT')),
                                 subtitle: Text(
                                   csat['subscribers_avg'] == null
-                                      ? 'بدون امتیاز در بازه'
-                                      : '${csat['subscribers_avg']} از ۵ · ${csat['subscribers_count']} نظر',
+                                      ? adminTx(context, 'بدون امتیاز در بازه', 'No ratings in this range')
+                                      : adminTx(context, '${csat['subscribers_avg']} از ۵ · ${csat['subscribers_count']} نظر', '${csat['subscribers_avg']} of 5 · ${csat['subscribers_count']} ratings'),
                                 ),
                               ),
                             ),
@@ -640,11 +673,11 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                             child: Card(
                               child: ListTile(
                                 leading: const Icon(Icons.star_outline),
-                                title: const Text('میانگین CSAT غیرمشترک'),
+                                title: Text(adminTx(context, 'میانگین CSAT غیرمشترک', 'Non-subscriber CSAT')),
                                 subtitle: Text(
                                   csat['non_subscribers_avg'] == null
-                                      ? 'بدون امتیاز در بازه'
-                                      : '${csat['non_subscribers_avg']} از ۵ · ${csat['non_subscribers_count']} نظر',
+                                      ? adminTx(context, 'بدون امتیاز در بازه', 'No ratings in this range')
+                                      : adminTx(context, '${csat['non_subscribers_avg']} از ۵ · ${csat['non_subscribers_count']} نظر', '${csat['non_subscribers_avg']} of 5 · ${csat['non_subscribers_count']} ratings'),
                                 ),
                               ),
                             ),
@@ -654,32 +687,34 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                             child: Card(
                               child: ListTile(
                                 leading: const Icon(Icons.data_usage),
-                                title: Text('سهمیه hybrid (${hybrid['billing_mode'] ?? '-'})'),
+                                title: Text(adminTx(context, 'سهمیه hybrid (${hybrid['billing_mode'] ?? '-'})', 'Hybrid quota (${hybrid['billing_mode'] ?? '-'})')),
                                 subtitle: Text(
-                                  'دوره ${hybrid['period_key'] ?? '-'} · میانگین مصرف ${hybrid['avg_tickets_created'] ?? 0}'
-                                  '${hybrid['free_quota_per_month'] != null ? ' از ${hybrid['free_quota_per_month']}' : ''}'
-                                  '${hybrid['quota_utilization_pct'] != null ? ' · ${hybrid['quota_utilization_pct']}%' : ''}',
+                                  adminTx(
+                                    context,
+                                    'دوره ${hybrid['period_key'] ?? '-'} · میانگین مصرف ${hybrid['avg_tickets_created'] ?? 0}${hybrid['free_quota_per_month'] != null ? ' از ' : ''}${hybrid['free_quota_per_month'] ?? ''}${hybrid['quota_utilization_pct'] != null ? ' · ' : ''}${hybrid['quota_utilization_pct'] ?? ''}${hybrid['quota_utilization_pct'] != null ? '%' : ''}',
+                                    'Period ${hybrid['period_key'] ?? '-'} · avg usage ${hybrid['avg_tickets_created'] ?? 0}${hybrid['free_quota_per_month'] != null ? ' of ' : ''}${hybrid['free_quota_per_month'] ?? ''}${hybrid['quota_utilization_pct'] != null ? ' · ' : ''}${hybrid['quota_utilization_pct'] ?? ''}${hybrid['quota_utilization_pct'] != null ? '%' : ''}',
+                                  ),
                                 ),
                                 onTap: () => _showBreakdownDialog(
-                                  title: 'جزئیات سهمیه hybrid',
+                                  title: adminTx(context, 'جزئیات سهمیه hybrid', 'Hybrid quota details'),
                                   rows: [
-                                    ('حالت صورتحساب', '${hybrid['billing_mode'] ?? '—'}'),
-                                    ('کلید دوره', '${hybrid['period_key'] ?? '—'}'),
-                                    ('سهمیه رایگان ماهانه', '${hybrid['free_quota_per_month'] ?? '—'}'),
-                                    ('کاربران دارای مصرف', '${hybrid['users_with_usage'] ?? 0}'),
-                                    ('میانگین تیکت ایجادشده', '${hybrid['avg_tickets_created'] ?? 0}'),
-                                    ('حداکثر مصرف', '${hybrid['max_tickets_created'] ?? 0}'),
+                                    (adminTx(context, 'حالت صورتحساب', 'Billing mode'), '${hybrid['billing_mode'] ?? '—'}'),
+                                    (adminTx(context, 'کلید دوره', 'Period key'), '${hybrid['period_key'] ?? '—'}'),
+                                    (adminTx(context, 'سهمیه رایگان ماهانه', 'Free monthly quota'), '${hybrid['free_quota_per_month'] ?? '—'}'),
+                                    (adminTx(context, 'کاربران دارای مصرف', 'Users with usage'), '${hybrid['users_with_usage'] ?? 0}'),
+                                    (adminTx(context, 'میانگین تیکت ایجادشده', 'Average tickets created'), '${hybrid['avg_tickets_created'] ?? 0}'),
+                                    (adminTx(context, 'حداکثر مصرف', 'Peak usage'), '${hybrid['max_tickets_created'] ?? 0}'),
                                     (
-                                      'درصد مصرف میانگین',
+                                      adminTx(context, 'درصد مصرف میانگین', 'Average usage percent'),
                                       hybrid['quota_utilization_pct'] == null
                                           ? '—'
                                           : '${hybrid['quota_utilization_pct']}%',
                                     ),
                                     (
-                                      'تیکت مشترکان در بازه',
+                                      adminTx(context, 'تیکت مشترکان در بازه', 'Subscriber tickets in range'),
                                       '${s?['tickets_by_subscribers_in_period'] ?? 0}',
                                     ),
-                                    ('تعداد کاربران مشترک', '${s?['subscriber_user_count'] ?? 0}'),
+                                    (adminTx(context, 'تعداد کاربران مشترک', 'Subscriber count'), '${s?['subscriber_user_count'] ?? 0}'),
                                   ],
                                 ),
                               ),
@@ -689,7 +724,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                       ),
 
                       // صورت‌حساب‌ها
-                      _sectionTitle('صورت‌حساب‌ها ($_invoiceTotal)'),
+                      _sectionTitle(adminTx(context, 'صورت‌حساب‌ها ($_invoiceTotal)', 'Invoices ($_invoiceTotal)')),
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(12),
@@ -701,7 +736,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                     child: TextField(
                                       controller: _searchCtrl,
                                       decoration: InputDecoration(
-                                        hintText: 'جستجو با کد صورت‌حساب',
+                                        hintText: adminTx(context, 'جستجو با کد صورت‌حساب', 'Search by invoice code'),
                                         prefixIcon: const Icon(Icons.search),
                                         isDense: true,
                                         border: const OutlineInputBorder(),
@@ -721,7 +756,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                   const SizedBox(width: 8),
                                   FilledButton.tonal(
                                     onPressed: _load,
-                                    child: const Text('اعمال'),
+                                    child: Text(adminTx(context, 'اعمال', 'Apply')),
                                   ),
                                 ],
                               ),
@@ -730,7 +765,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                 spacing: 6,
                                 children: [
                                   FilterChip(
-                                    label: const Text('همه'),
+                                    label: Text(adminTx(context, 'همه', 'All')),
                                     selected: _invoiceStatus == null,
                                     onSelected: (_) {
                                       setState(() => _invoiceStatus = null);
@@ -760,8 +795,8 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                       ),
                       const SizedBox(height: 8),
                       if (_invoices.isEmpty)
-                        const Card(
-                          child: ListTile(title: Text('صورت‌حسابی یافت نشد')),
+                        Card(
+                          child: ListTile(title: Text(adminTx(context, 'صورت‌حسابی یافت نشد', 'No invoices'))),
                         )
                       else
                         ..._invoices.map((inv) {
@@ -776,7 +811,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                           };
                           final userLabel = inv['user_name']?.toString().trim().isNotEmpty == true
                               ? inv['user_name']
-                              : 'کاربر #${inv['user_id']}';
+                              : adminTx(context, 'کاربر #${inv['user_id']}', 'User #${inv['user_id']}');
                           return Card(
                             child: ListTile(
                               onTap: () => _openInvoiceDetail(inv),
@@ -786,8 +821,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                               ),
                               title: Text(inv['code']?.toString() ?? ''),
                               subtitle: Text(
-                                '$userLabel · ${inv['plan_name'] ?? '-'} · '
-                                '${_money(inv['amount'])} ریال · ${_statusLabel(status)}',
+                                '$userLabel · ${inv['plan_name'] ?? '-'} · ${adminTx(context, '${_money(inv['amount'])} ریال · ${_statusLabel(status)}', '${_money(inv['amount'])} IRR · ${_statusLabel(status)}')}',
                               ),
                               trailing: const Icon(Icons.chevron_left),
                             ),
@@ -810,9 +844,9 @@ class _RevenueTimeseriesChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (points.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 180,
-        child: Center(child: Text('در این بازه درآمدی ثبت نشده است')),
+        child: Center(child: Text(adminTx(context, 'در این بازه درآمدی ثبت نشده است', 'No revenue in this range'))),
       );
     }
 
@@ -873,7 +907,7 @@ class _RevenueTimeseriesChart extends StatelessWidget {
                 final i = t.x.toInt();
                 final date = (i >= 0 && i < points.length) ? '${points[i]['date']}' : '';
                 return LineTooltipItem(
-                  '$date\n${money(t.y)} ریال',
+                  adminTx(context, '$date\n${money(t.y)} ریال', '$date\n${money(t.y)} IRR'),
                   TextStyle(color: theme.colorScheme.onInverseSurface, fontWeight: FontWeight.w600),
                 );
               }).toList(),
@@ -924,15 +958,15 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ابطال صورت‌حساب'),
+        title: Text(adminTx(context, 'ابطال صورت‌حساب', 'Void invoice')),
         content: Text(
-          'صورت‌حساب ${widget.invoice['code']} ابطال شود؟\nاین عمل برای صورت‌حساب‌های پرداخت‌شده مجاز نیست.',
+          adminTx(context, 'صورت‌حساب ${widget.invoice['code']} ابطال شود؟\nاین عمل برای صورت‌حساب‌های پرداخت‌شده مجاز نیست.', 'Void invoice ${widget.invoice['code']}?\nPaid invoices cannot be voided.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ابطال'),
+            child: Text(adminTx(context, 'ابطال', 'Void')),
           ),
         ],
       ),
@@ -979,7 +1013,7 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     final canVoid = status != null && status != 'paid' && status != 'void' && status != 'refunded';
     final userLabel = inv['user_name']?.toString().trim().isNotEmpty == true
         ? '${inv['user_name']} (#${inv['user_id']})'
-        : 'کاربر #${inv['user_id']}';
+        : adminTx(context, 'کاربر #${inv['user_id']}', 'User #${inv['user_id']}');
 
     return SafeArea(
       child: Padding(
@@ -994,38 +1028,38 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(inv['code']?.toString() ?? 'صورت‌حساب', style: theme.textTheme.titleLarge),
+              Text(inv['code']?.toString() ?? adminTx(context, 'صورت‌حساب', 'Invoice'), style: theme.textTheme.titleLarge),
               const SizedBox(height: 4),
               Text(
                 widget.statusLabel(status),
                 style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
               ),
               const Divider(height: 24),
-              _row('کاربر', userLabel),
-              if (inv['user_email'] != null) _row('ایمیل', '${inv['user_email']}'),
-              _row('پلن', '${inv['plan_name'] ?? '—'}'),
-              if (inv['plan_code'] != null) _row('کد پلن', '${inv['plan_code']}'),
-              _row('نوع', widget.invoiceTypeLabel(inv['invoice_type']?.toString())),
-              _row('مبلغ', '${widget.money(inv['amount'])} ریال'),
+              _row(adminTx(context, 'کاربر', 'User'), userLabel),
+              if (inv['user_email'] != null) _row(adminTx(context, 'ایمیل', 'Email'), '${inv['user_email']}'),
+              _row(adminTx(context, 'پلن', 'Plan'), '${inv['plan_name'] ?? '—'}'),
+              if (inv['plan_code'] != null) _row(adminTx(context, 'کد پلن', 'Plan code'), '${inv['plan_code']}'),
+              _row(adminTx(context, 'نوع', 'Type'), widget.invoiceTypeLabel(inv['invoice_type']?.toString())),
+              _row(adminTx(context, 'مبلغ', 'Amount'), adminTx(context, '${widget.money(inv['amount'])} ریال', '${widget.money(inv['amount'])} IRR')),
               if ((inv['discount_amount'] is num) && (inv['discount_amount'] as num) > 0)
-                _row('تخفیف', '${widget.money(inv['discount_amount'])} ریال'),
-              _row('مدت', '${inv['period_months'] ?? '—'} ماه'),
-              _row('صدور', widget.formatDate(inv['issued_at'])),
-              _row('سررسید', widget.formatDate(inv['due_at'])),
-              _row('پرداخت', widget.formatDate(inv['paid_at'])),
-              _row('شروع پوشش', widget.formatDate(inv['coverage_starts_at'])),
-              _row('پایان پوشش', widget.formatDate(inv['coverage_ends_at'])),
-              _row('درگاه', '${inv['gateway_provider'] ?? '—'}'),
-              if (inv['gateway_ref'] != null) _row('مرجع درگاه', '${inv['gateway_ref']}'),
-              if (inv['gateway_trace'] != null) _row('پیگیری', '${inv['gateway_trace']}'),
-              if (inv['payment_session_id'] != null) _row('نشست پرداخت', '#${inv['payment_session_id']}'),
+                _row(adminTx(context, 'تخفیف', 'Discount'), adminTx(context, '${widget.money(inv['discount_amount'])} ریال', '${widget.money(inv['discount_amount'])} IRR')),
+              _row(adminTx(context, 'مدت', 'Term'), adminTx(context, '${inv['period_months'] ?? '—'} ماه', '${inv['period_months'] ?? '—'} mo')),
+              _row(adminTx(context, 'صدور', 'Issued'), widget.formatDate(inv['issued_at'])),
+              _row(adminTx(context, 'سررسید', 'Due'), widget.formatDate(inv['due_at'])),
+              _row(adminTx(context, 'پرداخت', 'Paid'), widget.formatDate(inv['paid_at'])),
+              _row(adminTx(context, 'شروع پوشش', 'Coverage start'), widget.formatDate(inv['coverage_starts_at'])),
+              _row(adminTx(context, 'پایان پوشش', 'Coverage end'), widget.formatDate(inv['coverage_ends_at'])),
+              _row(adminTx(context, 'درگاه', 'Gateway'), '${inv['gateway_provider'] ?? '—'}'),
+              if (inv['gateway_ref'] != null) _row(adminTx(context, 'مرجع درگاه', 'Gateway reference'), '${inv['gateway_ref']}'),
+              if (inv['gateway_trace'] != null) _row(adminTx(context, 'پیگیری', 'Tracking'), '${inv['gateway_trace']}'),
+              if (inv['payment_session_id'] != null) _row(adminTx(context, 'نشست پرداخت', 'Payment session'), '#${inv['payment_session_id']}'),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('بستن'),
+                      child: Text(adminTx(context, 'بستن', 'Close')),
                     ),
                   ),
                   if (canVoid) ...[
@@ -1042,7 +1076,7 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
                                 height: 18,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text('ابطال'),
+                            : Text(adminTx(context, 'ابطال', 'Void')),
                       ),
                     ),
                   ],

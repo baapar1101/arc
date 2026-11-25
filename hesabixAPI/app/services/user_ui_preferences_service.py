@@ -13,6 +13,8 @@ _MAX_TABS_PER_BUSINESS = 24
 _MAX_QUICK_SALES_SHORTCUT_BUSINESSES = 100
 _MAX_QUICK_SALES_SHORTCUTS_PER_BUSINESS = 100
 _QUICK_SALES_SHORTCUT_PLATFORMS = frozenset({"windows", "web"})
+MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS = 12
+_MAX_QUICK_SALES_PINNED_BUSINESSES = 100
 
 
 def _default_preferences() -> Dict[str, Any]:
@@ -135,6 +137,34 @@ def _normalize_quick_sales_payment_shortcuts(raw: Any) -> Dict[str, Any]:
 	return out
 
 
+def _normalize_quick_sales_pinned_products(raw: Any) -> Dict[str, List[int]]:
+	"""Keep per-user pinned quick-sales products small and ordered per business."""
+	if not isinstance(raw, dict):
+		return {}
+	out: Dict[str, List[int]] = {}
+	for business_key, ids_raw in list(raw.items())[:_MAX_QUICK_SALES_PINNED_BUSINESSES]:
+		try:
+			business_id = int(str(business_key))
+		except (TypeError, ValueError):
+			continue
+		if business_id <= 0 or not isinstance(ids_raw, list):
+			continue
+		seen: set[int] = set()
+		ids: List[int] = []
+		for raw_id in ids_raw[:MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS]:
+			try:
+				product_id = int(raw_id)
+			except (TypeError, ValueError):
+				continue
+			if product_id <= 0 or product_id in seen:
+				continue
+			seen.add(product_id)
+			ids.append(product_id)
+		if ids:
+			out[str(business_id)] = ids
+	return out
+
+
 def _parse_business_path(path: str) -> Tuple[bool, int, str]:
 	m = _BUSINESS_PATH_RE.match(path.split("?")[0])
 	if not m:
@@ -161,6 +191,9 @@ def get_user_ui_preferences(db: Session, user_id: int) -> Dict[str, Any]:
 	data["business_panel_tabs"] = tabs
 	data["quick_sales_payment_shortcuts"] = _normalize_quick_sales_payment_shortcuts(
 		stored.get("quick_sales_payment_shortcuts")
+	)
+	data["quick_sales_pinned_products"] = _normalize_quick_sales_pinned_products(
+		stored.get("quick_sales_pinned_products")
 	)
 	# فقط اگر کاربر قبلاً تم را صریحاً ذخیره کرده باشد برگردان
 	if "theme_id" in stored:
@@ -215,6 +248,17 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 		)
 	if quick_sales_shortcuts:
 		next_prefs["quick_sales_payment_shortcuts"] = quick_sales_shortcuts
+
+	if "quick_sales_pinned_products" in payload:
+		quick_sales_pinned = _normalize_quick_sales_pinned_products(
+			payload.get("quick_sales_pinned_products")
+		)
+	else:
+		quick_sales_pinned = _normalize_quick_sales_pinned_products(
+			stored_raw.get("quick_sales_pinned_products")
+		)
+	if quick_sales_pinned:
+		next_prefs["quick_sales_pinned_products"] = quick_sales_pinned
 
 	# تم فقط وقتی در payload باشد یا قبلاً توسط کاربر ذخیره شده باشد حفظ می‌شود
 	if "theme_id" in payload:
@@ -296,3 +340,37 @@ def save_quick_sales_payment_shortcuts(
 		((result.get("quick_sales_payment_shortcuts") or {}).get(business_key) or {}).get(platform)
 		or {}
 	)
+
+
+def get_quick_sales_pinned_product_ids(
+	db: Session,
+	user_id: int,
+	business_id: int,
+) -> List[int]:
+	preferences = get_user_ui_preferences(db, user_id)
+	all_pinned = preferences.get("quick_sales_pinned_products") or {}
+	ids = all_pinned.get(str(int(business_id))) or []
+	return [int(pid) for pid in ids] if isinstance(ids, list) else []
+
+
+def save_quick_sales_pinned_product_ids(
+	db: Session,
+	user_id: int,
+	business_id: int,
+	product_ids: List[int],
+) -> List[int]:
+	preferences = get_user_ui_preferences(db, user_id)
+	all_pinned = dict(preferences.get("quick_sales_pinned_products") or {})
+	business_key = str(int(business_id))
+	normalized = _normalize_quick_sales_pinned_products({business_key: list(product_ids)})
+	clean_ids = list(normalized.get(business_key) or [])
+	if clean_ids:
+		all_pinned[business_key] = clean_ids
+	else:
+		all_pinned.pop(business_key, None)
+	result = save_user_ui_preferences(
+		db,
+		user_id,
+		{"quick_sales_pinned_products": all_pinned},
+	)
+	return list((result.get("quick_sales_pinned_products") or {}).get(business_key) or [])

@@ -25,6 +25,7 @@ from app.core.permissions import (
     has_invoice_type_permission_for_business,
     allowed_invoice_types_for_business,
     user_can_change_invoice_unit_price,
+    user_can_confirm_expired_sale,
     has_business_permission_for_business,
 )
 from app.core.responses import success_response, format_datetime_fields
@@ -106,7 +107,7 @@ from app.services.document_list_sort import apply_invoice_search_ordering, apply
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 
 logger = logging.getLogger(__name__)
@@ -205,7 +206,8 @@ router = APIRouter(prefix="/invoices", tags=["اسناد فروش", "اسناد 
     summary="ایجاد فاکتور",
     description=(
         "ثبت فاکتور جدید برای کسب‌وکار. بدنه درخواست همان ساختار پذیرفته‌شده توسط سرویس ایجاد فاکتور است "
-        "(نوع سند، تاریخ، طرف حساب، خطوط کالا/خدمت، استعلام انبار، اقساط و غیره در `extra_info`). "
+        "(نوع سند، تاریخ، طرف حساب، خطوط کالا/خدمت، استعلام انبار، اقساط). "
+        "ابزار MCP: `create_invoice` (نیازمند تأیید). extra_info در MCP پذیرفته نمی‌شود. "
         "انتخاب دستی نرخ تسعیر ارز فقط با مجوز مشاهدهٔ تاریخچه نرخ (`currency_revaluation.view`) مجاز است."
     ),
 )
@@ -223,6 +225,10 @@ def create_invoice_endpoint(
     # پس از کنترل ویژگی فروش سریع، تنظیمات کسب‌وکار و مجوز کاربر در سرور ساخته می‌شود.
     extra = dict(payload.get("extra_info") or {})
     extra.pop("_stock_override", None)
+    if "woo_create_key" in payload and extra.get("quick_sale"):
+        raise ApiError(
+            "INVALID_WOO_CREATE_KEY", "کلید صدور ووکامرس برای فروش سریع معتبر نیست.", http_status=422
+        )
     if extra.get("quick_sale") is True:
         if payload.get("invoice_type") != "invoice_sales":
             raise ApiError(
@@ -324,6 +330,7 @@ def create_invoice_endpoint(
     payload["extra_info"] = extra
     can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
     can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
+    can_confirm_expired = user_can_confirm_expired_sale(ctx, db, business_id)
     result = create_invoice(
         db=db,
         business_id=business_id,
@@ -331,6 +338,7 @@ def create_invoice_endpoint(
         data=payload,
         user_can_select_fx_rate=can_pick,
         user_can_change_invoice_unit_price=can_change_unit,
+        user_can_confirm_expired_sale=can_confirm_expired,
         lightweight_response=extra.get("quick_sale") is True,
     )
     return success_response(data=result, request=request, message="INVOICE_CREATED")
@@ -339,7 +347,7 @@ def create_invoice_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/installments",
     summary="طرح اقساط فاکتور",
-    description="در صورت ثبت طرح اقساط روی فاکتور، جزئیات برنامه (اقساط، مبالغ، سررسیدها) برگردانده می‌شود.",
+    description="جزئیات برنامه اقساط. ابزار MCP: `get_invoice_installments`.",
 )
 @require_business_access("business_id")
 def get_invoice_installments_endpoint(
@@ -357,7 +365,7 @@ def get_invoice_installments_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/share-link",
     summary="وضعیت لینک اشتراک‌گذاری فاکتور",
-    description="اگر لینک عمومی فعال برای مشاهدهٔ فاکتور وجود داشته باشد، آدرس و محدودیت‌های آن؛ در غیر این صورت بدون خطا با دادهٔ خالی.",
+    description="وضعیت لینک عمومی فاکتور. ابزار MCP: `get_invoice_share_link`.",
 )
 @require_business_access("business_id")
 def get_invoice_share_link_endpoint(
@@ -383,7 +391,7 @@ def get_invoice_share_link_endpoint(
     summary="ایجاد یا تمدید لینک اشتراک‌گذاری فاکتور",
     description=(
         "ایجاد لینک عمومی با امکان تعیین مدت اعتبار، حداکثر بازدید و جایگزینی لینک قبلی. "
-        "بدنه مطابق مدل `InvoiceShareLinkCreateRequest` است."
+        "ابزار MCP: `create_invoice_share_link` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -419,7 +427,7 @@ def create_invoice_share_link_endpoint(
 @router.delete(
     "/business/{business_id}/{invoice_id}/share-link",
     summary="لغو لینک اشتراک‌گذاری فاکتور",
-    description="ابطال لینک عمومی فعال؛ در صورت نبود لینک فعال پاسخ 404 برمی‌گردد.",
+    description="ابطال لینک عمومی فعال. ابزار MCP: `revoke_invoice_share_link` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def delete_invoice_share_link_endpoint(
@@ -444,7 +452,7 @@ def delete_invoice_share_link_endpoint(
 @router.patch(
     "/business/{business_id}/{invoice_id}/share-link/payment",
     summary="تنظیم پرداخت آنلاین روی لینک عمومی فاکتور",
-    description="فعال/غیرفعال کردن پرداخت آنلاین و انتخاب درگاه برای لینک فعال.",
+    description="پرداخت آنلاین لینک فعال. ابزار MCP: `update_invoice_share_link_payment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def patch_invoice_share_link_payment_endpoint(
@@ -480,8 +488,7 @@ def patch_invoice_share_link_payment_endpoint(
     "/business/{business_id}/installments/search",
     summary="جستجوی اقساط",
     description=(
-        "لیست اقساط با فیلترهای اختیاری: سال مالی، بازه سررسید، وضعیت، شخص، فاکتور، صفحه‌بندی (`take`/`skip`) و غیره. "
-        "جزئیات فیلدها در docstring تابع آمده است."
+        "جستجوی اقساط با فیلتر سررسید/وضعیت/شخص. ابزار MCP: `search_invoice_installments`."
     ),
 )
 @require_business_access("business_id")
@@ -519,7 +526,7 @@ def search_installments_endpoint(
 @router.post(
     "/business/{business_id}/installments/export/excel",
     summary="خروجی Excel اقساط",
-    description="همان فیلترهای `installments/search`؛ در صورت نبود کتابخانه XLSX ممکن است CSV برگردد.",
+    description="خروجی باینری Excel/CSV است و در MCP ثبت نشده. JSON: `search_invoice_installments`.",
 )
 @require_business_access("business_id")
 def export_installments_excel_endpoint(
@@ -552,7 +559,7 @@ def export_installments_excel_endpoint(
 @router.post(
     "/business/{business_id}/installments/export/pdf",
     summary="خروجی PDF گزارش اقساط",
-    description="PDF گزارش اقساط با همان فیلترهای جستجو؛ پارامترهای `paper_size` و `orientation` در بدنه اختیاری هستند.",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `search_invoice_installments`.",
 )
 @require_business_access("business_id")
 def export_installments_pdf_endpoint(
@@ -736,8 +743,8 @@ def export_installments_pdf_endpoint(
     "/business/{business_id}/{invoice_id}",
     summary="ویرایش فاکتور",
     description=(
-        "به‌روزرسانی فاکتور موجود. خطاهای رایج: شخص نامعتبر (`INVALID_PERSON`)، تکراری بودن شماره فاکتور (`DUPLICATE_DOCUMENT_CODE`). "
-        "همان قواعد انتخاب نرخ ارز دستی مانند ایجاد فاکتور اعمال می‌شود."
+        "به‌روزرسانی فاکتور موجود. ابزار MCP: `update_invoice` (نیازمند تأیید). extra_info در MCP پذیرفته نمی‌شود. "
+        "خطاهای رایج: شخص نامعتبر (`INVALID_PERSON`)، تکراری بودن شماره فاکتور (`DUPLICATE_DOCUMENT_CODE`)."
     ),
 )
 @require_business_access("business_id")
@@ -769,6 +776,7 @@ def update_invoice_endpoint(
     try:
         can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
         can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
+        can_confirm_expired = user_can_confirm_expired_sale(ctx, db, business_id)
         result = update_invoice(
             db=db,
             document_id=invoice_id,
@@ -776,6 +784,7 @@ def update_invoice_endpoint(
             data=payload,
             user_can_select_fx_rate=can_pick,
             user_can_change_invoice_unit_price=can_change_unit,
+            user_can_confirm_expired_sale=can_confirm_expired,
         )
     except IntegrityError as e:
         db.rollback()
@@ -804,7 +813,7 @@ def update_invoice_endpoint(
 @router.delete(
     "/business/{business_id}/{invoice_id}",
     summary="حذف فاکتور",
-    description="حذف یک فاکتور پس از اعتبارسنجی مالکیت و نوع سند؛ در صورت وجود وابستگی به اسناد دیگر ممکن است خطای منطقی برگردد.",
+    description="حذف یک فاکتور پس از اعتبارسنجی مالکیت. ابزار MCP: `delete_invoice` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def delete_invoice_endpoint(
@@ -840,8 +849,8 @@ def delete_invoice_endpoint(
     "/business/{business_id}/bulk-delete",
     summary="حذف گروهی فاکتورها",
     description=(
-        'بدنه: `{"invoice_ids": [int, ...]}` — حذف چند فاکتور همزمان؛ '
-        "شناسه‌های حذف‌شده در `deleted` و موارد رد شده با دلیل در `skipped` برمی‌گردد."
+        "حذف گروهی حداکثر ۱۰۰ فاکتور. ابزار MCP: `bulk_delete_invoices` (نیازمند تأیید). "
+        "شناسه‌های حذف‌شده در `deleted` و موارد رد شده در `skipped`."
     ),
 )
 @require_business_access("business_id")
@@ -876,9 +885,7 @@ def bulk_delete_invoices_endpoint(
     "/business/{business_id}/bulk-upsert",
     summary="ایجاد/ویرایش گروهی فاکتورها (یکپارچه‌سازی)",
     description=(
-        "بدنه شامل `items`: آرایه‌ای از `{client_ref?، invoice_id?، payload}`؛ برای ایجاد `invoice_id` خالی؛ "
-        "برای ویرایش عدد همان شناسه سند؛ `payload` همان بدنهٔ تکی ایجاد/ویرایش فاکتور. "
-        "حداکثر ۱۰۰۰ آیتم در هر درخواست؛ نتیجهٔ per-item در `results` با status=created|updated|failed است."
+        "ایجاد/ویرایش گروهی فاکتور. ابزار MCP سقف ۲۵ مورد: `bulk_upsert_invoices` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -904,8 +911,7 @@ def bulk_upsert_invoices_integration_endpoint(
     "/business/{business_id}/{invoice_id}/delete-info",
     summary="پیش‌نمایش اثرات حذف فاکتور",
     description=(
-        "قبل از حذف، ارتباطات سند را برمی‌گرداند: کارپوشه مودیان، اقساط، اسناد دریافت/پرداخت و حواله‌های انبار. "
-        "برای نمایش هشدار در رابط کاربری استفاده می‌شود."
+        "پیش‌نمایش وابستگی‌های حذف. ابزار MCP: `get_invoice_delete_info`."
     ),
 )
 @require_business_access("business_id")
@@ -1024,7 +1030,7 @@ def get_invoice_delete_info(
 @router.get(
     "/business/{business_id}/tags",
     summary="لیست برچسب‌های فاکتور",
-    description="برچسب‌های قابل انتساب به فاکتور برای این کسب‌وکار (با ایجاد خودکار پیش‌فرض در اولین بار)",
+    description="برچسب‌های قابل انتساب به فاکتور. ابزار MCP: `list_invoice_tags`.",
 )
 @require_business_access("business_id")
 def list_invoice_tags_endpoint(
@@ -1045,7 +1051,7 @@ def list_invoice_tags_endpoint(
 @router.post(
     "/business/{business_id}/tags",
     summary="ایجاد برچسب فاکتور",
-    description='بدنه: `{"name": "...", "color": "#RRGGBB?"}` — برچسب برای فیلتر و نمایش روی فاکتورها.',
+    description="ایجاد برچسب فاکتور. ابزار MCP: `create_invoice_tag` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def create_invoice_tag_endpoint(
@@ -1065,7 +1071,7 @@ def create_invoice_tag_endpoint(
 @router.patch(
     "/business/{business_id}/tags/{tag_id}",
     summary="ویرایش برچسب فاکتور",
-    description="فیلدهای ارسالی (نام، رنگ، فعال/غیرفعال و ...) طبق بدنه درخواست به‌روز می‌شوند.",
+    description="ویرایش برچسب غیرسیستمی. ابزار MCP: `update_invoice_tag` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def update_invoice_tag_endpoint(
@@ -1084,7 +1090,7 @@ def update_invoice_tag_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}",
     summary="جزئیات یک فاکتور",
-    description="خروجی کامل سند به شکل دیکشنری (شامل خطوط، مبالغ، اضافه‌اطلاعات، برچسب‌ها پس از فرمت‌دهی).",
+    description="خروجی کامل سند شامل خطوط و مبالغ. ابزار MCP: `get_invoice_details`. extra_info در MCP برنمی‌گردد.",
 )
 @require_business_access("business_id")
 def get_invoice_endpoint(
@@ -1103,6 +1109,15 @@ def get_invoice_endpoint(
         raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
     # پاک‌سازی لینک‌های مرده در invoice_document_to_dict انجام می‌شود
     result = invoice_document_to_dict(db, doc)
+    if ctx.has_business_permission("crm", "view"):
+        try:
+            from app.services.crm_deal_document_service import deals_for_document
+
+            result["crm_deals"] = deals_for_document(db, business_id, int(doc.id), ctx)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning("crm deal back-reference failed invoice_id=%s", invoice_id, exc_info=True)
     return success_response(data={"item": result}, request=request, message="INVOICE")
 
 
@@ -1111,7 +1126,7 @@ def get_invoice_endpoint(
     summary="پر کردن دفتر سود قطعی (شناسایی)",
     description=(
         "برای اسناد قبلی، مقادیر بهای تمام‌شده و سود ناخالص قطعی را مطابق تنظیم «زمان شناسایی قطعی» کسب‌وکار ذخیره می‌کند. "
-        "اختیاری: `fiscal_year_id`, `invoice_ids`, `limit`, `use_background` برای صف صف پس‌زمینه."
+        "اختیاری: `fiscal_year_id`, `invoice_ids`, `limit`, `use_background` برای صف پس‌زمینه. ابزار MCP همگام: `backfill_invoice_profit_ledger` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -1200,7 +1215,7 @@ def backfill_invoice_profit_ledger_endpoint(
     summary="محاسبه مجدد سود همه فاکتورها",
     description=(
         "معادل فراخوانی `recalculate-profits` بدون فیلتر؛ پس از تغییر تنظیمات محاسبه سود کسب‌وکار استفاده می‌شود. "
-        "در صورت حجم بالا، صف پس‌زمینه به‌کار می‌رود."
+        "در صورت حجم بالا، صف پس‌زمینه به‌کار می‌رود. ابزار MCP سقف ۵۰ سند: `recalculate_all_invoice_profits` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -1252,7 +1267,8 @@ def recalculate_all_invoice_profits_endpoint(
     summary="محاسبه مجدد سود فاکتورها (با فیلتر)",
     description=(
         "بدنه: `invoice_ids` اختیاری، `document_type`, `fiscal_year_id`, `batch_size` (پیش‌فرض ۱۰۰)، "
-        "`use_background` (پیش‌فرض true). فقط انواع فروش/برگشت از فروش/تولید در منطق فعلی پردازش می‌شوند."
+        "`use_background` (پیش‌فرض true). فقط انواع فروش/برگشت از فروش/تولید در منطق فعلی پردازش می‌شوند. "
+        "ابزار MCP همگام حداکثر ۵۰ فاکتور: recalculate_invoice_profits."
     ),
 )
 @require_business_access("business_id")
@@ -1429,9 +1445,7 @@ def recalculate_invoice_profits_endpoint(
     "/business/{business_id}/{invoice_id}/pdf",
     summary="PDF یک فاکتور",
     description=(
-        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض همان scope "
-        "(`invoices/detail` یا `invoices/receipt` برای سایز فیش)، در نهایت HTML پیش‌فرض. "
-        "پارامترهای query مانند `paper_size` (A4/A5/A6 یا 60mm/80mm/100mm)، `orientation` و `show_stamp` چاپ را کنترل می‌کنند."
+        "باینری PDF است؛ در MCP نیست. JSON: `get_invoice_details`."
     ),
 )
 @require_business_access("business_id")
@@ -1468,7 +1482,27 @@ async def export_single_invoice_pdf(
 
     # جزئیات کامل فاکتور (به‌صورت دیکشنری قابل ارسال به قالب)
     item = invoice_document_to_dict(db, doc)
+    try:
+        invoice_currency = db.get(Currency, int(doc.currency_id))
+        if invoice_currency is not None:
+            item["currency"] = {
+                "id": invoice_currency.id,
+                "code": invoice_currency.code,
+                "title": invoice_currency.title,
+                "symbol": invoice_currency.symbol or invoice_currency.code,
+            }
+    except Exception:
+        pass
     item = dict(item or {})
+    if not isinstance(item.get("currency"), dict):
+        item["currency"] = {
+            "id": item.get("currency_id"),
+            "code": item.get("currency_code"),
+            "title": item.get("currency_title") or item.get("currency_name"),
+            "symbol": item.get("currency_code") or "",
+        }
+    elif not item["currency"].get("symbol"):
+        item["currency"]["symbol"] = item["currency"].get("code") or item.get("currency_code") or ""
 
     # اطلاعات کسب‌وکار (اختیاری) + فایل‌های گرافیکی (لوگو/مهر) و امضای مالک
     business_name = ""
@@ -1953,43 +1987,51 @@ async def export_single_invoice_pdf(
         except Exception:
             amount_without_tax = None
 
-    # محاسبه وضعیت حساب مشتری (فقط برای فاکتورهای دارای person_id و با همان ارز فاکتور)
+    # تراز شخص در ارز پایه کسب‌وکار جمع می‌شود تا فاکتور ارزی و پرداخت ریالی همدیگر را خنثی کنند.
     customer_balance_info: Dict[str, Any] = {}
     try:
         if person_id is not None:
-            # محاسبه تراز فعلی مشتری (فقط اسناد قطعی و با همان ارز فاکتور)
-            invoice_currency_id = item.get("currency_id")
-            if invoice_currency_id:
-                # محاسبه تراز با فیلتر ارز
-                query = db.query(
-                    func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
-                    func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
-                ).join(
-                    Document, DocumentLine.document_id == Document.id
-                ).filter(
-                    DocumentLine.person_id == int(person_id),
-                    Document.is_proforma == False,  # فقط اسناد قطعی
-                    Document.currency_id == int(invoice_currency_id)  # فقط همان ارز فاکتور
-                )
-                result = query.first()
-                if result is not None:
-                    total_credit = float(result.total_credit or 0)
-                    total_debit = float(result.total_debit or 0)
-                    current_balance = total_credit - total_debit
-                    if total_credit == 0 and total_debit == 0:
-                        current_status = "بدون تراکنش"
-                    elif current_balance > 0:
-                        current_status = "بستانکار"
-                    elif current_balance < 0:
-                        current_status = "بدهکار"
-                    else:
-                        current_status = "بالانس"
-                else:
-                    current_balance = 0.0
-                    current_status = "بدون تراکنش"
+            balance_business = db.query(Business).filter(Business.id == business_id).first()
+            base_currency_id = getattr(balance_business, "default_currency_id", None)
+            if not base_currency_id:
+                base_currency_id = item.get("currency_id")
+            base_currency = db.get(Currency, int(base_currency_id)) if base_currency_id else None
+            base_currency_symbol = getattr(base_currency, "symbol", None) or getattr(base_currency, "code", "")
+            debit_in_base = case(
+                (Document.currency_id == base_currency_id, DocumentLine.debit),
+                else_=DocumentLine.debit * func.coalesce(DocumentLine.exchange_rate, 0),
+            )
+            credit_in_base = case(
+                (Document.currency_id == base_currency_id, DocumentLine.credit),
+                else_=DocumentLine.credit * func.coalesce(DocumentLine.exchange_rate, 0),
+            )
+            debit_base = func.coalesce(
+                DocumentLine.debit_base,
+                debit_in_base,
+            )
+            credit_base = func.coalesce(
+                DocumentLine.credit_base,
+                credit_in_base,
+            )
+            result = db.query(
+                func.coalesce(func.sum(credit_base), 0).label("total_credit"),
+                func.coalesce(func.sum(debit_base), 0).label("total_debit"),
+            ).join(Document, DocumentLine.document_id == Document.id).filter(
+                DocumentLine.person_id == int(person_id),
+                Document.business_id == business_id,
+                Document.is_proforma == False,
+            ).first()
+            total_credit = float(result.total_credit or 0) if result else 0.0
+            total_debit = float(result.total_debit or 0) if result else 0.0
+            current_balance = total_credit - total_debit
+            if total_credit == 0 and total_debit == 0:
+                current_status = "بدون تراکنش" if is_fa else "No transactions"
+            elif current_balance > 0:
+                current_status = "بستانکار" if is_fa else "Creditor"
+            elif current_balance < 0:
+                current_status = "بدهکار" if is_fa else "Debtor"
             else:
-                # اگر ارز فاکتور مشخص نبود، از تابع قبلی استفاده می‌کنیم
-                current_balance, current_status = calculate_person_balance(db, int(person_id))
+                current_status = "بالانس" if is_fa else "Balanced"
             
             # اگر فاکتور پیش‌فاکتور است، تراز احتمالی بعد از قطعی شدن را محاسبه می‌کنیم
             if is_proforma:
@@ -1999,12 +2041,19 @@ async def export_single_invoice_pdf(
                 # برای فاکتور خرید: بستانکار می‌شود (credit)
                 # برای فاکتور برگشت از خرید: بدهکار می‌شود (debit)
                 invoice_impact = 0.0
+                invoice_base_total = payable_total or 0
+                fx_totals = item.get("fx_totals") if isinstance(item.get("fx_totals"), dict) else {}
+                fx_base = fx_totals.get("base") if isinstance(fx_totals.get("base"), dict) else {}
+                if fx_base:
+                    invoice_base_total = fx_base.get("payable", fx_base.get("net", invoice_base_total))
+                elif base_currency_id and int(doc.currency_id) != int(base_currency_id):
+                    invoice_base_total = 0
                 if inv_type in ("invoice_sales", "invoice_purchase_return"):
                     # بدهکار می‌شود
-                    invoice_impact = -float(payable_total or 0)
+                    invoice_impact = -float(invoice_base_total or 0)
                 elif inv_type in ("invoice_sales_return", "invoice_purchase"):
                     # بستانکار می‌شود
-                    invoice_impact = float(payable_total or 0)
+                    invoice_impact = float(invoice_base_total or 0)
                 
                 potential_balance = current_balance + invoice_impact
                 
@@ -2022,12 +2071,14 @@ async def export_single_invoice_pdf(
                     "potential_balance": potential_balance,
                     "potential_status": potential_status,
                     "invoice_impact": invoice_impact,
+                    "currency_symbol": base_currency_symbol,
                 }
             else:
                 # فاکتور قطعی است، تراز فعلی شامل این فاکتور است
                 customer_balance_info = {
                     "current_balance": current_balance,
                     "current_status": current_status,
+                    "currency_symbol": base_currency_symbol,
                 }
     except Exception:
         logger.exception("Error calculating customer balance for invoice_id=%s", invoice_id)
@@ -2129,6 +2180,7 @@ async def export_single_invoice_pdf(
 
                 # اطلاعات تسویه بین‌ارزی از person_lines / extra_info سند
                 fx_display = None
+                payment_currency = db.get(Currency, int(rp.get("currency_id"))) if rp.get("currency_id") else None
                 try:
                     fx_src = None
                     for pl in (rp.get("person_lines") or []):
@@ -2188,6 +2240,7 @@ async def export_single_invoice_pdf(
                         "document_type_name": rp.get("document_type_name"),
                         "date": pay_date_display,
                         "total_amount": rp.get("total_amount"),
+                        "currency_symbol": getattr(payment_currency, "symbol", None) or getattr(payment_currency, "code", ""),
                         "methods": ", ".join(methods),
                         "account_details": account_details,
                         "description": rp.get("description") or "",
@@ -2557,6 +2610,7 @@ async def export_single_invoice_pdf(
         "fa_font_url_bold": fa_font_url_bold,
         "invoice_footer_note": invoice_footer_note,
         "customer_balance_info": customer_balance_info,
+        "show_currency_symbol": bool(print_settings.get("show_currency_symbol", False)),
         "show_invoice_verify_qr": show_invoice_verify_qr,
         "invoice_verify_qr_data_uri": invoice_verify_qr_data_uri,
         "show_footer_print_time": bool(print_settings.get("show_footer_print_time", True)),
@@ -2771,10 +2825,8 @@ def _apply_invoice_list_text_search(
     "/business/{business_id}/search",
     summary="لیست و جستجوی فاکتورها",
     description=(
-        "ترکیب استاندارد `QueryInfo` (take، skip، sort، search، filters) با فیلترهای فاکتور: "
-        "`document_type`, `is_proforma`, `currency_id`, `fiscal_year_id` (یا هدر `X-Fiscal-Year-ID`), "
-        "`project_id`, `person_id`, بازه `from_date`/`to_date`, برچسب‌ها، فاکتور اقساطی (`is_installment_sale`) و … . "
-        "خروجی شامل آیتم‌های غنی، مانده و وضعیت مودیان است؛ نتیجه ممکن است کش کوتاه‌مدت داشته باشد."
+        "جستجوی فاکتور با `QueryInfo` و فیلتر نوع/طرف‌حساب/بازه تاریخ. "
+        "ابزار MCP: `search_invoices`. خروجی Excel/PDF در MCP نیست."
     ),
 )
 @require_business_access("business_id")
@@ -2865,6 +2917,8 @@ async def search_invoices_endpoint(
 		
 		key_payload = {
 			"business_id": business_id,
+			# Bump this when list fields change so old cached rows cannot hide new fields.
+			"profit_fields_version": 1,
 			"take": query_info.take,
 			"skip": query_info.skip,
 			"sort_by": query_info.sort_by,
@@ -3047,7 +3101,7 @@ async def search_invoices_endpoint(
 
 	data_items: List[Dict[str, Any]] = []
 	_log = logging.getLogger(__name__)
-	list_dicts = invoice_documents_to_list_dicts(db, items)
+	list_dicts = invoice_documents_to_list_dicts(db, items, include_profit=True)
 	remaining_by_id = batch_calculate_invoices_remaining(db, business_id, items)
 	for item in list_dicts:
 		d_id = int(item.get("id") or 0)
@@ -3205,8 +3259,7 @@ def _add_counterparty_to_invoice_item(db: Session, item: Dict[str, Any]) -> None
     "/business/{business_id}/tax-workspace/search",
     summary="جستجو در کارپوشه مودیان",
     description=(
-        "فقط اسنادی که در کارپوشه مالیاتی علامت خورده‌اند؛ فیلتر `tax_status` در بدنه اختیاری است. "
-        "بدنه ترکیبی از `QueryInfo` و فیلدهای تخت مشابه لیست فاکتور است."
+        "جستجوی کارپوشه مالیاتی. ابزار MCP: `search_tax_workspace`."
     ),
 )
 @require_business_access("business_id")
@@ -3448,7 +3501,7 @@ def _ensure_sales_or_return(doc: Document) -> None:
     "/business/{business_id}/{invoice_id}/tax-workspace/add",
     summary="افزودن فاکتور به کارپوشه مودیان",
     description=(
-        "فقط فاکتور فروش یا برگشت از فروش. برای برگشت، `reference_invoice_id` شناسه فاکتور فروش مرجع است."
+        "افزودن به کارپوشه مودیان. ابزار MCP: `add_invoice_to_tax_workspace` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -3504,7 +3557,7 @@ def add_invoice_to_tax_workspace(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/link-reference",
     summary="اتصال فاکتور مرجع برای برگشت/اصلاح",
-    description='بدنه: `{"reference_invoice_id": 123}`',
+    description='اتصال فاکتور مرجع برای برگشت/اصلاح در کارپوشه مالیاتی. بدنه: `{"reference_invoice_id": 123}`. افزونه مودیان لازم است. ابزار MCP: `link_tax_workspace_reference` (نیازمند تأیید).',
 )
 @require_business_access("business_id")
 def link_tax_workspace_reference(
@@ -3544,7 +3597,7 @@ def link_tax_workspace_reference(
 @router.get(
     "/business/{business_id}/tax-workspace/reference-candidates",
     summary="فاکتورهای مرجع قابل انتخاب برای برگشت",
-    description="فاکتورهای فروش ارسال‌شده به مودیان برای اتصال به برگشت از فروش.",
+    description="فاکتورهای فروش قابل اتصال به برگشت. ابزار MCP: `search_tax_reference_candidates`.",
 )
 @require_business_access("business_id")
 def list_tax_reference_candidates(
@@ -3594,7 +3647,7 @@ def list_tax_reference_candidates(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/remove",
     summary="حذف فاکتور از کارپوشه مودیان",
-    description="فقط در صورتی مجاز است که فاکتور هنوز به‌صورت نهایی به سامانه ارسال نشده باشد (`sent`/`finalized` ممنوع).",
+    description="حذف از کارپوشه اگر هنوز نهایی ارسال نشده باشد. ابزار MCP: `remove_invoice_from_tax_workspace` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def remove_invoice_from_tax_workspace(
@@ -3632,7 +3685,7 @@ def remove_invoice_from_tax_workspace(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/send-to-system",
     summary="ارسال تکی فاکتور به سامانه مودیان",
-    description="فاکتور باید در کارپوشه باشد و قبلاً قطعی ارسال نشده باشد؛ پس از فراخوانی، وضعیت و کدهای رهگیری در سند به‌روز می‌شوند.",
+    description="ارسال تکی به سامانه مودیان. ابزار MCP: `send_invoice_to_tax_system` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def send_invoice_to_tax_system(
@@ -3735,7 +3788,7 @@ def _finalize_tax_workspace_submission(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/cancel-in-system",
     summary="ابطال فاکتور در سامانه مودیان",
-    description="ارسال صورتحساب ابطالی (inp=3) برای فاکتور قبلاً ارسال‌شده.",
+    description="ارسال صورتحساب ابطالی. ابزار MCP: `cancel_invoice_in_tax_system` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def cancel_invoice_in_tax_system(
@@ -3762,7 +3815,7 @@ def cancel_invoice_in_tax_system(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/send-corrective",
     summary="ارسال صورتحساب اصلاحی به مودیان",
-    description="ارسال صورتحساب اصلاحی (inp=4) برای فاکتور ارسال‌شده.",
+    description="ارسال صورتحساب اصلاحی. ابزار MCP: `send_corrective_invoice_to_tax_system` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def send_corrective_invoice_to_tax_system(
@@ -3789,7 +3842,7 @@ def send_corrective_invoice_to_tax_system(
 @router.post(
     "/business/{business_id}/tax-workspace/send-to-system-batch",
     summary="ارسال گروهی به سامانه مودیان",
-    description='بدنه: `{"invoice_ids": [1,2,...]}` — برای هر شناسه نتیجه در `succeeded` یا جزئیات خطا در `failed`.',
+    description="ارسال گروهی به مودیان. ابزار MCP: `send_tax_invoice_batch` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def send_invoices_to_tax_system_batch(
@@ -3872,7 +3925,7 @@ def send_invoices_to_tax_system_batch(
 @router.post(
     "/business/{business_id}/tax-workspace/remove-batch",
     summary="حذف گروهی از کارپوشه مودیان",
-    description='بدنه: `{"invoice_ids": [...]}` — اسناد ارسال‌شده به سامانه از کارپوشه حذف نمی‌شوند.',
+    description="حذف گروهی از کارپوشه. ابزار MCP: `remove_tax_invoice_batch` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def remove_invoices_from_tax_workspace_batch(
@@ -3925,7 +3978,7 @@ def remove_invoices_from_tax_workspace_batch(
 @router.get(
     "/business/{business_id}/tax-workspace/health",
     summary="سلامت اتصال سامانه مالیاتی",
-    description="وضعیت پیکربندی و اتصال (مثلاً سامانه مودیان) برای این کسب‌وکار؛ مناسب داشبورد و عیب‌یابی.",
+    description="سلامت اتصال سامانه مالیاتی. ابزار MCP: `check_tax_system_health`.",
 )
 @require_business_access("business_id")
 def get_tax_system_health(
@@ -3950,7 +4003,7 @@ def get_tax_system_health(
 @router.get(
     "/business/{business_id}/tax-workspace/failed-invoices",
     summary="صف ارسال ناموفق (Dead Letter)",
-    description="ردیف‌های صف خطای ارسال مالیاتی با امکان فیلتر و صفحه‌بندی.",
+    description="صف ارسال ناموفق مالیاتی. ابزار MCP: `list_tax_failed_invoices`.",
 )
 @require_business_access("business_id")
 def get_failed_invoices(
@@ -3994,7 +4047,7 @@ def get_failed_invoices(
 @router.post(
     "/business/{business_id}/tax-workspace/failed-invoices/{failed_id}/retry",
     summary="تلاش مجدد ارسال رکورد ناموفق",
-    description="یک رکورد از صف Dead Letter را دوباره برای ارسال به سامانه مالیاتی تلاش می‌کند.",
+    description="تلاش مجدد صف ناموفق. ابزار MCP: `retry_tax_failed_invoice` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def retry_failed_invoice_endpoint(
@@ -4021,7 +4074,7 @@ def retry_failed_invoice_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/tax-timeline",
     summary="تایم‌لاین مالیاتی فاکتور",
-    description="رویدادهای ارسال، استعلام و خطا مرتبط با وضعیت مالیاتی سند (شامل تلاقی با صف ناموفق).",
+    description="رویدادهای ارسال و استعلام مالیاتی. ابزار MCP: `get_invoice_tax_timeline`.",
 )
 @require_business_access("business_id")
 def get_invoice_tax_timeline(
@@ -4100,8 +4153,7 @@ def get_invoice_tax_timeline(
     "/business/{business_id}/tax-workspace/inquire-status",
     summary="استعلام وضعیت از سامانه مالیاتی",
     description=(
-        "حداقل یکی از `invoice_ids` یا `tracking_codes` در بدنه لازم است. "
-        "نتیجهٔ استعلام برای اسناد به‌روزرسانی و در پاسخ برمی‌گردد."
+        "استعلام زنده وضعیت مالیاتی. ابزار MCP: `inquire_invoice_tax_status` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -4144,7 +4196,7 @@ def inquire_tax_status_endpoint(
 @router.post(
     "/business/{business_id}/tax-workspace/validate-batch",
     summary="اعتبارسنجی گروهی قبل از ارسال مالیاتی",
-    description='بدنه: `{"invoice_ids": [...]}` — فهرست `validated` و ردها با `issues` در `invalid`.',
+    description="اعتبارسنجی گروهی قبل از ارسال. ابزار MCP: `validate_tax_invoice_batch`.",
 )
 @require_business_access("business_id")
 def validate_invoices_for_tax_batch(
@@ -4220,8 +4272,7 @@ def validate_invoices_for_tax_batch(
     "/business/{business_id}/tax-workspace/quick-actions",
     summary="عملیات سریع کارپوشه مالیاتی",
     description=(
-        "بدنه باید شامل `action` باشد: `send_all_pending`, `inquire_all_sent`, `retry_all_failed`. "
-        "در پس‌زمینه از همان endpointهای ارسال گروهی یا استعلام استفاده می‌شود."
+        "عملیات سریع کارپوشه. در MCP جدا نیست؛ از `send_tax_invoice_batch`، `inquire_invoice_tax_status` و `retry_tax_failed_invoice` استفاده شود."
     ),
 )
 @require_business_access("business_id")
@@ -4320,8 +4371,7 @@ def tax_workspace_quick_actions(
     "/business/{business_id}/export/excel",
     summary="خروجی Excel لیست فاکتورها",
     description=(
-        "فیلتر مشابه جستجو (متن، نوع سند، پیش‌فاکتور، ارز، سال مالی، پروژه، بازه تاریخ، برچسب، تیک/اسکیپ). "
-        "`export_columns` ستون‌ها و برچسب‌ها را مشخص می‌کند؛ `selected_only` و `selected_indices` برای خروج فقط سطرهای انتخاب‌شده در گرید."
+        "خروجی Excel باینری است؛ در MCP نیست. JSON: `search_invoices`."
     ),
 )
 @require_business_access("business_id")
@@ -4682,8 +4732,7 @@ async def export_invoices_excel(
     "/business/{business_id}/export/pdf",
     summary="خروجی PDF لیست فاکتورها",
     description=(
-        "همان منطق فیلتر و ستون‌های Excel؛ علاوه بر آن `template_id` برای قالب سفارشی ماژول invoices/list، "
-        "`disposition` برای attachment/inline، `paper_size` و `orientation` برای چاپ."
+        "باینری PDF است؛ در MCP نیست. JSON: `search_invoices`."
     ),
 )
 @require_business_access("business_id")
@@ -5177,8 +5226,7 @@ async def export_invoices_pdf(
     "/business/{business_id}/import/template",
     summary="دانلود تمپلیت ایمپورت فاکتورها",
     description=(
-        "فایل XLSX با هدر ستون‌ها و چند ردیف نمونه؛ ستون `invoice_number` ردیف‌های یک فاکتور را گروه‌بندی می‌کند. "
-        "انواع مجاز در ستون invoice_type در توضیحات هدر فایل آمده است."
+        "تمپلیت Excel باینری است؛ در MCP نیست."
     ),
 )
 @require_business_access("business_id")
@@ -5283,8 +5331,7 @@ async def download_invoices_import_template(
     "/business/{business_id}/import/excel",
     summary="ایمپورت فاکتورها از فایل Excel",
     description=(
-        "فرم چندبخشی: فیلد `file` (xlsx)، فرم `dry_run` (true/false) — در حالت dry_run فقط اعتبارسنجی و خلاصه بدون ثبت سند. "
-        "خروجی شامل `summary` (تعداد، معتبر، نامعتبر، ایجادشده) و آرایه `errors` به تفکیک شماره فاکتور است."
+        "ایمپورت Excel باینری است؛ در MCP نیست. ایجاد تکی: `create_invoice`."
     ),
 )
 @require_business_access("business_id")
@@ -5564,10 +5611,15 @@ async def import_invoices_excel(
                     line_errors.append("قیمت واحد الزامی است")
                     continue
                 
-                # Unit
-                unit = str(row_data.get("unit", "main")).strip().lower()
-                if unit not in ("main", "secondary"):
-                    unit = "main"
+                # Unit: Excel uses main/secondary aliases; store the product's real unit label
+                # so inventory conversion matches UI invoices.
+                unit_key = str(row_data.get("unit", "main")).strip().lower()
+                if unit_key not in ("main", "secondary"):
+                    unit_key = "main"
+                if unit_key == "secondary" and getattr(product, "secondary_unit", None):
+                    unit = str(product.secondary_unit).strip()
+                else:
+                    unit = str(getattr(product, "main_unit", None) or "").strip() or None
                 
                 # Discount
                 discount_type = str(row_data.get("discount_type", "amount")).strip().lower()
@@ -5607,6 +5659,8 @@ async def import_invoices_excel(
                     "discount_value": float(discount_value),
                     "tax_rate": float(tax_rate),
                 }
+                if unit:
+                    line_extra_info["unit"] = unit
                 if movement:
                     line_extra_info["movement"] = movement
                 if warehouse_id:
@@ -5661,6 +5715,7 @@ async def import_invoices_excel(
         if not is_dry_run and valid_invoices:
             user_id = ctx.get_user_id()
             can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
+            can_confirm_expired = user_can_confirm_expired_sale(ctx, db, business_id)
             for inv_info in valid_invoices:
                 try:
                     create_invoice(
@@ -5669,6 +5724,7 @@ async def import_invoices_excel(
                         user_id=user_id,
                         data=inv_info["payload"],
                         user_can_change_invoice_unit_price=can_change_unit,
+                        user_can_confirm_expired_sale=can_confirm_expired,
                     )
                     created_count += 1
                 except Exception as e:
@@ -5703,8 +5759,7 @@ async def import_invoices_excel(
     "/business/{business_id}/invoices/calculate-remaining",
     summary="مانده چند فاکتور (پرداخت‌شده و باقیمانده)",
     description=(
-        "بدنه: `{\"invoice_ids\": [int, ...]}` — برای هر شناسه مبلغ کل، پرداخت‌شده، مانده و وضعیت تسویه برمی‌گردد. "
-        "برای نمایش در لیست یا فاکتور اقساطی کاربرد دارد."
+        "مانده چند فاکتور. ابزار MCP: `calculate_invoice_balances`."
     ),
 )
 @require_business_access("business_id")

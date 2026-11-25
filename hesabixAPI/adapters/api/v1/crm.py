@@ -4,13 +4,24 @@ API endpoints برای CRM: فرایندها، مراحل، سرنخ، فرصت 
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, Path, Body, Query, Request
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_, or_, text
 
 from adapters.db.session import get_db
+from app.services.crm_enterprise import effective_forecast
+from app.services.crm_enterprise_service import (
+    assert_activity_access,
+    assert_can_view_record,
+    record_acl_enforced,
+    restrict_activity_query,
+    restrict_visibility_query,
+)
 from adapters.db.models.crm import (
     CrmProcessDefinition,
     CrmProcessStage,
@@ -55,7 +66,11 @@ from adapters.api.v1.schema_models.crm import (
     CrmSequenceCreate,
     CrmSequenceUpdate,
     CrmSequenceEnrollRequest,
+    CrmSequenceDryRunRequest,
+    CrmDiscountApprovalTemplateRequest,
     CrmDealConvertToInvoiceRequest,
+    CrmDealDocumentLinkRequest,
+    CrmSavedViewCreate,
     CrmAutomationSettingsUpdate,
 )
 from app.services import crm_tag_service
@@ -68,7 +83,12 @@ from adapters.db.models.person import Person, PersonType
 from adapters.api.v1.schema_models.person import PersonCreateRequest
 from app.services.person_service import create_person
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_permission_dep
+from app.core.permissions import (
+    has_invoice_type_permission_for_business,
+    require_business_access,
+    require_business_permission_dep,
+)
+from app.services.crm_guards import assert_currency_enabled_for_business, assert_document_in_business
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services import crm_calendar_note_service as crm_cal_notes
 
@@ -78,7 +98,7 @@ router = APIRouter(prefix="/crm", tags=["CRM"])
 @router.get(
     "/businesses/{business_id}/summary",
     summary="خلاصه CRM",
-    description="تعداد سرنخ‌ها، فرصت‌های فروش، مبلغ کل و نرخ تبدیل",
+    description="تعداد سرنخ‌ها، فرصت‌ها، مبلغ و نرخ تبدیل. ابزار MCP: `get_crm_summary`.",
 )
 @require_business_access("business_id")
 async def get_crm_summary(
@@ -121,7 +141,7 @@ async def get_crm_summary(
 @router.get(
     "/businesses/{business_id}/follow-ups-today",
     summary="پیگیری‌های امروز",
-    description="سرنخ‌ها و فرصت‌های فروش با یادآور پیگیری در امروز یا روزهای آینده (تا ۷ روز)",
+    description="پیگیری‌های امروز تا چند روز آینده. ابزار MCP: `get_crm_follow_ups`.",
 )
 @require_business_access("business_id")
 async def get_follow_ups_today(
@@ -163,6 +183,7 @@ async def get_follow_ups_today(
             Lead.person_id.is_(None),
         )
     )
+    q_leads = restrict_visibility_query(q_leads, db, business_id, ctx, Lead, "lead")
     if restrict_assignee:
         q_leads = q_leads.filter(or_(Lead.assigned_to_user_id.is_(None), Lead.assigned_to_user_id == current_user_id))
     q_leads = q_leads.order_by(Lead.next_follow_up_at).limit(50)
@@ -182,6 +203,7 @@ async def get_follow_ups_today(
             Deal.next_follow_up_at <= end,
         )
     )
+    q_deals = restrict_visibility_query(q_deals, db, business_id, ctx, Deal, "deal")
     if restrict_assignee:
         q_deals = q_deals.filter(or_(Deal.assigned_to_user_id.is_(None), Deal.assigned_to_user_id == current_user_id))
     q_deals = q_deals.order_by(Deal.next_follow_up_at).limit(50)
@@ -197,7 +219,7 @@ async def get_follow_ups_today(
 @router.get(
     "/businesses/{business_id}/reports/pipeline",
     summary="گزارش پایپلاین فروش",
-    description="تعداد و مبلغ فرصت‌ها به تفکیک مرحله. با from_date و to_date فقط فرصت‌های ایجادشده در این بازه شمرده می‌شوند.",
+    description="تعداد و مبلغ فرصت‌ها به تفکیک مرحله. ابزار MCP: `get_crm_pipeline_report`.",
 )
 @require_business_access("business_id")
 async def get_pipeline_report(
@@ -239,6 +261,13 @@ async def get_pipeline_report(
     )
     if process_definition_id:
         q = q.filter(CrmProcessDefinition.id == process_definition_id)
+    from sqlalchemy.orm import aliased
+    deal_alias = aliased(Deal)
+    visible_deals = restrict_visibility_query(
+        db.query(deal_alias.id).filter(deal_alias.business_id == business_id),
+        db, business_id, ctx, deal_alias, "deal",
+    )
+    q = q.filter(or_(Deal.id.is_(None), Deal.id.in_(visible_deals)))
     q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
     q = q.order_by(CrmProcessStage.order_index)
     rows = q.all()
@@ -258,7 +287,7 @@ async def get_pipeline_report(
 @router.get(
     "/businesses/{business_id}/reports/lead-funnel",
     summary="گزارش قیف سرنخ",
-    description="تعداد سرنخ به تفکیک مرحله. با from_date و to_date فقط سرنخ‌های ایجادشده در این بازه شمرده می‌شوند.",
+    description="تعداد سرنخ به تفکیک مرحله. ابزار MCP: `get_lead_funnel_report`.",
 )
 @require_business_access("business_id")
 async def get_lead_funnel_report(
@@ -299,6 +328,13 @@ async def get_lead_funnel_report(
     )
     if process_definition_id:
         q = q.filter(CrmProcessDefinition.id == process_definition_id)
+    from sqlalchemy.orm import aliased
+    lead_alias = aliased(Lead)
+    visible_leads = restrict_visibility_query(
+        db.query(lead_alias.id).filter(lead_alias.business_id == business_id),
+        db, business_id, ctx, lead_alias, "lead",
+    )
+    q = q.filter(or_(Lead.id.is_(None), Lead.id.in_(visible_leads)))
     q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
     q = q.order_by(CrmProcessStage.order_index)
     rows = q.all()
@@ -312,7 +348,7 @@ async def get_lead_funnel_report(
 @router.get(
     "/businesses/{business_id}/reports/lead-sources",
     summary="گزارش منبع سرنخ",
-    description="تعداد سرنخ به تفکیک منبع",
+    description="تعداد سرنخ به تفکیک منبع. ابزار MCP: `get_crm_lead_sources_report`.",
 )
 @require_business_access("business_id")
 async def get_lead_sources_report(
@@ -323,9 +359,10 @@ async def get_lead_sources_report(
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
     from sqlalchemy import func
+    source_query = db.query(Lead).filter(Lead.business_id == business_id, Lead.source_code.isnot(None), Lead.source_code != "")
+    source_query = restrict_visibility_query(source_query, db, business_id, ctx, Lead, "lead")
     q = (
-        db.query(Lead.source_code, func.count(Lead.id).label("count"))
-        .filter(Lead.business_id == business_id, Lead.source_code.isnot(None), Lead.source_code != "")
+        source_query.with_entities(Lead.source_code, func.count(Lead.id).label("count"))
         .group_by(Lead.source_code)
     )
     rows = q.all()
@@ -336,7 +373,7 @@ async def get_lead_sources_report(
 @router.get(
     "/businesses/{business_id}/reports/weighted-forecast",
     summary="پیش‌بینی درآمد (مبلغ موزون)",
-    description="مجموع مبلغ فرصت‌های باز ضرب در احتمال موفقیت (پیش‌بینی درآمد مورد انتظار)",
+    description="مبلغ موزون فرصت‌های باز. ابزار MCP: `get_crm_weighted_forecast`.",
 )
 @require_business_access("business_id")
 async def get_weighted_forecast_report(
@@ -360,6 +397,7 @@ async def get_weighted_forecast_report(
         )
         .filter(Deal.business_id == business_id, Deal.closed_at.is_(None))
     )
+    q = restrict_visibility_query(q, db, business_id, ctx, Deal, "deal")
     if process_definition_id:
         q = q.filter(Deal.process_definition_id == process_definition_id)
     row = q.first()
@@ -374,7 +412,7 @@ async def get_weighted_forecast_report(
 @router.get(
     "/businesses/{business_id}/reports/employee-performance",
     summary="گزارش عملکرد کارمندان",
-    description="مقایسه عملکرد کارمندان بر اساس سرنخ، فرصت فروش و فعالیت",
+    description="مقایسه عملکرد اعضا. ابزار MCP: `get_crm_employee_performance`.",
 )
 @require_business_access("business_id")
 async def get_employee_performance_report(
@@ -418,6 +456,54 @@ async def get_employee_performance_report(
 
     if not user_ids:
         return success_response(data=[], restricted_to_self=restricted_to_self, request=request)
+
+    if record_acl_enforced(db, business_id, ctx):
+        from sqlalchemy import func
+        from adapters.db.models.user import User
+
+        visible_leads = restrict_visibility_query(
+            db.query(Lead).filter(Lead.business_id == business_id), db, business_id, ctx, Lead, "lead"
+        )
+        visible_deals = restrict_visibility_query(
+            db.query(Deal).filter(Deal.business_id == business_id), db, business_id, ctx, Deal, "deal"
+        )
+        scoped = []
+        for uid in sorted(user_ids):
+            user = db.get(User, uid)
+            first_name = (user.first_name or "").strip() if user is not None else ""
+            last_name = (user.last_name or "").strip() if user is not None else ""
+            leads_count = visible_leads.filter(Lead.assigned_to_user_id == uid).count()
+            converted = visible_leads.filter(Lead.assigned_to_user_id == uid, Lead.person_id.isnot(None)).count()
+            deals_count = visible_deals.filter(Deal.assigned_to_user_id == uid).count()
+            closed_deals = visible_deals.filter(Deal.assigned_to_user_id == uid, Deal.closed_at.isnot(None)).count()
+            total_amount = visible_deals.filter(Deal.assigned_to_user_id == uid).with_entities(
+                func.coalesce(func.sum(Deal.amount), 0)
+            ).scalar()
+            scoped.append(
+                {
+                    "user_id": uid,
+                    "user_name": f"{first_name} {last_name}".strip() or str(uid),
+                    "leads_count": int(leads_count or 0),
+                    "converted_leads": int(converted or 0),
+                    "conversion_rate": round((converted / leads_count * 100) if leads_count else 0, 1),
+                    "deals_count": int(deals_count or 0),
+                    "closed_deals": int(closed_deals or 0),
+                    "total_amount": float(total_amount or 0),
+                    "activities_count": int(
+                        db.query(func.count(CrmActivity.id))
+                        .filter(
+                            CrmActivity.business_id == business_id,
+                            CrmActivity.created_by_user_id == uid,
+                            or_(CrmActivity.lead_id.is_(None), CrmActivity.lead_id.in_(visible_leads.with_entities(Lead.id))),
+                            or_(CrmActivity.deal_id.is_(None), CrmActivity.deal_id.in_(visible_deals.with_entities(Deal.id))),
+                        )
+                        .scalar()
+                        or 0
+                    ),
+                }
+            )
+        scoped.sort(key=lambda item: (item["total_amount"], item["deals_count"]), reverse=True)
+        return success_response(data=scoped, restricted_to_self=restricted_to_self, request=request)
 
     ids_sql = ",".join(str(int(x)) for x in sorted(user_ids))
     sql = text(
@@ -471,7 +557,7 @@ async def get_employee_performance_report(
 @router.get(
     "/businesses/{business_id}/reports/sales-trend",
     summary="روند فروش در زمان",
-    description="تعداد و مبلغ فرصت‌های بسته‌شده در بازه زمانی",
+    description="روند فرصت‌های بسته‌شده. ابزار MCP: `get_crm_sales_trend`.",
 )
 @require_business_access("business_id")
 async def get_sales_trend_report(
@@ -500,6 +586,7 @@ async def get_sales_trend_report(
             )
             .group_by(func.date(Deal.closed_at))
         )
+        q = restrict_visibility_query(q, db, business_id, ctx, Deal, "deal")
         rows = q.all()
         raw_data = [{"period": str(r.period), "count": r.count, "amount": float(r.amount or 0)} for r in rows]
         if period == "month":
@@ -515,11 +602,13 @@ async def get_sales_trend_report(
         else:
             data = sorted(raw_data, key=lambda x: x["period"])
     except Exception:
+        logger.exception("crm sales trend query failed business_id=%s", business_id)
         q = (
             db.query(func.date(Deal.closed_at).label("period"), func.count(Deal.id).label("count"), func.coalesce(func.sum(Deal.amount), 0).label("amount"))
             .filter(Deal.business_id == business_id, Deal.closed_at.isnot(None))
             .group_by(func.date(Deal.closed_at))
         )
+        q = restrict_visibility_query(q, db, business_id, ctx, Deal, "deal")
         rows = q.all()
         data = [{"period": str(r.period), "count": r.count, "amount": float(r.amount or 0)} for r in rows]
         data.sort(key=lambda x: x["period"])
@@ -602,7 +691,7 @@ def _log_crm_change(
 @router.get(
     "/businesses/{business_id}/process-definitions",
     summary="لیست فرایندهای CRM",
-    description="دریافت لیست فرایندهای تعریف‌شده برای کسب‌وکار (فانل سرنخ، pipeline فروش، انواع فعالیت)",
+    description="فانل سرنخ، پایپلاین فروش و انواع فعالیت. ابزار MCP: `list_crm_process_definitions`.",
 )
 @require_business_access("business_id")
 async def list_process_definitions(
@@ -631,7 +720,7 @@ async def list_process_definitions(
 @router.post(
     "/businesses/{business_id}/process-definitions",
     summary="ایجاد فرایند CRM",
-    description="تعریف فرایند جدید (فانل سرنخ یا pipeline فروش) با مراحل",
+    description="تعریف فرایند جدید با مراحل. ابزار MCP: `create_crm_process_definition` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_process_definition(
@@ -688,6 +777,7 @@ async def create_process_definition(
 @router.get(
     "/businesses/{business_id}/process-definitions/{definition_id}",
     summary="جزئیات فرایند",
+    description="ابزار MCP: `get_crm_process_definition`.",
 )
 @require_business_access("business_id")
 async def get_process_definition(
@@ -716,6 +806,7 @@ async def get_process_definition(
 @router.put(
     "/businesses/{business_id}/process-definitions/{definition_id}",
     summary="ویرایش فرایند",
+    description="ابزار MCP: `update_crm_process_definition` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_process_definition(
@@ -755,6 +846,7 @@ async def update_process_definition(
 @router.delete(
     "/businesses/{business_id}/process-definitions/{definition_id}",
     summary="حذف فرایند",
+    description="ابزار MCP: `delete_crm_process_definition` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_process_definition(
@@ -793,6 +885,7 @@ async def delete_process_definition(
 @router.get(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages",
     summary="لیست مراحل یک فرایند",
+    description="ابزار MCP: `list_crm_process_stages`.",
 )
 @require_business_access("business_id")
 async def list_stages(
@@ -823,6 +916,7 @@ async def list_stages(
 @router.post(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages",
     summary="افزودن مرحله به فرایند",
+    description="ابزار MCP: `create_crm_process_stage` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_stage(
@@ -877,6 +971,7 @@ async def create_stage(
 @router.put(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages/{stage_id}",
     summary="ویرایش مرحله",
+    description="ابزار MCP: `update_crm_process_stage` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_stage(
@@ -920,7 +1015,7 @@ async def update_stage(
     if body.order_index is not None:
         stage.order_index = body.order_index
     if body.color is not None:
-        stage.color = body.color
+        stage.color = str(body.color).strip() or None
     if body.is_win is not None:
         stage.is_win = body.is_win
     if body.is_lost is not None:
@@ -935,6 +1030,7 @@ async def update_stage(
 @router.delete(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages/{stage_id}",
     summary="حذف مرحله",
+    description="ابزار MCP: `delete_crm_process_stage` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_stage(
@@ -970,16 +1066,40 @@ async def delete_stage(
     )
     if not stage:
         raise ApiError("NOT_FOUND", "مرحله یافت نشد.", http_status=404)
-    if db.query(Lead).filter(Lead.stage_id == stage_id).first():
+    if db.query(Lead.id).filter(Lead.business_id == business_id, Lead.stage_id == stage_id).first():
         raise ApiError("CRM_STAGE_IN_USE", "این مرحله در سرنخ‌ها استفاده شده است.", http_status=400)
-    if db.query(Deal).filter(Deal.stage_id == stage_id).first():
+    if db.query(Deal.id).filter(Deal.business_id == business_id, Deal.stage_id == stage_id).first():
         raise ApiError("CRM_STAGE_IN_USE", "این مرحله در فرصت‌های فروش استفاده شده است.", http_status=400)
+    sequence_steps = (
+        db.query(CrmSequenceStep)
+        .join(CrmSequence, CrmSequence.id == CrmSequenceStep.sequence_id)
+        .filter(CrmSequence.business_id == business_id)
+        .all()
+    )
+    for step in sequence_steps:
+        raw_stage = (step.action_config or {}).get("stage_id")
+        try:
+            referenced = int(raw_stage) if raw_stage is not None else None
+        except (TypeError, ValueError):
+            referenced = None
+        if referenced == int(stage_id):
+            raise ApiError("CRM_STAGE_IN_USE", "این مرحله در توالی خودکار استفاده شده است.", http_status=400)
     db.delete(stage)
     db.commit()
     return success_response(message="CRM_STAGE_DELETED", request=request)
 
 
 # --- سرنخ (Leads) ---
+
+
+def _person_display_name(person) -> Optional[str]:
+    if not person:
+        return None
+    name = (getattr(person, "alias_name", None) or "").strip()
+    if name:
+        return name
+    full = f"{getattr(person, 'first_name', None) or ''} {getattr(person, 'last_name', None) or ''}".strip()
+    return full or (getattr(person, "company_name", None) or None)
 
 
 def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
@@ -1003,15 +1123,19 @@ def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[
         ),
         "next_follow_up_at": lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
         "person_id": lead.person_id,
-        "person_name": lead.person.alias_name if lead.person else None,
+        "person_name": _person_display_name(lead.person) if lead.person else None,
         "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
         "score": lead.score,
         "sla_due_at": lead.sla_due_at.isoformat() if lead.sla_due_at else None,
         "first_touched_at": lead.first_touched_at.isoformat() if lead.first_touched_at else None,
         "last_activity_at": lead.last_activity_at.isoformat() if lead.last_activity_at else None,
         "tags": tags,
+        "custom_fields": ((lead.extra_info or {}).get("_custom") or {}),
         "created_at": lead.created_at.isoformat(),
         "updated_at": lead.updated_at.isoformat(),
+        "organization_id": lead.organization_id,
+        "organization_name": lead.organization.name if lead.organization else None,
+        "queue_id": lead.queue_id,
         "created_by_user_id": lead.created_by_user_id,
         "created_by_name": (
             f"{lead.created_by.first_name or ''} {lead.created_by.last_name or ''}".strip()
@@ -1026,6 +1150,7 @@ def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[
 @router.get(
     "/businesses/{business_id}/leads",
     summary="لیست سرنخ‌ها",
+    description="ابزار MCP: `search_leads`. جزئیات تکی: `get_lead_details`.",
 )
 @require_business_access("business_id")
 async def list_leads(
@@ -1057,6 +1182,7 @@ async def list_leads(
         )
         .filter(Lead.business_id == business_id)
     )
+    q = restrict_visibility_query(q, db, business_id, ctx, Lead, "lead")
     if process_definition_id:
         q = q.filter(Lead.process_definition_id == process_definition_id)
     if stage_id:
@@ -1099,6 +1225,7 @@ async def list_leads(
 @router.post(
     "/businesses/{business_id}/leads",
     summary="ایجاد سرنخ",
+    description="ابزار MCP: `create_lead` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_lead(
@@ -1134,25 +1261,15 @@ async def create_lead(
     if not stage:
         raise ApiError("NOT_FOUND", "مرحله یافت نشد.", http_status=404)
 
-    mobile_norm = (str(body.mobile).strip() if body.mobile else "") or None
-    email_norm = (str(body.email).strip().lower() if body.email else "") or None
-    if mobile_norm or email_norm:
-        dup_parts = []
-        if mobile_norm:
-            dup_parts.append(Lead.mobile == mobile_norm)
-        if email_norm:
-            dup_parts.append(Lead.email == email_norm)
-        dup = (
-            db.query(Lead)
-            .filter(Lead.business_id == business_id, Lead.person_id.is_(None), or_(*dup_parts))
-            .first()
-        )
-        if dup:
-            raise ApiError(
-                "CRM_LEAD_DUPLICATE",
-                "سرنخ فعال با همین موبایل یا ایمیل از قبل وجود دارد.",
-                http_status=409,
-            )
+    from app.services.crm_duplicate_service import assert_lead_identity_available
+
+    assert_lead_identity_available(
+        db,
+        business_id,
+        body.mobile,
+        body.email,
+        allow_similar=bool(body.allow_similar),
+    )
 
     from datetime import date
     from app.services.document_numbering_service import generate_document_code
@@ -1195,7 +1312,7 @@ async def create_lead(
         crm_automation_service.set_lead_sla(db, business_id, lead)
         crm_automation_service.apply_lead_score(db, business_id, lead)
     except Exception:
-        pass
+        logger.exception("crm lead automation failed business_id=%s", business_id)
     db.add(lead)
     db.flush()
     # اعمال برچسب‌ها در صورت ارسال
@@ -1215,13 +1332,14 @@ async def create_lead(
             user_id=ctx.get_user_id(),
         )
     except Exception:
-        pass
+        logger.exception("crm.lead.created trigger failed lead_id=%s", lead.id)
     return success_response(data=_lead_to_dict(lead, request, tags=_lead_tags), request=request, message="CRM_LEAD_CREATED")
 
 
 @router.get(
     "/businesses/{business_id}/leads/{lead_id}",
     summary="جزئیات سرنخ",
+    description="ابزار MCP: `get_lead_details`. تاریخچه: `get_crm_lead_history`.",
 )
 @require_business_access("business_id")
 async def get_lead(
@@ -1245,13 +1363,19 @@ async def get_lead(
     )
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead)
     tags = crm_tag_service.get_lead_tags(db, business_id, lead_id)
-    return success_response(data=_lead_to_dict(lead, request, tags=tags), request=request)
+    data = _lead_to_dict(lead, request, tags=tags)
+    from app.services.crm_next_action_service import next_action_for_lead
+
+    data["next_action"] = next_action_for_lead(db, business_id, lead)
+    return success_response(data=data, request=request)
 
 
 @router.get(
     "/businesses/{business_id}/leads/{lead_id}/history",
     summary="تاریخچه تغییرات سرنخ",
+    description="ابزار MCP: `get_crm_lead_history`.",
 )
 @require_business_access("business_id")
 async def get_lead_history(
@@ -1266,6 +1390,7 @@ async def get_lead_history(
     lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead)
     rows = (
         db.query(CrmChangeHistory)
         .options(joinedload(CrmChangeHistory.changed_by))
@@ -1299,6 +1424,7 @@ async def get_lead_history(
 @router.put(
     "/businesses/{business_id}/leads/{lead_id}",
     summary="ویرایش سرنخ",
+    description="ابزار MCP: `update_lead` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_lead(
@@ -1323,6 +1449,7 @@ async def update_lead(
     )
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead, write=True)
     old_assigned_to_user_id = lead.assigned_to_user_id
     if body.stage_id is not None:
         stage = db.query(CrmProcessStage).filter(
@@ -1341,9 +1468,9 @@ async def update_lead(
             from app.services.workflow.workflow_trigger_service import trigger_lead_stage_changed
             trigger_lead_stage_changed(db, business_id, lead_id=lead_id, old_stage_id=old_stage_id, new_stage_id=body.stage_id, user_id=ctx.get_user_id())
         except Exception:
-            pass
+            logger.exception("crm.lead.stage_changed trigger failed lead_id=%s", lead_id)
     if body.source_code is not None:
-        lead.source_code = body.source_code
+        lead.source_code = str(body.source_code).strip() or None
     if body.code is not None and str(body.code).strip():
         code_val = str(body.code).strip()
         existing = db.query(Lead).filter(Lead.business_id == business_id, Lead.code == code_val, Lead.id != lead_id).first()
@@ -1353,15 +1480,31 @@ async def update_lead(
     if body.name is not None:
         lead.name = body.name
     if body.company_name is not None:
-        lead.company_name = body.company_name
+        lead.company_name = str(body.company_name).strip() or None
+    new_mobile = str(body.mobile).strip() or None if body.mobile is not None else lead.mobile
+    new_email = str(body.email).strip() or None if body.email is not None else lead.email
+    if body.mobile is not None or body.email is not None:
+        from app.services.crm_duplicate_service import assert_lead_identity_available
+
+        assert_lead_identity_available(
+            db,
+            business_id,
+            new_mobile,
+            new_email,
+            allow_similar=bool(body.allow_similar),
+            exclude_lead_id=lead.id,
+            exclude_person_id=lead.person_id,
+        )
     if body.mobile is not None:
-        lead.mobile = body.mobile
+        lead.mobile = new_mobile
     if body.email is not None:
-        lead.email = body.email
+        lead.email = new_email
     if body.description is not None:
-        lead.description = body.description
-    if body.assigned_to_user_id is not None:
-        new_assign = body.assigned_to_user_id
+        lead.description = str(body.description).strip() or None
+    if body.clear_assigned_to and body.assigned_to_user_id is not None:
+        raise ApiError("CRM_ASSIGNEE_CONFLICT", "هم‌زمان نمی‌توان مسئول را تنظیم و پاک کرد.", http_status=422)
+    if body.clear_assigned_to or body.assigned_to_user_id is not None:
+        new_assign = None if body.clear_assigned_to else body.assigned_to_user_id
         if new_assign != old_assigned_to_user_id:
             lead.assigned_to_user_id = new_assign
             try:
@@ -1376,8 +1519,12 @@ async def update_lead(
                     user_id=ctx.get_user_id(),
                 )
             except Exception:
-                pass
-    if body.next_follow_up_at is not None:
+                logger.exception("crm.lead.assigned trigger failed lead_id=%s", lead_id)
+    if body.clear_next_follow_up and body.next_follow_up_at is not None:
+        raise ApiError("CRM_FOLLOW_UP_CONFLICT", "هم‌زمان نمی‌توان پیگیری را تنظیم و پاک کرد.", http_status=422)
+    if body.clear_next_follow_up:
+        lead.next_follow_up_at = None
+    elif body.next_follow_up_at is not None:
         lead.next_follow_up_at = body.next_follow_up_at
     if body.extra_info is not None:
         lead.extra_info = body.extra_info
@@ -1396,7 +1543,7 @@ async def update_lead(
 @router.post(
     "/businesses/{business_id}/leads/{lead_id}/convert",
     summary="تبدیل سرنخ به مشتری",
-    description="ایجاد شخص (مشتری) از سرنخ و اتصال آن به سرنخ. با ارسال create_deal می‌توان همزمان یک فرصت فروش ایجاد کرد.",
+    description="تبدیل سرنخ به مشتری. ابزار MCP: `convert_lead_to_customer` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def convert_lead_to_customer(
@@ -1412,6 +1559,7 @@ async def convert_lead_to_customer(
     lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead, write=True)
     if lead.person_id is not None:
         raise ApiError("CRM_LEAD_ALREADY_CONVERTED", "این سرنخ قبلاً به مشتری تبدیل شده است.", http_status=400)
     alias = (lead.name or lead.company_name or "مشتری بدون نام").strip()
@@ -1462,6 +1610,8 @@ async def convert_lead_to_customer(
             raise ApiError("NOT_FOUND", "مرحله پایپلاین یافت نشد.", http_status=404)
         from app.services.document_numbering_service import generate_document_code
         code_val = generate_document_code(db, business_id, "crm_deal", date.today())
+        if opt.currency_id is not None:
+            assert_currency_enabled_for_business(db, business_id, opt.currency_id)
         new_deal = Deal(
             business_id=business_id,
             person_id=person_id,
@@ -1480,6 +1630,11 @@ async def convert_lead_to_customer(
         db.add(new_deal)
         db.flush()
         db.refresh(new_deal)
+    from app.services.crm_enterprise_service import link_converted_person_to_lead_organization
+
+    link_converted_person_to_lead_organization(db, business_id, lead, int(person_id), new_deal if body and body.create_deal else None)
+    if body and body.create_deal:
+        db.refresh(new_deal)
         deal_data = _deal_to_dict(new_deal, request)
     db.commit()
     db.refresh(lead)
@@ -1487,7 +1642,7 @@ async def convert_lead_to_customer(
         from app.services.workflow.workflow_trigger_service import trigger_lead_converted
         trigger_lead_converted(db, business_id, lead_id=lead_id, person_id=person_id, user_id=ctx.get_user_id())
     except Exception:
-        pass
+        logger.exception("crm.lead.converted trigger failed lead_id=%s", lead_id)
     out = {"lead": _lead_to_dict(lead, request), "person": result["data"]}
     if deal_data:
         out["deal"] = deal_data
@@ -1501,6 +1656,7 @@ async def convert_lead_to_customer(
 @router.delete(
     "/businesses/{business_id}/leads/{lead_id}",
     summary="حذف سرنخ",
+    description="ابزار MCP: `delete_lead` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_lead(
@@ -1514,6 +1670,7 @@ async def delete_lead(
     lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead, write=True)
     db.delete(lead)
     db.commit()
     return success_response(message="CRM_LEAD_DELETED", request=request)
@@ -1528,7 +1685,7 @@ def _deal_to_dict(deal: Deal, request: Request = None, tags: Optional[List[Dict[
         "business_id": deal.business_id,
         "code": deal.code,
         "person_id": deal.person_id,
-        "person_name": deal.person.alias_name if deal.person else None,
+        "person_name": _person_display_name(deal.person) if deal.person else None,
         "process_definition_id": deal.process_definition_id,
         "stage_id": deal.stage_id,
         "stage_name": deal.stage.name if deal.stage else None,
@@ -1549,7 +1706,18 @@ def _deal_to_dict(deal: Deal, request: Request = None, tags: Optional[List[Dict[
         "lost_reason_code": deal.lost_reason_code,
         "competitor_name": deal.competitor_name,
         "stage_entered_at": deal.stage_entered_at.isoformat() if deal.stage_entered_at else None,
+        "organization_id": deal.organization_id,
+        "organization_name": deal.organization.name if deal.organization else None,
+        "forecast_override": deal.forecast_category,
+        "forecast_category": effective_forecast(
+            closed=deal.closed_at is not None,
+            is_win=bool(deal.stage and deal.stage.is_win),
+            is_lost=bool(deal.stage and deal.stage.is_lost),
+            probability=deal.probability_percent,
+            override=deal.forecast_category,
+        ),
         "tags": tags,
+        "custom_fields": ((deal.extra_info or {}).get("_custom") or {}),
         "created_at": deal.created_at.isoformat(),
         "updated_at": deal.updated_at.isoformat(),
         "created_by_user_id": deal.created_by_user_id,
@@ -1566,6 +1734,7 @@ def _deal_to_dict(deal: Deal, request: Request = None, tags: Optional[List[Dict[
 @router.get(
     "/businesses/{business_id}/deals",
     summary="لیست فرصت‌های فروش",
+    description="ابزار MCP: `search_deals`.",
 )
 @require_business_access("business_id")
 async def list_deals(
@@ -1575,7 +1744,7 @@ async def list_deals(
     stage_id: Optional[int] = Query(None),
     person_id: Optional[int] = Query(None),
     assigned_to_user_id: Optional[int] = Query(None),
-    search: Optional[str] = Query(None, description="جستجو در عنوان، نام مشتری"),
+    search: Optional[str] = Query(None, description="جستجو در عنوان، کد و نام مشتری"),
     from_date: Optional[str] = Query(None, description="از تاریخ ایجاد (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="تا تاریخ ایجاد (YYYY-MM-DD)"),
     open_only: Optional[bool] = Query(None, description="فقط فرصت‌های باز (بسته نشده)"),
@@ -1598,6 +1767,7 @@ async def list_deals(
         )
         .filter(Deal.business_id == business_id)
     )
+    q = restrict_visibility_query(q, db, business_id, ctx, Deal, "deal")
     if process_definition_id:
         q = q.filter(Deal.process_definition_id == process_definition_id)
     if stage_id:
@@ -1625,6 +1795,7 @@ async def list_deals(
         q = q.join(Deal.person).filter(
             or_(
                 Deal.title.ilike(term),
+                Deal.code.ilike(term),
                 Person.alias_name.ilike(term),
             )
         )
@@ -1640,6 +1811,7 @@ async def list_deals(
 @router.post(
     "/businesses/{business_id}/deals",
     summary="ایجاد فرصت فروش",
+    description="ابزار MCP: `create_deal` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_deal(
@@ -1695,6 +1867,7 @@ async def create_deal(
     extra_info_val = crm_custom_field_service.validate_and_merge_custom_values(
         db, business_id, "deal", body.extra_info, getattr(body, "custom_fields", None)
     )
+    assert_currency_enabled_for_business(db, business_id, body.currency_id)
     deal = Deal(
         business_id=business_id,
         person_id=body.person_id,
@@ -1733,13 +1906,14 @@ async def create_deal(
             user_id=ctx.get_user_id(),
         )
     except Exception:
-        pass
+        logger.exception("crm.deal.created trigger failed deal_id=%s", deal.id)
     return success_response(data=_deal_to_dict(deal, request, tags=_deal_tags), request=request, message="CRM_DEAL_CREATED")
 
 
 @router.get(
     "/businesses/{business_id}/deals/{deal_id}",
     summary="جزئیات فرصت فروش",
+    description="ابزار MCP: `get_deal_details`. تاریخچه: `get_crm_deal_history`. خطوط: `list_crm_deal_lines`.",
 )
 @require_business_access("business_id")
 async def get_deal(
@@ -1763,13 +1937,78 @@ async def get_deal(
     )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal)
     tags = crm_tag_service.get_deal_tags(db, business_id, deal_id)
-    return success_response(data=_deal_to_dict(deal, request, tags=tags), request=request)
+    data = _deal_to_dict(deal, request, tags=tags)
+    from app.services.crm_deal_document_service import list_deal_documents
+    from app.services.crm_next_action_service import next_action_for_deal
+
+    data["next_action"] = next_action_for_deal(db, business_id, deal)
+    from app.services.crm_intelligence_service import deal_predictive_score
+
+    data["predictive"] = deal_predictive_score(db, business_id, deal.stage_id)
+    data["documents"] = list_deal_documents(db, business_id, deal_id)
+    if deal.organization_id:
+        from adapters.db.models.crm import CrmOrganization
+
+        org = db.query(CrmOrganization).filter(
+            CrmOrganization.id == deal.organization_id, CrmOrganization.business_id == business_id
+        ).first()
+        data["organization_name"] = org.name if org is not None else None
+    return success_response(data=data, request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/deals/{deal_id}/documents",
+    summary="پیوند سند حسابداری به فرصت فروش",
+    description="نقش proforma یا invoice اشاره‌گر document_id را هم به‌روز می‌کند. ابزار MCP ندارد و از مسیر REST تأییدشده صدا زده می‌شود.",
+)
+@require_business_access("business_id")
+async def link_crm_deal_document(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    deal_id: int = Path(..., gt=0),
+    body: CrmDealDocumentLinkRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    from app.services.crm_deal_document_service import link_deal_document, list_deal_documents
+
+    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    _row, created = link_deal_document(
+        db,
+        business_id,
+        deal,
+        int(body.document_id),
+        role=body.role,
+        created_by_user_id=ctx.get_user_id(),
+    )
+    if created:
+        _log_crm_change(
+            db,
+            business_id,
+            "deal",
+            deal_id,
+            "document_link",
+            None,
+            f"{body.role or 'auto'}:{body.document_id}",
+            ctx.get_user_id(),
+        )
+    db.commit()
+    return success_response(
+        data={"items": list_deal_documents(db, business_id, deal_id)},
+        request=request,
+        message="CRM_DEAL_DOCUMENT_LINKED",
+    )
 
 
 @router.get(
     "/businesses/{business_id}/deals/{deal_id}/history",
     summary="تاریخچه تغییرات فرصت فروش",
+    description="ابزار MCP: `get_crm_deal_history`.",
 )
 @require_business_access("business_id")
 async def get_deal_history(
@@ -1784,6 +2023,7 @@ async def get_deal_history(
     deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal)
     rows = (
         db.query(CrmChangeHistory)
         .options(joinedload(CrmChangeHistory.changed_by))
@@ -1817,6 +2057,7 @@ async def get_deal_history(
 @router.put(
     "/businesses/{business_id}/deals/{deal_id}",
     summary="ویرایش فرصت فروش (شامل تغییر مرحله)",
+    description="ابزار MCP: `update_deal` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_deal(
@@ -1841,6 +2082,7 @@ async def update_deal(
     )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal, write=True)
     from datetime import datetime as _dt_now
     old_assigned_to_user_id = deal.assigned_to_user_id
     if body.stage_id is not None:
@@ -1878,28 +2120,62 @@ async def update_deal(
             from app.services.workflow.workflow_trigger_service import trigger_deal_stage_changed
             trigger_deal_stage_changed(db, business_id, deal_id=deal_id, old_stage_id=old_stage_id, new_stage_id=body.stage_id, user_id=ctx.get_user_id())
         except Exception:
-            pass
+            logger.exception("crm.deal.stage_changed trigger failed deal_id=%s", deal_id)
     if body.code is not None and str(body.code).strip():
         code_val = str(body.code).strip()
         existing = db.query(Deal).filter(Deal.business_id == business_id, Deal.code == code_val, Deal.id != deal_id).first()
         if existing:
             raise ApiError("CRM_DEAL_CODE_EXISTS", f"فرصت فروش با کد {code_val} از قبل وجود دارد.", http_status=400)
         deal.code = code_val
+    if body.person_id is not None and int(body.person_id) != int(deal.person_id):
+        from app.services.crm_enterprise_service import change_deal_person
+
+        old_person_id = deal.person_id
+        change_deal_person(db, business_id, deal, int(body.person_id))
+        _log_crm_change(db, business_id, "deal", deal_id, "person_id", str(old_person_id), str(body.person_id), ctx.get_user_id())
     if body.title is not None:
         deal.title = body.title
     if body.amount is not None:
         _log_crm_change(db, business_id, "deal", deal_id, "amount", str(deal.amount), str(body.amount), ctx.get_user_id())
         deal.amount = body.amount
     if body.currency_id is not None:
+        assert_currency_enabled_for_business(db, business_id, body.currency_id)
         deal.currency_id = body.currency_id
     if body.probability_percent is not None:
         deal.probability_percent = body.probability_percent
-    if body.expected_close_date is not None:
+    if body.clear_expected_close_date and body.expected_close_date is not None:
+        raise ApiError("CRM_CLOSE_DATE_CONFLICT", "هم‌زمان نمی‌توان تاریخ پیش‌بینی را تنظیم و پاک کرد.", http_status=422)
+    if body.clear_expected_close_date:
+        deal.expected_close_date = None
+    elif body.expected_close_date is not None:
         deal.expected_close_date = body.expected_close_date
-    if body.next_follow_up_at is not None:
+    if body.clear_next_follow_up and body.next_follow_up_at is not None:
+        raise ApiError("CRM_FOLLOW_UP_CONFLICT", "هم‌زمان نمی‌توان پیگیری را تنظیم و پاک کرد.", http_status=422)
+    if body.clear_next_follow_up:
+        deal.next_follow_up_at = None
+    elif body.next_follow_up_at is not None:
         deal.next_follow_up_at = body.next_follow_up_at
     if body.document_id is not None:
-        deal.document_id = body.document_id
+        from app.services.crm_deal_document_service import link_deal_document
+
+        _link, created = link_deal_document(
+            db,
+            business_id,
+            deal,
+            int(body.document_id),
+            created_by_user_id=ctx.get_user_id(),
+        )
+        if created:
+            _log_crm_change(
+                db,
+                business_id,
+                "deal",
+                deal_id,
+                "document_link",
+                None,
+                str(body.document_id),
+                ctx.get_user_id(),
+            )
     if body.assigned_to_user_id is not None:
         new_assign = body.assigned_to_user_id
         if new_assign != old_assigned_to_user_id:
@@ -1916,9 +2192,9 @@ async def update_deal(
                     user_id=ctx.get_user_id(),
                 )
             except Exception:
-                pass
+                logger.exception("crm.deal.assigned trigger failed deal_id=%s", deal_id)
     if body.description is not None:
-        deal.description = body.description
+        deal.description = str(body.description).strip() or None
     if body.extra_info is not None:
         deal.extra_info = body.extra_info
     if getattr(body, "won_reason_code", None) is not None:
@@ -1936,6 +2212,14 @@ async def update_deal(
     if body.closed_at is not None:
         deal.closed_at = body.closed_at
         try:
+            from app.services.crm_automation_service import cancel_sequence_enrollments
+
+            cancel_sequence_enrollments(
+                db, business_id, entity_type="deal", entity_id=deal_id, reason="deal_closed", when="close"
+            )
+        except Exception:
+            logger.exception("sequence stop on deal close failed deal_id=%s", deal_id)
+        try:
             from app.services.workflow.workflow_trigger_service import trigger_deal_closed
 
             st = deal.stage
@@ -1952,7 +2236,7 @@ async def update_deal(
                 is_lost=is_lost,
             )
         except Exception:
-            pass
+            logger.exception("crm.deal.closed trigger failed deal_id=%s", deal_id)
     db.commit()
     db.refresh(deal)
     tags = crm_tag_service.get_deal_tags(db, business_id, deal_id)
@@ -1962,6 +2246,7 @@ async def update_deal(
 @router.delete(
     "/businesses/{business_id}/deals/{deal_id}",
     summary="حذف فرصت فروش",
+    description="ابزار MCP: `delete_deal` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_deal(
@@ -1975,6 +2260,7 @@ async def delete_deal(
     deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal, write=True)
     db.delete(deal)
     db.commit()
     return success_response(message="CRM_DEAL_DELETED", request=request)
@@ -1988,7 +2274,7 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
         "id": a.id,
         "business_id": a.business_id,
         "person_id": a.person_id,
-        "person_name": a.person.alias_name if getattr(a, "person", None) else None,
+        "person_name": _person_display_name(getattr(a, "person", None)),
         "lead_id": a.lead_id,
         "lead_name": a.lead.name if getattr(a, "lead", None) else None,
         "code": a.code,
@@ -1997,6 +2283,9 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
         "description": a.description,
         "activity_date": a.activity_date.isoformat(),
         "deal_id": a.deal_id,
+        "deal_title": a.deal.title if getattr(a, "deal", None) else None,
+        "deal_code": a.deal.code if getattr(a, "deal", None) else None,
+        "deal_person_id": a.deal.person_id if getattr(a, "deal", None) else None,
         "is_task": bool(a.is_task),
         "due_at": a.due_at.isoformat() if a.due_at else None,
         "status": a.status,
@@ -2008,6 +2297,7 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
         ),
         "outcome": a.outcome,
         "priority": a.priority,
+        "custom_fields": ((a.extra_info or {}).get("_custom") or {}),
         "created_by_user_id": a.created_by_user_id,
         "created_by_name": (
             f"{a.created_by.first_name or ''} {a.created_by.last_name or ''}".strip()
@@ -2024,6 +2314,7 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
 @router.get(
     "/businesses/{business_id}/activities",
     summary="لیست فعالیت‌ها (با فیلتر شخص)",
+    description="ابزار MCP: `search_activities`. جزئیات تکی: `get_crm_activity`.",
 )
 @require_business_access("business_id")
 async def list_activities(
@@ -2044,11 +2335,13 @@ async def list_activities(
         .options(
             selectinload(CrmActivity.created_by),
             selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.deal),
             selectinload(CrmActivity.person),
             selectinload(CrmActivity.assigned_to),
         )
         .filter(CrmActivity.business_id == business_id)
     )
+    q = restrict_activity_query(q, db, business_id, ctx, CrmActivity)
     if person_id:
         q = q.filter(CrmActivity.person_id == person_id)
     if lead_id is not None:
@@ -2057,6 +2350,12 @@ async def list_activities(
         q = q.filter(CrmActivity.deal_id == deal_id)
     if activity_type:
         q = q.filter(CrmActivity.activity_type == activity_type)
+    try:
+        from app.services.telephony.telephony_access import filter_crm_activities_for_telephony
+
+        q = filter_crm_activities_for_telephony(q, db, ctx, business_id)
+    except Exception:
+        logger.exception("crm activity telephony filter skipped business_id=%s", business_id)
     total = q.count()
     items = q.order_by(CrmActivity.activity_date.desc()).offset((page - 1) * limit).limit(limit).all()
     data = [_activity_to_dict(a, request) for a in items]
@@ -2069,6 +2368,7 @@ async def list_activities(
 @router.post(
     "/businesses/{business_id}/activities",
     summary="ثبت فعالیت",
+    description="ابزار MCP: `create_crm_activity` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_activity(
@@ -2089,12 +2389,18 @@ async def create_activity(
         lead = db.query(Lead).filter(and_(Lead.id == lead_id_val, Lead.business_id == business_id)).first()
         if not lead:
             raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, "lead", lead, write=True)
         if lead.person_id and not person_id_val:
             person_id_val = int(lead.person_id)
     if person_id_val is not None:
         person = db.query(Person).filter(and_(Person.id == person_id_val, Person.business_id == business_id)).first()
         if not person:
             raise ApiError("NOT_FOUND", "شخص یافت نشد.", http_status=404)
+    if body.deal_id is not None:
+        linked_deal = db.query(Deal).filter(and_(Deal.id == body.deal_id, Deal.business_id == business_id)).first()
+        if not linked_deal:
+            raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, "deal", linked_deal, write=True)
 
     from datetime import date
     from app.services.document_numbering_service import generate_document_code
@@ -2149,6 +2455,7 @@ async def create_activity(
         db.query(CrmActivity)
         .options(
             selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.deal),
             selectinload(CrmActivity.created_by),
             selectinload(CrmActivity.person),
             selectinload(CrmActivity.assigned_to),
@@ -2161,13 +2468,14 @@ async def create_activity(
 
         trigger_crm_activity_created(db, business_id, activity.id, user_id=ctx.get_user_id())
     except Exception:
-        pass
+        logger.exception("crm.activity.created trigger failed activity_id=%s", activity.id)
     return success_response(data=_activity_to_dict(activity, request), request=request, message="CRM_ACTIVITY_CREATED")
 
 
 @router.get(
     "/businesses/{business_id}/activities/{activity_id}",
     summary="جزئیات فعالیت",
+    description="ابزار MCP: `get_crm_activity`.",
 )
 @require_business_access("business_id")
 async def get_activity(
@@ -2182,6 +2490,7 @@ async def get_activity(
         db.query(CrmActivity)
         .options(
             selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.deal),
             selectinload(CrmActivity.person),
             selectinload(CrmActivity.created_by),
             selectinload(CrmActivity.assigned_to),
@@ -2191,12 +2500,14 @@ async def get_activity(
     )
     if not activity:
         raise ApiError("NOT_FOUND", "فعالیت یافت نشد.", http_status=404)
+    assert_activity_access(db, business_id, ctx, activity)
     return success_response(data=_activity_to_dict(activity, request), request=request)
 
 
 @router.put(
     "/businesses/{business_id}/activities/{activity_id}",
     summary="ویرایش فعالیت",
+    description="ابزار MCP: `update_crm_activity` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_activity(
@@ -2213,6 +2524,12 @@ async def update_activity(
     ).first()
     if not activity:
         raise ApiError("NOT_FOUND", "فعالیت یافت نشد.", http_status=404)
+    assert_activity_access(db, business_id, ctx, activity, write=True)
+    if body.deal_id is not None and body.deal_id != activity.deal_id:
+        linked_deal = db.query(Deal).filter(and_(Deal.id == body.deal_id, Deal.business_id == business_id)).first()
+        if not linked_deal:
+            raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, "deal", linked_deal, write=True)
     if body.code is not None and str(body.code).strip():
         code_val = str(body.code).strip()
         existing = db.query(CrmActivity).filter(
@@ -2231,7 +2548,9 @@ async def update_activity(
         activity.description = body.description
     if body.activity_date is not None:
         activity.activity_date = body.activity_date
-    if body.deal_id is not None:
+    if body.clear_deal:
+        activity.deal_id = None
+    elif body.deal_id is not None:
         activity.deal_id = body.deal_id
     if body.extra_info is not None:
         activity.extra_info = body.extra_info
@@ -2260,6 +2579,7 @@ async def update_activity(
         db.query(CrmActivity)
         .options(
             selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.deal),
             selectinload(CrmActivity.created_by),
             selectinload(CrmActivity.person),
             selectinload(CrmActivity.assigned_to),
@@ -2273,6 +2593,7 @@ async def update_activity(
 @router.delete(
     "/businesses/{business_id}/activities/{activity_id}",
     summary="حذف فعالیت",
+    description="ابزار MCP: `delete_crm_activity` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_activity(
@@ -2288,6 +2609,7 @@ async def delete_activity(
     ).first()
     if not activity:
         raise ApiError("NOT_FOUND", "فعالیت یافت نشد.", http_status=404)
+    assert_activity_access(db, business_id, ctx, activity, write=True)
     db.delete(activity)
     db.commit()
     return success_response(message="CRM_ACTIVITY_DELETED", request=request)
@@ -2303,6 +2625,7 @@ def _crm_note_translator(request: Request):
 @router.get(
     "/businesses/{business_id}/note-types",
     summary="انواع یادداشت CRM",
+    description="ابزار MCP: `list_crm_note_types`.",
 )
 @require_business_access("business_id")
 async def list_crm_note_types(
@@ -2321,6 +2644,7 @@ async def list_crm_note_types(
 @router.post(
     "/businesses/{business_id}/note-types",
     summary="ایجاد نوع یادداشت سفارشی",
+    description="ابزار MCP: `create_crm_note_type` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_crm_note_type(
@@ -2351,6 +2675,7 @@ async def create_crm_note_type(
 @router.patch(
     "/businesses/{business_id}/note-types/{type_id}",
     summary="ویرایش نوع یادداشت",
+    description="ابزار MCP: `update_crm_note_type` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_crm_note_type(
@@ -2383,6 +2708,7 @@ async def update_crm_note_type(
 @router.delete(
     "/businesses/{business_id}/note-types/{type_id}",
     summary="حذف نوع یادداشت غیرسیستمی",
+    description="ابزار MCP: `delete_crm_note_type` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_crm_note_type(
@@ -2402,6 +2728,7 @@ async def delete_crm_note_type(
 @router.get(
     "/businesses/{business_id}/notes",
     summary="لیست یادداشت‌های تقویم در بازه تاریخ",
+    description="ابزار MCP: `list_crm_notes`.",
 )
 @require_business_access("business_id")
 async def list_crm_notes(
@@ -2429,6 +2756,7 @@ async def list_crm_notes(
 @router.get(
     "/businesses/{business_id}/notes/{note_id}",
     summary="جزئیات یادداشت",
+    description="ابزار MCP: `get_crm_note`.",
 )
 @require_business_access("business_id")
 async def get_crm_note(
@@ -2449,7 +2777,8 @@ async def get_crm_note(
 
 @router.post(
     "/businesses/{business_id}/notes",
-    summary="ایجاد یادداشت",
+    summary="ایجاد یادداشت CRM",
+    description="ابزار MCP: `create_crm_note` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_crm_note(
@@ -2473,6 +2802,8 @@ async def create_crm_note(
         starts_at=body.starts_at,
         ends_at=body.ends_at,
         lead_id=body.lead_id,
+        person_id=body.person_id,
+        deal_id=body.deal_id,
         shared_user_ids=body.shared_user_ids,
         translator=tr,
     )
@@ -2485,7 +2816,8 @@ async def create_crm_note(
 
 @router.patch(
     "/businesses/{business_id}/notes/{note_id}",
-    summary="ویرایش یادداشت",
+    summary="ویرایش یادداشت CRM",
+    description="ابزار MCP: `update_crm_note` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_crm_note(
@@ -2508,6 +2840,24 @@ async def update_crm_note(
     else:
         lead_field_set = False
         lead_val = None
+    if dump.get("clear_person"):
+        person_field_set = True
+        person_val = None
+    elif "person_id" in dump:
+        person_field_set = True
+        person_val = dump.get("person_id")
+    else:
+        person_field_set = False
+        person_val = None
+    if dump.get("clear_deal"):
+        deal_field_set = True
+        deal_val = None
+    elif "deal_id" in dump:
+        deal_field_set = True
+        deal_val = dump.get("deal_id")
+    else:
+        deal_field_set = False
+        deal_val = None
     note = crm_cal_notes.update_note(
         db,
         ctx,
@@ -2522,6 +2872,10 @@ async def update_crm_note(
         ends_at=body.ends_at,
         lead_id=lead_val,
         lead_field_set=lead_field_set,
+        person_id=person_val,
+        person_field_set=person_field_set,
+        deal_id=deal_val,
+        deal_field_set=deal_field_set,
         status=body.status,
         shared_user_ids=body.shared_user_ids,
         translator=tr,
@@ -2535,6 +2889,7 @@ async def update_crm_note(
 @router.delete(
     "/businesses/{business_id}/notes/{note_id}",
     summary="حذف نرم یادداشت",
+    description="ابزار MCP: `delete_crm_note` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_crm_note(
@@ -2554,6 +2909,7 @@ async def delete_crm_note(
 @router.get(
     "/businesses/{business_id}/notes/{note_id}/comments",
     summary="کامنت‌های یادداشت",
+    description="ابزار MCP: `list_crm_note_comments`.",
 )
 @require_business_access("business_id")
 async def list_crm_note_comments(
@@ -2572,7 +2928,8 @@ async def list_crm_note_comments(
 
 @router.post(
     "/businesses/{business_id}/notes/{note_id}/comments",
-    summary="افزودن کامنت",
+    summary="افزودن کامنت یادداشت",
+    description="ابزار MCP: `add_crm_note_comment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_crm_note_comment(
@@ -2592,7 +2949,8 @@ async def create_crm_note_comment(
 
 @router.delete(
     "/businesses/{business_id}/notes/{note_id}/comments/{comment_id}",
-    summary="حذف کامنت",
+    summary="حذف کامنت یادداشت",
+    description="ابزار MCP: `delete_crm_note_comment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_crm_note_comment(
@@ -2613,6 +2971,7 @@ async def delete_crm_note_comment(
 @router.get(
     "/businesses/{business_id}/notes/{note_id}/audit",
     summary="تاریخچه audit یادداشت",
+    description="ابزار MCP: `get_crm_note_audit`.",
 )
 @require_business_access("business_id")
 async def list_crm_note_audit(
@@ -2634,7 +2993,11 @@ async def list_crm_note_audit(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/tags", summary="لیست برچسب‌های CRM")
+@router.get(
+    "/businesses/{business_id}/tags",
+    summary="لیست برچسب‌های CRM",
+    description="برچسب‌های CRM کسب‌وکار. ابزار MCP: `list_crm_tags`.",
+)
 @require_business_access("business_id")
 async def list_crm_tags(
     request: Request,
@@ -2648,7 +3011,7 @@ async def list_crm_tags(
     return success_response(data={"items": items}, request=request)
 
 
-@router.post("/businesses/{business_id}/tags", summary="ایجاد برچسب")
+@router.post("/businesses/{business_id}/tags", summary="ایجاد برچسب CRM", description="ابزار MCP: `create_crm_tag` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_crm_tag(
     request: Request,
@@ -2663,7 +3026,7 @@ async def create_crm_tag(
     return success_response(data=crm_tag_service.tag_to_dict(tag), request=request, message="CRM_TAG_CREATED")
 
 
-@router.patch("/businesses/{business_id}/tags/{tag_id}", summary="ویرایش برچسب")
+@router.patch("/businesses/{business_id}/tags/{tag_id}", summary="ویرایش برچسب CRM", description="ابزار MCP: `update_crm_tag` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_crm_tag(
     request: Request,
@@ -2682,7 +3045,7 @@ async def update_crm_tag(
     return success_response(data=crm_tag_service.tag_to_dict(tag), request=request, message="CRM_TAG_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/tags/{tag_id}", summary="حذف برچسب")
+@router.delete("/businesses/{business_id}/tags/{tag_id}", summary="حذف برچسب CRM", description="ابزار MCP: `delete_crm_tag` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_crm_tag(
     request: Request,
@@ -2697,7 +3060,7 @@ async def delete_crm_tag(
     return success_response(message="CRM_TAG_DELETED", request=request)
 
 
-@router.put("/businesses/{business_id}/leads/{lead_id}/tags", summary="تنظیم برچسب‌های سرنخ")
+@router.put("/businesses/{business_id}/leads/{lead_id}/tags", summary="تنظیم برچسب‌های سرنخ", description="ابزار MCP: `set_crm_lead_tags` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def set_lead_tags_endpoint(
     request: Request,
@@ -2708,12 +3071,16 @@ async def set_lead_tags_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
+    lead = db.query(Lead).filter(and_(Lead.id == lead_id, Lead.business_id == business_id)).first()
+    if not lead:
+        raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead, write=True)
     tags = crm_tag_service.set_lead_tags(db, business_id, lead_id, body.tag_ids)
     db.commit()
     return success_response(data={"tags": tags}, request=request, message="CRM_LEAD_TAGS_SET")
 
 
-@router.put("/businesses/{business_id}/deals/{deal_id}/tags", summary="تنظیم برچسب‌های فرصت فروش")
+@router.put("/businesses/{business_id}/deals/{deal_id}/tags", summary="تنظیم برچسب‌های فرصت فروش", description="ابزار MCP: `set_crm_deal_tags` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def set_deal_tags_endpoint(
     request: Request,
@@ -2724,6 +3091,10 @@ async def set_deal_tags_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
+    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal, write=True)
     tags = crm_tag_service.set_deal_tags(db, business_id, deal_id, body.tag_ids)
     db.commit()
     return success_response(data={"tags": tags}, request=request, message="CRM_DEAL_TAGS_SET")
@@ -2734,7 +3105,7 @@ async def set_deal_tags_endpoint(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/close-reasons", summary="لیست دلایل برد/باخت")
+@router.get("/businesses/{business_id}/close-reasons", summary="لیست دلایل برد/باخت", description="ابزار MCP: `list_crm_close_reasons`.")
 @require_business_access("business_id")
 async def list_close_reasons(
     request: Request,
@@ -2749,7 +3120,7 @@ async def list_close_reasons(
     return success_response(data={"items": items}, request=request)
 
 
-@router.post("/businesses/{business_id}/close-reasons", summary="ایجاد دلیل برد/باخت")
+@router.post("/businesses/{business_id}/close-reasons", summary="ایجاد دلیل برد/باخت", description="ابزار MCP: `create_crm_close_reason` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_close_reason(
     request: Request,
@@ -2767,7 +3138,7 @@ async def create_close_reason(
     return success_response(data=crm_close_reason_service.reason_to_dict(r), request=request, message="CRM_CLOSE_REASON_CREATED")
 
 
-@router.patch("/businesses/{business_id}/close-reasons/{reason_id}", summary="ویرایش دلیل")
+@router.patch("/businesses/{business_id}/close-reasons/{reason_id}", summary="ویرایش دلیل برد/باخت", description="ابزار MCP: `update_crm_close_reason` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_close_reason(
     request: Request,
@@ -2786,7 +3157,7 @@ async def update_close_reason(
     return success_response(data=crm_close_reason_service.reason_to_dict(r), request=request, message="CRM_CLOSE_REASON_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/close-reasons/{reason_id}", summary="حذف دلیل")
+@router.delete("/businesses/{business_id}/close-reasons/{reason_id}", summary="حذف دلیل برد/باخت", description="ابزار MCP: `delete_crm_close_reason` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_close_reason(
     request: Request,
@@ -2806,7 +3177,7 @@ async def delete_close_reason(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/custom-fields", summary="لیست فیلدهای سفارشی")
+@router.get("/businesses/{business_id}/custom-fields", summary="لیست فیلدهای سفارشی CRM", description="ابزار MCP: `list_crm_custom_fields`.")
 @require_business_access("business_id")
 async def list_custom_fields(
     request: Request,
@@ -2820,7 +3191,7 @@ async def list_custom_fields(
     return success_response(data={"items": items}, request=request)
 
 
-@router.post("/businesses/{business_id}/custom-fields", summary="ایجاد فیلد سفارشی")
+@router.post("/businesses/{business_id}/custom-fields", summary="ایجاد فیلد سفارشی CRM", description="ابزار MCP: `create_crm_custom_field` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_custom_field(
     request: Request,
@@ -2840,7 +3211,7 @@ async def create_custom_field(
     return success_response(data=crm_custom_field_service.definition_to_dict(d), request=request, message="CRM_CUSTOM_FIELD_CREATED")
 
 
-@router.patch("/businesses/{business_id}/custom-fields/{field_id}", summary="ویرایش فیلد سفارشی")
+@router.patch("/businesses/{business_id}/custom-fields/{field_id}", summary="ویرایش فیلد سفارشی CRM", description="ابزار MCP: `update_crm_custom_field` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_custom_field(
     request: Request,
@@ -2860,7 +3231,7 @@ async def update_custom_field(
     return success_response(data=crm_custom_field_service.definition_to_dict(d), request=request, message="CRM_CUSTOM_FIELD_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/custom-fields/{field_id}", summary="حذف فیلد سفارشی")
+@router.delete("/businesses/{business_id}/custom-fields/{field_id}", summary="حذف فیلد سفارشی CRM", description="ابزار MCP: `delete_crm_custom_field` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_custom_field(
     request: Request,
@@ -2880,7 +3251,11 @@ async def delete_custom_field(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/deals/{deal_id}/lines", summary="خطوط فرصت فروش")
+@router.get(
+    "/businesses/{business_id}/deals/{deal_id}/lines",
+    summary="خطوط فرصت فروش",
+    description="کالا/خدمت‌های روی فرصت فروش. ابزار MCP: `list_crm_deal_lines`.",
+)
 @require_business_access("business_id")
 async def list_deal_lines(
     request: Request,
@@ -2890,11 +3265,19 @@ async def list_deal_lines(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
+    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal)
     lines = crm_deal_line_service.list_lines(db, business_id, deal_id)
     return success_response(data={"items": lines}, request=request)
 
 
-@router.put("/businesses/{business_id}/deals/{deal_id}/lines", summary="جایگزینی خطوط فرصت فروش")
+@router.put(
+    "/businesses/{business_id}/deals/{deal_id}/lines",
+    summary="جایگزینی خطوط فرصت فروش",
+    description="جایگزینی کامل خطوط معامله. ابزار MCP: `replace_deal_lines` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def replace_deal_lines(
     request: Request,
@@ -2905,6 +3288,10 @@ async def replace_deal_lines(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
+    deal = db.query(Deal).filter(and_(Deal.id == deal_id, Deal.business_id == business_id)).first()
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal, write=True)
     lines_input = [l.model_dump() for l in body.lines]
     result = crm_deal_line_service.replace_lines(db, business_id, deal_id, lines_input)
     db.commit()
@@ -2916,7 +3303,11 @@ async def replace_deal_lines(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/persons/{person_id}/customer-360", summary="دید ۳۶۰ درجه مشتری")
+@router.get(
+    "/businesses/{business_id}/persons/{person_id}/customer-360",
+    summary="دید ۳۶۰ درجه مشتری",
+    description="تجمیع شخص، معاملات و فعالیت‌ها. ابزار MCP: `get_crm_customer_360`.",
+)
 @require_business_access("business_id")
 async def get_customer_360(
     request: Request,
@@ -2926,8 +3317,127 @@ async def get_customer_360(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
 ) -> Dict[str, Any]:
-    data = crm_customer_360_service.get_customer_360(db, business_id, person_id)
+    data = crm_customer_360_service.get_customer_360(db, business_id, person_id, ctx)
     return success_response(data=format_datetime_fields(data, request), request=request)
+
+
+# ============================================================================
+# جست‌وجو، نمای ذخیره‌شده، فرصت راکد
+# ============================================================================
+
+
+def _crm_user_id(ctx: AuthContext) -> int:
+    user_id = ctx.get_user_id()
+    if user_id is None:
+        raise ApiError("UNAUTHORIZED", "کاربر شناسایی نشد.", http_status=401)
+    return int(user_id)
+
+
+@router.get(
+    "/businesses/{business_id}/search",
+    summary="جست‌وجوی سراسری CRM",
+    description="سرنخ، فرصت و شخص همین کسب‌وکار. حداقل دو نویسه.",
+)
+@require_business_access("business_id")
+async def search_crm_workspace(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    q: str = Query("", max_length=80),
+    limit: int = Query(12, ge=1, le=20),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from app.services.crm_workspace_service import search_crm
+
+    return success_response(data=search_crm(db, business_id, q, limit, ctx), request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/stale-deals",
+    summary="فرصت‌های راکد",
+    description="فرصت‌های باز که بیش از stale_deal_days در مرحله فعلی مانده‌اند.",
+)
+@require_business_access("business_id")
+async def list_stale_crm_deals(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    limit: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from app.services.crm_workspace_service import list_stale_deals
+
+    return success_response(data=format_datetime_fields(list_stale_deals(db, business_id, limit, ctx), request), request=request)
+
+
+@router.get(
+    "/businesses/{business_id}/saved-views",
+    summary="نماهای ذخیره‌شده CRM",
+    description="نماهای خود کاربر و نماهای مشترک کسب‌وکار.",
+)
+@require_business_access("business_id")
+async def list_crm_saved_views(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    entity_type: str = Query(..., description="lead | deal"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from app.services.crm_workspace_service import list_saved_views
+
+    items = list_saved_views(db, business_id, _crm_user_id(ctx), entity_type)
+    return success_response(data={"items": items}, request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/saved-views",
+    summary="ذخیره نمای CRM",
+)
+@require_business_access("business_id")
+async def create_crm_saved_view(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmSavedViewCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    from app.services.crm_workspace_service import create_saved_view
+
+    data = create_saved_view(
+        db,
+        business_id,
+        _crm_user_id(ctx),
+        entity_type=body.entity_type,
+        name=body.name,
+        filters=body.filters,
+        is_shared=body.is_shared,
+    )
+    db.commit()
+    return success_response(data=data, request=request, message="CRM_SAVED_VIEW_CREATED")
+
+
+@router.delete(
+    "/businesses/{business_id}/saved-views/{view_id}",
+    summary="حذف نمای CRM",
+)
+@require_business_access("business_id")
+async def delete_crm_saved_view(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    view_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    from app.services.crm_workspace_service import delete_saved_view
+
+    delete_saved_view(db, business_id, _crm_user_id(ctx), view_id)
+    db.commit()
+    return success_response(data={"id": view_id}, request=request, message="CRM_SAVED_VIEW_DELETED")
 
 
 # ============================================================================
@@ -2935,7 +3445,11 @@ async def get_customer_360(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/my-work-queue", summary="صف کاری من")
+@router.get(
+    "/businesses/{business_id}/my-work-queue",
+    summary="صف کاری من",
+    description="وظایف باز تخصیص‌یافته به کاربر جاری. ابزار MCP: `get_crm_my_work_queue`.",
+)
 @require_business_access("business_id")
 async def my_work_queue(
     request: Request,
@@ -2960,6 +3474,10 @@ async def my_work_queue(
             CrmActivity.status == "open",
             CrmActivity.assigned_to_user_id == user_id,
         )
+    )
+    tasks = restrict_activity_query(tasks, db, business_id, ctx, CrmActivity)
+    tasks = (
+        tasks
         .order_by(CrmActivity.due_at.asc().nullslast())
         .limit(100)
         .all()
@@ -2994,11 +3512,14 @@ async def my_work_queue(
         .limit(100)
         .all()
     )
+    from app.services.crm_next_action_service import queue_suggestions
+
     data = {
         "tasks": [_activity_to_dict(t, request) for t in tasks],
         "overdue_tasks_count": sum(1 for t in tasks if t.due_at and t.due_at < now),
         "lead_follow_ups": [_lead_to_dict(l, request) for l in lead_follow_ups],
         "deal_follow_ups": [_deal_to_dict(d, request) for d in deal_follow_ups],
+        "suggested_actions": queue_suggestions(tasks, lead_follow_ups, deal_follow_ups, now),
     }
     return success_response(data=data, request=request)
 
@@ -3008,7 +3529,11 @@ async def my_work_queue(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/reports/lost-reasons", summary="گزارش دلایل باخت")
+@router.get(
+    "/businesses/{business_id}/reports/lost-reasons",
+    summary="گزارش دلایل باخت",
+    description="ابزار MCP: `get_crm_lost_reasons_report`.",
+)
 @require_business_access("business_id")
 async def report_lost_reasons(
     request: Request,
@@ -3026,9 +3551,8 @@ async def report_lost_reasons(
             func.coalesce(func.sum(Deal.amount), 0).label("total_amount"),
         )
         .filter(Deal.business_id == business_id, Deal.lost_reason_code.isnot(None), Deal.lost_reason_code != "")
-        .group_by(Deal.lost_reason_code)
-        .all()
     )
+    rows = restrict_visibility_query(rows, db, business_id, ctx, Deal, "deal").group_by(Deal.lost_reason_code).all()
     reason_names = {
         r["code"]: r["name"]
         for r in crm_close_reason_service.list_reasons(db, business_id, reason_type="lost")
@@ -3046,7 +3570,11 @@ async def report_lost_reasons(
     return success_response(data=data, request=request)
 
 
-@router.get("/businesses/{business_id}/reports/won-reasons", summary="گزارش دلایل برد")
+@router.get(
+    "/businesses/{business_id}/reports/won-reasons",
+    summary="گزارش دلایل برد",
+    description="ابزار MCP: `get_crm_won_reasons_report`.",
+)
 @require_business_access("business_id")
 async def report_won_reasons(
     request: Request,
@@ -3064,9 +3592,8 @@ async def report_won_reasons(
             func.coalesce(func.sum(Deal.amount), 0).label("total_amount"),
         )
         .filter(Deal.business_id == business_id, Deal.won_reason_code.isnot(None), Deal.won_reason_code != "")
-        .group_by(Deal.won_reason_code)
-        .all()
     )
+    rows = restrict_visibility_query(rows, db, business_id, ctx, Deal, "deal").group_by(Deal.won_reason_code).all()
     reason_names = {
         r["code"]: r["name"]
         for r in crm_close_reason_service.list_reasons(db, business_id, reason_type="won")
@@ -3089,7 +3616,7 @@ async def report_won_reasons(
 # ============================================================================
 
 
-@router.post("/businesses/{business_id}/deals/{deal_id}/convert-to-invoice", summary="تبدیل فرصت فروش به فاکتور/پیش‌فاکتور")
+@router.post("/businesses/{business_id}/deals/{deal_id}/convert-to-invoice", summary="تبدیل فرصت فروش به فاکتور", description="ابزار MCP: `convert_deal_to_invoice` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def convert_deal_to_invoice(
     request: Request,
@@ -3100,8 +3627,16 @@ async def convert_deal_to_invoice(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
-    from datetime import date, datetime
+    from datetime import datetime
     from decimal import Decimal
+    from app.core.business_calendar import business_today
+
+    if not has_invoice_type_permission_for_business(ctx, db, business_id, "invoice_sales", "add"):
+        raise ApiError(
+            "CRM_INVOICE_PERMISSION_REQUIRED",
+            "برای صدور فاکتور از فرصت فروش، مجوز افزودن فاکتور فروش لازم است.",
+            http_status=403,
+        )
 
     deal = (
         db.query(Deal)
@@ -3111,8 +3646,18 @@ async def convert_deal_to_invoice(
     )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal, write=True)
     if deal.document_id:
         raise ApiError("CRM_DEAL_ALREADY_INVOICED", "برای این فرصت فروش قبلاً فاکتور صادر شده است.", http_status=400)
+    if body.close_as_won:
+        won_code = body.won_reason_code or deal.won_reason_code
+        if not won_code or not crm_close_reason_service.is_valid_reason_code(db, business_id, "won", won_code):
+            raise ApiError("CRM_WON_REASON_REQUIRED", "برای بستن به‌عنوان برد، دلیل برد معتبر لازم است.", http_status=400)
+    if body.warehouse_id is not None:
+        from adapters.db.models.warehouse import Warehouse
+
+        if db.query(Warehouse.id).filter(Warehouse.id == int(body.warehouse_id), Warehouse.business_id == business_id).first() is None:
+            raise ApiError("CRM_WAREHOUSE_NOT_IN_BUSINESS", "انبار انتخاب‌شده در این کسب‌وکار نیست.", http_status=400)
 
     # تعیین ارز: ارز معامله یا ارز پیش‌فرض کسب‌وکار
     from adapters.db.models.business import Business as _Biz
@@ -3120,6 +3665,9 @@ async def convert_deal_to_invoice(
     currency_id = deal.currency_id or (biz.default_currency_id if biz else None)
     if not currency_id:
         raise ApiError("CRM_DEAL_NO_CURRENCY", "ارز فرصت فروش مشخص نیست و ارز پیش‌فرض کسب‌وکار نیز تنظیم نشده است.", http_status=400)
+    from app.services.crm_guards import assert_currency_enabled_for_business
+
+    assert_currency_enabled_for_business(db, business_id, int(currency_id))
 
     # ساخت خطوط فاکتور از خطوط دارای کالا
     invoice_lines: List[Dict[str, Any]] = []
@@ -3159,10 +3707,10 @@ async def convert_deal_to_invoice(
     invoice_data: Dict[str, Any] = {
         "invoice_type": "invoice_sales",
         "currency_id": int(currency_id),
-        "document_date": date.today().isoformat(),
+        "document_date": business_today(business_id).isoformat(),
         "is_proforma": bool(body.is_proforma),
         "lines": invoice_lines,
-        "extra_info": {"person_id": int(deal.person_id)},
+        "extra_info": {"person_id": int(deal.person_id), "crm_deal_id": int(deal.id)},
         "description": f"صادر شده از فرصت فروش {deal.code or deal.id}",
     }
 
@@ -3177,14 +3725,33 @@ async def convert_deal_to_invoice(
 
     document_id = result.get("id") if isinstance(result, dict) else None
     if document_id:
-        deal.document_id = int(document_id)
+        from app.services.crm_deal_document_service import link_deal_document
 
+        link_deal_document(
+            db,
+            business_id,
+            deal,
+            int(document_id),
+            role="proforma" if body.is_proforma else "invoice",
+            created_by_user_id=ctx.get_user_id(),
+        )
+
+    old_stage_id = deal.stage_id
+    closed_now = False
     # بستن معامله به‌عنوان برد در صورت درخواست
     if body.close_as_won:
         won_code = body.won_reason_code or deal.won_reason_code
         if won_code and crm_close_reason_service.is_valid_reason_code(db, business_id, "won", won_code):
             deal.won_reason_code = won_code
         deal.closed_at = datetime.utcnow()
+        try:
+            from app.services.crm_automation_service import cancel_sequence_enrollments
+
+            cancel_sequence_enrollments(
+                db, business_id, entity_type="deal", entity_id=deal.id, reason="deal_closed", when="close"
+            )
+        except Exception:
+            logger.exception("sequence stop on won invoice failed deal_id=%s", deal.id)
         # انتقال به مرحله برد در صورت وجود
         win_stage = (
             db.query(CrmProcessStage)
@@ -3195,9 +3762,41 @@ async def convert_deal_to_invoice(
             .order_by(CrmProcessStage.order_index.desc())
             .first()
         )
-        if win_stage:
+        if win_stage and win_stage.id != deal.stage_id:
             deal.stage_id = win_stage.id
             deal.stage_entered_at = datetime.utcnow()
+        closed_now = True
+
+    if deal.stage_id != old_stage_id:
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_deal_stage_changed
+
+            trigger_deal_stage_changed(
+                db,
+                business_id,
+                deal_id=deal_id,
+                old_stage_id=old_stage_id,
+                new_stage_id=deal.stage_id,
+                user_id=ctx.get_user_id(),
+            )
+        except Exception:
+            logger.exception("crm.deal.stage_changed trigger failed on invoice convert deal_id=%s", deal_id)
+    if closed_now:
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_deal_closed
+
+            trigger_deal_closed(
+                db,
+                business_id,
+                deal_id=deal_id,
+                amount=float(deal.amount or 0),
+                is_win=True,
+                document_id=deal.document_id,
+                user_id=ctx.get_user_id(),
+                is_lost=False,
+            )
+        except Exception:
+            logger.exception("crm.deal.closed trigger failed on invoice convert deal_id=%s", deal_id)
 
     db.commit()
     db.refresh(deal)
@@ -3221,6 +3820,9 @@ def _sequence_to_dict(seq: CrmSequence, include_steps: bool = True) -> Dict[str,
         "name": seq.name,
         "description": seq.description,
         "is_active": bool(seq.is_active),
+        "sms_daily_cap": seq.sms_daily_cap,
+        "stop_on_reply": bool(seq.stop_on_reply),
+        "stop_on_close": bool(seq.stop_on_close),
         "created_at": seq.created_at.isoformat() if seq.created_at else None,
         "updated_at": seq.updated_at.isoformat() if seq.updated_at else None,
         "created_by_user_id": seq.created_by_user_id,
@@ -3239,7 +3841,11 @@ def _sequence_to_dict(seq: CrmSequence, include_steps: bool = True) -> Dict[str,
     return d
 
 
-@router.get("/businesses/{business_id}/sequences", summary="لیست توالی‌های خودکار")
+@router.get(
+    "/businesses/{business_id}/sequences",
+    summary="لیست توالی‌های خودکار",
+    description="ابزار MCP: `list_crm_sequences`.",
+)
 @require_business_access("business_id")
 async def list_sequences(
     request: Request,
@@ -3258,7 +3864,7 @@ async def list_sequences(
     return success_response(data={"items": [_sequence_to_dict(s) for s in rows]}, request=request)
 
 
-@router.post("/businesses/{business_id}/sequences", summary="ایجاد توالی خودکار")
+@router.post("/businesses/{business_id}/sequences", summary="ایجاد توالی خودکار", description="ابزار MCP: `create_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_sequence(
     request: Request,
@@ -3273,6 +3879,9 @@ async def create_sequence(
         name=body.name,
         description=body.description,
         is_active=body.is_active,
+        sms_daily_cap=body.sms_daily_cap or None,
+        stop_on_reply=body.stop_on_reply,
+        stop_on_close=body.stop_on_close,
         created_by_user_id=ctx.get_user_id(),
     )
     db.add(seq)
@@ -3292,7 +3901,7 @@ async def create_sequence(
     return success_response(data=_sequence_to_dict(seq), request=request, message="CRM_SEQUENCE_CREATED")
 
 
-@router.get("/businesses/{business_id}/sequences/{sequence_id}", summary="جزئیات توالی")
+@router.get("/businesses/{business_id}/sequences/{sequence_id}", summary="جزئیات توالی", description="ابزار MCP: `get_crm_sequence`.")
 @require_business_access("business_id")
 async def get_sequence(
     request: Request,
@@ -3313,7 +3922,7 @@ async def get_sequence(
     return success_response(data=_sequence_to_dict(seq), request=request)
 
 
-@router.patch("/businesses/{business_id}/sequences/{sequence_id}", summary="ویرایش توالی")
+@router.patch("/businesses/{business_id}/sequences/{sequence_id}", summary="ویرایش توالی", description="ابزار MCP: `update_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_sequence(
     request: Request,
@@ -3338,6 +3947,14 @@ async def update_sequence(
         seq.description = body.description
     if body.is_active is not None:
         seq.is_active = body.is_active
+    if body.clear_sms_daily_cap:
+        seq.sms_daily_cap = None
+    elif body.sms_daily_cap is not None:
+        seq.sms_daily_cap = body.sms_daily_cap or None
+    if body.stop_on_reply is not None:
+        seq.stop_on_reply = body.stop_on_reply
+    if body.stop_on_close is not None:
+        seq.stop_on_close = body.stop_on_close
     if body.steps is not None:
         db.query(CrmSequenceStep).filter(CrmSequenceStep.sequence_id == seq.id).delete(synchronize_session=False)
         for s in body.steps:
@@ -3355,7 +3972,7 @@ async def update_sequence(
     return success_response(data=_sequence_to_dict(seq), request=request, message="CRM_SEQUENCE_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/sequences/{sequence_id}", summary="حذف توالی")
+@router.delete("/businesses/{business_id}/sequences/{sequence_id}", summary="حذف توالی", description="ابزار MCP: `delete_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_sequence(
     request: Request,
@@ -3377,7 +3994,7 @@ async def delete_sequence(
     return success_response(message="CRM_SEQUENCE_DELETED", request=request)
 
 
-@router.post("/businesses/{business_id}/sequences/{sequence_id}/enroll", summary="ثبت‌نام در توالی")
+@router.post("/businesses/{business_id}/sequences/{sequence_id}/enroll", summary="ثبت‌نام در توالی", description="ابزار MCP: `enroll_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def enroll_sequence(
     request: Request,
@@ -3388,6 +4005,12 @@ async def enroll_sequence(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
+    target_model = Lead if body.entity_type == "lead" else Deal if body.entity_type == "deal" else None
+    if target_model is not None:
+        target = db.query(target_model).filter(target_model.id == body.entity_id, target_model.business_id == business_id).first()
+        if target is None:
+            raise ApiError("NOT_FOUND", "رکورد یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, body.entity_type, target, write=True)
     enrollment = crm_automation_service.enroll_in_sequence(
         db, business_id, sequence_id, body.entity_type, body.entity_id
     )
@@ -3405,6 +4028,158 @@ async def enroll_sequence(
     return success_response(data=format_datetime_fields(data, request), request=request, message="CRM_SEQUENCE_ENROLLED")
 
 
+def _sequence_preview_values(
+    db: Session,
+    business_id: int,
+    entity_type: str | None,
+    entity_id: int | None,
+    ctx: Any | None = None,
+) -> Dict[str, Any]:
+    values: Dict[str, Any] = {
+        "name": "مشتری نمونه",
+        "company": "شرکت نمونه",
+        "mobile": "09120000000",
+        "title": "فرصت نمونه",
+        "code": "CRM-0",
+    }
+    if not entity_type and not entity_id:
+        return values
+    if entity_type not in ("lead", "deal") or not entity_id:
+        raise ApiError("CRM_SEQ_INVALID_ENTITY", "برای پیش‌نمایش واقعی، نوع و شناسه رکورد را با هم بفرستید.", http_status=400)
+    if entity_type == "lead":
+        lead = db.query(Lead).filter(Lead.id == entity_id, Lead.business_id == business_id).first()
+        if not lead:
+            raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+        if ctx is not None:
+            assert_can_view_record(db, business_id, ctx, "lead", lead)
+        values.update({"name": lead.name, "company": lead.company_name, "mobile": lead.mobile, "code": lead.code})
+        return values
+    deal = db.query(Deal).filter(Deal.id == entity_id, Deal.business_id == business_id).first()
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    if ctx is not None:
+        assert_can_view_record(db, business_id, ctx, "deal", deal)
+    person = db.get(Person, deal.person_id) if deal.person_id else None
+    values.update(
+        {
+            "name": person.alias_name if person else deal.title,
+            "title": deal.title,
+            "mobile": person.mobile if person else None,
+            "code": deal.code,
+        }
+    )
+    return values
+
+
+@router.post(
+    "/businesses/{business_id}/sequences/{sequence_id}/dry-run",
+    summary="پیش‌نمایش توالی بدون ارسال",
+    description="متن پیامک را با داده نمونه یا یک رکورد واقعی رندر می‌کند و هیچ پیامک، وظیفه یا اعلانی نمی‌سازد.",
+)
+@require_business_access("business_id")
+async def dry_run_sequence(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    sequence_id: int = Path(..., gt=0),
+    body: CrmSequenceDryRunRequest = Body(default=CrmSequenceDryRunRequest()),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from app.services.crm_sequence_runtime import render_sequence_sms
+
+    seq = (
+        db.query(CrmSequence)
+        .options(selectinload(CrmSequence.steps))
+        .filter(and_(CrmSequence.id == sequence_id, CrmSequence.business_id == business_id))
+        .first()
+    )
+    if not seq:
+        raise ApiError("NOT_FOUND", "توالی یافت نشد.", http_status=404)
+    values = _sequence_preview_values(db, business_id, body.entity_type, body.entity_id, ctx)
+    steps = []
+    for step in sorted(seq.steps, key=lambda item: item.step_order):
+        config = step.action_config or {}
+        preview = {
+            "step_order": step.step_order,
+            "delay_hours": step.delay_hours,
+            "action_type": step.action_type,
+            "would_send": False,
+        }
+        if step.action_type == "send_sms":
+            preview["message"] = render_sequence_sms(config.get("message") or config.get("text") or "", values)
+        elif step.action_type == "create_task":
+            preview["subject"] = config.get("subject") or "پیگیری"
+        elif step.action_type == "notify_assignee":
+            preview["title"] = config.get("title") or "یادآوری توالی CRM"
+            preview["message"] = config.get("message") or ""
+        steps.append(preview)
+    return success_response(
+        data={"sequence_id": seq.id, "values": values, "steps": steps, "executed": False},
+        request=request,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/sequence-templates/discount-approval",
+    summary="نصب پیش‌نویس گردش‌کار تأیید تخفیف",
+    description="یک گردش‌کار پیش‌نویس روی موتور موجود می‌سازد. تا وقتی در ویرایشگر فعال نشود اجرا نمی‌شود.",
+)
+@require_business_access("business_id")
+async def install_discount_approval_template(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmDiscountApprovalTemplateRequest = Body(default=CrmDiscountApprovalTemplateRequest()),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("workflows", "add")),
+) -> Dict[str, Any]:
+    from adapters.api.v1.workflows import validate_workflow_data
+    from adapters.db.models.workflow import Workflow, WorkflowStatus
+    from app.services.crm_sequence_runtime import DISCOUNT_APPROVAL_WORKFLOW_NAME, discount_approval_workflow_data
+    from app.services.workflow.workflow_trigger_service import ensure_workflow_webhook_settings
+
+    existing = (
+        db.query(Workflow)
+        .filter(Workflow.business_id == business_id, Workflow.name == DISCOUNT_APPROVAL_WORKFLOW_NAME)
+        .order_by(Workflow.id.asc())
+        .first()
+    )
+    if existing:
+        status_value = existing.status.value if hasattr(existing.status, "value") else existing.status
+        return success_response(
+            data={"id": existing.id, "name": existing.name, "status": status_value, "created": False},
+            request=request,
+            message="CRM_DISCOUNT_WORKFLOW_EXISTS",
+        )
+    workflow_data = discount_approval_workflow_data(business_id, body.threshold)
+    errors = validate_workflow_data(workflow_data)
+    if errors:
+        raise ApiError("WORKFLOW_DATA_INVALID", "; ".join(errors), http_status=400)
+    workflow = Workflow(
+        business_id=business_id,
+        name=DISCOUNT_APPROVAL_WORKFLOW_NAME,
+        description="وقتی تخفیف فاکتور فروش از سقف تعیین‌شده بیشتر باشد، برای مسئول اعلان تأیید می‌فرستد.",
+        status=WorkflowStatus.DRAFT,
+        workflow_data=workflow_data,
+        settings=ensure_workflow_webhook_settings(workflow_data, {}) or None,
+        created_by_user_id=ctx.get_user_id(),
+    )
+    db.add(workflow)
+    db.commit()
+    db.refresh(workflow)
+    return success_response(
+        data={
+            "id": workflow.id,
+            "name": workflow.name,
+            "status": workflow.status.value if hasattr(workflow.status, "value") else workflow.status,
+            "created": True,
+        },
+        request=request,
+        message="CRM_DISCOUNT_WORKFLOW_CREATED",
+    )
+
+
 # ============================================================================
 # تنظیمات اتوماسیون CRM
 # ============================================================================
@@ -3420,10 +4195,15 @@ def _automation_settings_to_dict(s) -> Dict[str, Any]:
         "follow_up_notify_enabled": bool(s.follow_up_notify_enabled),
         "stale_deal_days": s.stale_deal_days,
         "score_rules": s.score_rules,
+        "record_acl_enabled": bool(getattr(s, "record_acl_enabled", False)),
     }
 
 
-@router.get("/businesses/{business_id}/automation-settings", summary="تنظیمات اتوماسیون CRM")
+@router.get(
+    "/businesses/{business_id}/automation-settings",
+    summary="تنظیمات اتوماسیون CRM",
+    description="ابزار MCP: `get_crm_automation_settings`.",
+)
 @require_business_access("business_id")
 async def get_automation_settings(
     request: Request,
@@ -3438,7 +4218,11 @@ async def get_automation_settings(
     return success_response(data=_automation_settings_to_dict(s), request=request)
 
 
-@router.patch("/businesses/{business_id}/automation-settings", summary="ویرایش تنظیمات اتوماسیون CRM")
+@router.patch(
+    "/businesses/{business_id}/automation-settings",
+    summary="ویرایش تنظیمات اتوماسیون CRM",
+    description="ابزار MCP: `update_crm_automation_settings` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def update_automation_settings(
     request: Request,

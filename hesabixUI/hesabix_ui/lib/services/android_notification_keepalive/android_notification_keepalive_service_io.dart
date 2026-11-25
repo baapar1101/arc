@@ -41,10 +41,10 @@ class AndroidNotificationKeepAliveService {
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        // Refresh keep-alive text (clock/date) about once a minute.
-        eventAction: ForegroundTaskEventAction.repeat(60000),
-        autoRunOnBoot: false,
-        autoRunOnMyPackageReplaced: false,
+        // Softphone REST heartbeat + keep-alive clock (~session TTL 120min).
+        eventAction: ForegroundTaskEventAction.repeat(45000),
+        autoRunOnBoot: true,
+        autoRunOnMyPackageReplaced: true,
         allowWakeLock: true,
         allowWifiLock: true,
       ),
@@ -279,6 +279,27 @@ class AndroidNotificationKeepAliveService {
     } catch (e) {
       debugPrint('KeepAlive refreshStatusNotification error: $e');
     }
+  }
+
+  /// Restore Softphone session saved in FGS (reboot / killed UI).
+  Future<Map<String, dynamic>?> loadSoftphonePresence() async {
+    if (!supportsAndroidNotificationKeepAlive) return null;
+    await ensureInitialized();
+    final desired = (await FlutterForegroundTask.getData<bool>(key: 'softphoneDesired')) ?? false;
+    if (!desired) return null;
+    final sessionId = await FlutterForegroundTask.getData<String>(key: 'softphoneSessionId');
+    final mediaTicket = await FlutterForegroundTask.getData<String>(key: 'softphoneMediaTicket');
+    final businessId = await FlutterForegroundTask.getData<int>(key: 'softphoneBusinessId');
+    if (sessionId == null || sessionId.isEmpty || mediaTicket == null || mediaTicket.isEmpty) {
+      return null;
+    }
+    return <String, dynamic>{
+      'sessionId': sessionId,
+      'mediaTicket': mediaTicket,
+      'businessId': businessId,
+      'extension': await FlutterForegroundTask.getData<String>(key: 'softphoneExtension'),
+      'apiBaseUrl': await FlutterForegroundTask.getData<String>(key: 'softphoneApiBaseUrl'),
+    };
   }
 }
 

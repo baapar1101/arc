@@ -1,7 +1,10 @@
 import 'package:hesabix_ui/theme/glass.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 import '../../../services/repair_shop_service.dart';
+import '../../../services/business_storage_service.dart';
 import '../../../models/repair_order_model.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../core/api_client.dart';
@@ -9,11 +12,15 @@ import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../widgets/invoice/product_combobox_widget.dart';
+import '../../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../../widgets/invoice/unique_product_instance_selector_dialog.dart';
+import '../../../widgets/invoice/invoice_line_lot_picker_dialog.dart';
 import 'repair_shop_calendar_utils.dart';
+import 'repair_shop_status.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
-
-/// صفحه جزئیات و عملیات سفارش تعمیر
 class RepairOrderDetailPage extends StatefulWidget {
   final int businessId;
   final int orderId;
@@ -32,46 +39,19 @@ class RepairOrderDetailPage extends StatefulWidget {
 
 class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
   late final RepairShopService _service;
+  late final BusinessStorageService _storage;
 
   bool _isLoading = true;
+  bool _busy = false;
   RepairOrder? _order;
   String? _errorMessage;
-
-  // وضعیت‌ها و رنگ‌ها
-  final Map<String, String> _statusLabels = {
-    'received': 'دریافت شده',
-    'assigned': 'اختصاص داده شده',
-    'in_progress': 'در حال تعمیر',
-    'waiting_parts': 'منتظر قطعات',
-    'testing': 'در حال تست',
-    'completed_fixed': 'تعمیر موفق',
-    'completed_unfixable': 'غیرقابل تعمیر',
-    'ready_for_pickup': 'آماده تحویل',
-    'delivered': 'تحویل داده شده',
-    'cancelled': 'لغو شده',
-  };
-
-  Color _statusColorFor(BuildContext context, String? status) {
-    final map = <String, Color>{
-    'received': SemanticColorResolver.info(context),
-    'assigned': Colors.purple,
-    'in_progress': SemanticColorResolver.warning(context),
-    'waiting_parts': Colors.amber,
-    'testing': Colors.cyan,
-    'completed_fixed': SemanticColorResolver.positive(context),
-    'completed_unfixable': SemanticColorResolver.negative(context),
-    'ready_for_pickup': Colors.teal,
-    'delivered': Colors.grey,
-    'cancelled': Colors.black54,
-    };
-    return map[status] ?? Colors.grey;
-  }
-
 
   @override
   void initState() {
     super.initState();
-    _service = RepairShopService(ApiClient());
+    final api = ApiClient();
+    _service = RepairShopService(api);
+    _storage = BusinessStorageService(api);
     _loadOrder();
   }
 
@@ -86,41 +66,53 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
         businessId: widget.businessId,
         orderId: widget.orderId,
       );
-
+      if (!mounted) return;
       setState(() {
         _order = order;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage =
-            'خطا در بارگذاری سفارش: ${ErrorExtractor.forContext(e, context)}';
+            AppLocalizations.of(context).repairShopLoadOrderError(
+          ErrorExtractor.forContext(e, context),
+        );
         _isLoading = false;
       });
     }
   }
 
+  Future<void> _runAction(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _showStatusMenu() async {
-    // نمایش منوی انتخاب وضعیت
-    final newStatus = await showGlassDialog<String>(
+    final newStatus = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('انتخاب وضعیت جدید'),
-        children: _statusLabels.entries.map((entry) {
+        title: Text(AppLocalizations.of(context).repairShopSelectNewStatus),
+        children: RepairShopStatus.codes.map((code) {
           return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, entry.key),
+            onPressed: () => Navigator.pop(context, code),
             child: Row(
               children: [
                 Container(
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: _statusColorFor(context, entry.key),
+                    color: RepairShopStatus.color(context, code),
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(entry.value),
+                Text(RepairShopStatus.label(code, AppLocalizations.of(context))),
               ],
             ),
           );
@@ -129,7 +121,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     );
 
     if (newStatus != null) {
-      _updateStatus(newStatus);
+      await _updateStatus(newStatus);
     }
   }
 
@@ -137,19 +129,19 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('لغو سفارش'),
-        content: Text('آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟'),
+        title: Text(AppLocalizations.of(context).repairShopCancelOrder),
+        content: Text(AppLocalizations.of(context).repairShopCancelOrderConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('خیر'),
+            child: Text(AppLocalizations.of(context).no),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: SemanticColorResolver.negative(context),
             ),
-            child: const Text('بله، لغو کن'),
+            child: Text(AppLocalizations.of(context).repairShopCancelYes),
           ),
         ],
       ),
@@ -157,141 +149,215 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
     if (confirm != true) return;
 
-    try {
-      await _service.deleteOrder(
-        businessId: widget.businessId,
-        orderId: widget.orderId,
-      );
-
-      if (mounted) {
-        Navigator.of(context).pop(); // بازگشت به لیست
-        SnackBarHelper.show(context, message: 'سفارش لغو شد');
+    await _runAction(() async {
+      try {
+        await _service.deleteOrder(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+        );
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopOrderCancelled);
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
-      }
-    }
+    });
   }
 
   Future<void> _assignTechnician() async {
-    // دیالوگ انتخاب تعمیرکار
-    final technicians = await _service.listTechnicians(
-      businessId: widget.businessId,
-      onlyActive: true,
-    );
+    List<RepairTechnician> technicians;
+    try {
+      technicians = await _service.listTechnicians(
+        businessId: widget.businessId,
+        onlyActive: true,
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+        );
+      }
+      return;
+    }
 
     if (!mounted) return;
+    if (technicians.isEmpty) {
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopNeedActiveTechnician);
+      return;
+    }
 
     final selected = await showGlassDialog<RepairTechnician>(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('انتخاب تعمیرکار'),
-        children: technicians.map((tech) {
-          return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, tech),
-            child: ListTile(
-              title: Text(tech.personName),
-              subtitle: Text(tech.code),
-            ),
-          );
-        }).toList(),
-      ),
+      builder: (context) => _TechnicianPickDialog(technicians: technicians),
     );
 
     if (selected == null) return;
 
-    try {
-      await _service.assignTechnician(
-        businessId: widget.businessId,
-        orderId: widget.orderId,
-        technicianId: selected.id,
-      );
-
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'تعمیرکار با موفقیت اختصاص یافت');
-        _loadOrder();
+    await _runAction(() async {
+      try {
+        await _service.assignTechnician(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          technicianId: selected.id,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopTechnicianAssigned);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
-      }
-    }
+    });
   }
 
   Future<void> _updateStatus(String newStatus) async {
     final notes = await showGlassDialog<String>(
       context: context,
       builder: (context) => _NotesDialog(
-        title: 'تغییر وضعیت به ${_statusLabels[newStatus]}',
+        title: AppLocalizations.of(context).repairShopChangeStatusTo(RepairShopStatus.label(newStatus, AppLocalizations.of(context))),
       ),
     );
 
-    if (notes == null) return; // کنسل شد
+    if (notes == null) return;
 
-    try {
-      await _service.updateStatus(
-        businessId: widget.businessId,
-        orderId: widget.orderId,
-        status: newStatus,
-        notes: notes.isNotEmpty ? notes : null,
-      );
-
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'وضعیت با موفقیت تغییر کرد');
-        _loadOrder();
+    await _runAction(() async {
+      try {
+        await _service.updateStatus(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          status: newStatus,
+          notes: notes.isNotEmpty ? notes : null,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopStatusChanged);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
-      }
-    }
+    });
   }
 
   Future<void> _completeRepair(bool isFixed) async {
     final notes = await showGlassDialog<String>(
       context: context,
       builder: (context) => _NotesDialog(
-        title: isFixed ? 'تکمیل تعمیر موفق' : 'تعمیر ناموفق',
-        hint: 'توضیحات...',
+        title: isFixed ? AppLocalizations.of(context).repairShopCompleteFixedTitle : AppLocalizations.of(context).repairShopCompleteUnfixableTitle,
+        hint: AppLocalizations.of(context).repairShopNotesHint,
       ),
     );
 
     if (notes == null) return;
 
-    try {
-      await _service.completeRepair(
-        businessId: widget.businessId,
-        orderId: widget.orderId,
-        isFixed: isFixed,
-        notes: notes.isNotEmpty ? notes : null,
-      );
+    await _runAction(() async {
+      try {
+        await _service.completeRepair(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          isFixed: isFixed,
+          notes: notes.isNotEmpty ? notes : null,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopRepairCompleted);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
+      }
+    });
+  }
 
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'تعمیر با موفقیت تکمیل شد');
-        _loadOrder();
+  Future<void> _deliverRepair() async {
+    final notes = await showDialog<String>(
+      context: context,
+      builder: (context) => _NotesDialog(
+        title: AppLocalizations.of(context).repairShopDeliverToCustomer,
+        hint: AppLocalizations.of(context).repairShopDeliveryNotesHint,
+      ),
+    );
+    if (notes == null) return;
+
+    await _runAction(() async {
+      try {
+        await _service.deliverRepair(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          notes: notes.isNotEmpty ? notes : null,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopItemDelivered);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
-      }
-    }
+    });
   }
 
   Future<void> _createInvoice() async {
-    final confirm = await showGlassDialog<bool>(
+    final order = _order;
+    if (order == null) return;
+    if (order.laborCost <= 0 && order.parts.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).repairShopInvoiceRequiresCost,
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('صدور فاکتور'),
-        content: const Text('آیا می‌خواهید فاکتور این سفارش را صادر کنید؟'),
+        title: Text(AppLocalizations.of(context).repairShopIssueInvoice),
+        content: Text(
+          AppLocalizations.of(context).repairShopIssueInvoiceConfirm(order.formattedFinalCost),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('خیر'),
+            child: Text(AppLocalizations.of(context).no),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('بله، صدور فاکتور'),
+            child: Text(AppLocalizations.of(context).repairShopIssueInvoiceYes),
           ),
         ],
       ),
@@ -299,20 +365,271 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
     if (confirm != true) return;
 
-    try {
-      await _service.createInvoice(
-        businessId: widget.businessId,
-        orderId: widget.orderId,
-      );
+    await _runAction(() async {
+      try {
+        final result = await _service.createInvoice(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+        );
+        if (mounted) {
+          final code = result['code'] ??
+              (result['document'] is Map ? result['document']['code'] : null);
+          SnackBarHelper.show(
+            context,
+            message: code != null
+                ? AppLocalizations.of(context).repairShopInvoiceIssuedWithCode(code)
+                : AppLocalizations.of(context).repairShopInvoiceIssued,
+          );
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
+      }
+    });
+  }
 
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'فاکتور با موفقیت صادر شد');
-        _loadOrder();
+  Future<void> _openAddPartDialog() async {
+    final payload = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _AddPartDialog(
+        businessId: widget.businessId,
+        calendarController: widget.calendarController,
+      ),
+    );
+    if (payload == null) return;
+
+    await _runAction(() async {
+      try {
+        await _service.addParts(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          parts: [payload],
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopPartAdded);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+    });
+  }
+
+  Future<void> _removePart(RepairOrderPart part) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppLocalizations.of(context).repairShopDeletePart),
+        content: Text(AppLocalizations.of(context).repairShopDeletePartConfirm(part.productName)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(AppLocalizations.of(context).no),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(AppLocalizations.of(context).delete),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _runAction(() async {
+      try {
+        await _service.removePart(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          partId: part.id,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopPartDeleted);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
       }
+    });
+  }
+
+  Future<void> _setLaborCost() async {
+    final order = _order;
+    if (order == null) return;
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) => _LaborCostDialog(initial: order.laborCost),
+    );
+    if (result == null) return;
+
+    await _runAction(() async {
+      try {
+        await _service.calculateCosts(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          laborCost: result,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopLaborSaved);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> _addAttachment() async {
+    final attachmentType = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(AppLocalizations.of(context).repairShopAttachmentType),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'before_repair'),
+            child: Text(AppLocalizations.of(context).repairShopAttachmentBefore),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'during_repair'),
+            child: Text(AppLocalizations.of(context).repairShopAttachmentDuring),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'after_repair'),
+            child: Text(AppLocalizations.of(context).repairShopAttachmentAfter),
+          ),
+        ],
+      ),
+    );
+    if (attachmentType == null) return;
+
+    final picked = await FilePicker.platform.pickFiles(withData: true);
+    if (picked == null || picked.files.isEmpty) return;
+    final file = picked.files.first;
+    if (file.bytes == null) return;
+
+    await _runAction(() async {
+      try {
+        final uploaded = await _storage.uploadFile(
+          businessId: widget.businessId,
+          fileBytes: file.bytes!,
+          filename: file.name,
+          moduleContext: 'repair_shop',
+          contextId: widget.orderId.toString(),
+        );
+        final fileId = uploaded['id']?.toString() ??
+            uploaded['file_id']?.toString();
+        if (fileId == null) {
+          throw Exception(AppLocalizations.of(context).repairShopFileIdMissing);
+        }
+        final name = file.name.toLowerCase();
+        final fileType = name.endsWith('.mp4') || name.endsWith('.mov')
+            ? 'video'
+            : (name.endsWith('.png') ||
+                    name.endsWith('.jpg') ||
+                    name.endsWith('.jpeg') ||
+                    name.endsWith('.webp')
+                ? 'image'
+                : 'document');
+        await _service.addAttachment(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          fileStorageId: fileId,
+          fileType: fileType,
+          attachmentType: attachmentType,
+          description: file.name,
+        );
+        if (mounted) {
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopAttachmentAdded);
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> _deleteAttachment(RepairOrderAttachment attachment) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppLocalizations.of(context).repairShopDeleteAttachment),
+        content: Text(AppLocalizations.of(context).repairShopDeleteAttachmentConfirm(attachment.description ?? attachment.fileStorageId)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(AppLocalizations.of(context).no),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(AppLocalizations.of(context).delete),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    await _runAction(() async {
+      try {
+        await _service.deleteAttachment(
+          businessId: widget.businessId,
+          orderId: widget.orderId,
+          attachmentId: attachment.id,
+        );
+        if (mounted) {
+          await _loadOrder();
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> _editOrder() async {
+    final result = await context.push(
+      '/business/${widget.businessId}/repair-shop/${widget.orderId}/edit',
+    );
+    if (result == true) {
+      await _loadOrder();
     }
   }
 
@@ -326,9 +643,16 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(_order?.code ?? 'جزئیات سفارش'),
-            leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+            title: Text(_order?.code ?? AppLocalizations.of(context).repairShopOrderDetails),
+            leading:
+                hesabixBackAppBarLeading(context, businessId: widget.businessId),
             actions: [
+              if (_order != null && RepairShopStatus.isEditable(_order!.status))
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: AppLocalizations.of(context).repairShopEditOrder,
+                  onPressed: _editOrder,
+                ),
               if (_order != null)
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
@@ -337,29 +661,49 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                       _showStatusMenu();
                     } else if (value == 'delete') {
                       _deleteOrder();
+                    } else if (value == 'edit') {
+                      _editOrder();
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    if (RepairShopStatus.isEditable(_order!.status))
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit),
+                            const SizedBox(width: 8),
+                            Text(AppLocalizations.of(context).repairShopEditOrder),
+                          ],
+                        ),
+                      ),
+                    PopupMenuItem(
                       value: 'status',
                       child: Row(
                         children: [
-                          Icon(Icons.swap_horiz),
-                          SizedBox(width: 8),
-                          Text('تغییر وضعیت'),
+                          const Icon(Icons.swap_horiz),
+                          const SizedBox(width: 8),
+                          Text(AppLocalizations.of(context).repairShopChangeStatus),
                         ],
                       ),
                     ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
-                          SizedBox(width: 8),
-                          Text('لغو سفارش', style: TextStyle(color: SemanticColorResolver.negative(context))),
-                        ],
+                    if (RepairShopStatus.isEditable(_order!.status))
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete,
+                                color: SemanticColorResolver.negative(context)),
+                            const SizedBox(width: 8),
+                            Text(
+                              AppLocalizations.of(context).repairShopCancelOrder,
+                              style: TextStyle(
+                                color: SemanticColorResolver.negative(context),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               IconButton(
@@ -381,15 +725,16 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: _loadOrder,
-                            child: const Text('تلاش مجدد'),
+                            child: Text(AppLocalizations.of(context).retry),
                           ),
                         ],
                       ),
                     )
                   : _order == null
-                      ? const Center(child: Text('سفارش یافت نشد'))
+                      ? Center(child: Text(AppLocalizations.of(context).repairShopOrderNotFound))
                       : _buildContent(theme, colorScheme),
-          floatingActionButton: _floatingActionButton,
+          bottomNavigationBar:
+              _order == null || _isLoading ? null : _buildActionBar(colorScheme),
         );
       },
     );
@@ -402,205 +747,382 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
         RepairShopCalendarUtils.formatDateTime(dt, isJalali);
     String fmtOptional(DateTime? dt) =>
         dt == null ? '-' : RepairShopCalendarUtils.formatDateTime(dt, isJalali);
+    final formatter = intl.NumberFormat('#,###');
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // هدر با وضعیت
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: _statusColorFor(context, order.status).withValues(alpha: 0.1),
-            child: Column(
-              children: [
-                Text(
-                  order.code,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _statusColorFor(context, order.status),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _statusLabels[order.status] ?? order.status,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: RepairShopStatus.color(context, order.status)
+                    .withValues(alpha: 0.1),
+                child: Column(
+                  children: [
+                    Text(
+                      order.code,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // اطلاعات مشتری
-          _buildSection(
-            'اطلاعات مشتری',
-            Icons.person,
-            colorScheme,
-            [
-              _buildInfoRow('نام', order.customerName),
-              if (order.customerPhone != null)
-                _buildInfoRow('تلفن', order.customerPhone!),
-              if (order.customerEmail != null)
-                _buildInfoRow('ایمیل', order.customerEmail!),
-            ],
-          ),
-
-          // اطلاعات کالا
-          _buildSection(
-            'اطلاعات کالا',
-            Icons.devices,
-            colorScheme,
-            [
-              _buildInfoRow('نام کالا', order.productName),
-              if (order.productSerial != null)
-                _buildInfoRow('سریال', order.productSerial!),
-            ],
-          ),
-
-          // مشکل و یادداشت‌ها
-          _buildSection(
-            'شرح مشکل',
-            Icons.report_problem,
-            colorScheme,
-            [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(order.problemDescription),
-              ),
-              if (order.customerNotes != null) ...[
-                const Divider(),
-                const Text('یادداشت مشتری:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(order.customerNotes!),
-                ),
-              ],
-              if (order.technicianNotes != null) ...[
-                const Divider(),
-                const Text('یادداشت تعمیرکار:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(order.technicianNotes!),
-                ),
-              ],
-            ],
-          ),
-
-          // تعمیرکار
-          _buildSection(
-            'تعمیرکار',
-            Icons.engineering,
-            colorScheme,
-            [
-              if (order.technicianName != null)
-                _buildInfoRow('تعمیرکار', order.technicianName!)
-              else
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text('هنوز تعمیرکاری اختصاص نیافته'),
-                ),
-            ],
-          ),
-
-          // هزینه‌ها
-          _buildSection(
-            'هزینه‌ها',
-            Icons.attach_money,
-            colorScheme,
-            [
-              _buildInfoRow(
-                'دستمزد',
-                order.formattedLaborCost,
-              ),
-              _buildInfoRow(
-                'قطعات',
-                order.formattedPartsCost,
-              ),
-              _buildInfoRow(
-                'حق‌الزحمه تعمیرکار',
-                order.formattedCommission,
-              ),
-              const Divider(),
-              _buildInfoRow(
-                'جمع کل',
-                order.formattedFinalCost,
-                bold: true,
-              ),
-            ],
-          ),
-
-          // قطعات
-          if (order.parts.isNotEmpty)
-            _buildSection(
-              'قطعات استفاده شده',
-              Icons.inventory,
-              colorScheme,
-              order.parts.map((part) {
-                final formatter = intl.NumberFormat('#,###');
-                return ListTile(
-                  title: Text(part.productName),
-                  subtitle: Text('تعداد: ${part.quantity} × ${formatter.format(part.unitPrice)}'),
-                  trailing: Text(
-                    '${formatter.format(part.totalPrice)} ${order.currencySymbol}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                );
-              }).toList(),
-            ),
-
-          // Timeline وضعیت‌ها
-          if (order.statusHistory.isNotEmpty)
-            _buildSection(
-              'تاریخچه وضعیت‌ها',
-              Icons.timeline,
-              colorScheme,
-              order.statusHistory.map((status) {
-                return ListTile(
-                  leading: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _statusColorFor(context, status.status),
-                      shape: BoxShape.circle,
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: RepairShopStatus.color(context, order.status),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        RepairShopStatus.label(order.status, AppLocalizations.of(context)),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                  title: Text(_statusLabels[status.status] ?? status.status),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(fmt(status.createdAt)),
-                      if (status.notes != null) Text(status.notes!),
+                    if (order.hasInvoice) ...[
+                      const SizedBox(height: 8),
+                      Chip(
+                        avatar: const Icon(Icons.receipt_long, size: 16),
+                        label: Text(
+                          order.invoiceCode != null
+                              ? AppLocalizations.of(context).repairShopInvoiceWithCode(order.invoiceCode!)
+                              : AppLocalizations.of(context).repairShopInvoiceIssuedLabel,
+                        ),
+                      ),
                     ],
+                  ],
+                ),
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopCustomerInfo,
+                Icons.person,
+                colorScheme,
+                [
+                  _buildInfoRow(AppLocalizations.of(context).repairShopName, order.customerName),
+                  if (order.customerPhone != null)
+                    _buildInfoRow(AppLocalizations.of(context).phone, order.customerPhone!),
+                  if (order.customerEmail != null)
+                    _buildInfoRow(AppLocalizations.of(context).email, order.customerEmail!),
+                ],
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopProductInfo,
+                Icons.devices,
+                colorScheme,
+                [
+                  _buildInfoRow(AppLocalizations.of(context).repairShopProductNameLabel, order.productName),
+                  if (order.productSerial != null)
+                    _buildInfoRow(AppLocalizations.of(context).repairShopSerial, order.productSerial!),
+                  if (order.warrantyCodeId != null)
+                    _buildInfoRow(
+                        AppLocalizations.of(context).repairShopWarrantyCode, order.warrantyCodeId.toString()),
+                ],
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopProblemSection,
+                Icons.report_problem,
+                colorScheme,
+                [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(order.problemDescription),
                   ),
-                );
-              }).toList(),
-            ),
-
-          // تاریخ‌ها
-          _buildSection(
-            'تاریخ‌ها',
-            Icons.calendar_today,
-            colorScheme,
-            [
-              _buildInfoRow('دریافت', fmt(order.receivedAt)),
-              if (order.estimatedDeliveryAt != null)
-                _buildInfoRow('تحویل تقریبی', fmtOptional(order.estimatedDeliveryAt)),
-              if (order.completedAt != null)
-                _buildInfoRow('تکمیل تعمیر', fmtOptional(order.completedAt)),
-              if (order.deliveredAt != null)
-                _buildInfoRow('تحویل شده', fmtOptional(order.deliveredAt)),
+                  if (order.customerNotes != null) ...[
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(AppLocalizations.of(context).repairShopCustomerNotesLabel,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(order.customerNotes!),
+                    ),
+                  ],
+                  if (order.technicianNotes != null) ...[
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(AppLocalizations.of(context).repairShopTechnicianNotesLabel,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(order.technicianNotes!),
+                    ),
+                  ],
+                ],
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopTechnician,
+                Icons.engineering,
+                colorScheme,
+                [
+                  if (order.technicianName != null)
+                    _buildInfoRow(AppLocalizations.of(context).repairShopTechnician, order.technicianName!)
+                  else
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(AppLocalizations.of(context).repairShopNoTechnicianAssigned),
+                    ),
+                ],
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopCosts,
+                Icons.attach_money,
+                colorScheme,
+                [
+                  _buildInfoRow(AppLocalizations.of(context).repairShopLabor, order.formattedLaborCost),
+                  _buildInfoRow(AppLocalizations.of(context).repairShopParts, order.formattedPartsCost),
+                  _buildInfoRow(
+                      AppLocalizations.of(context).repairShopTechnicianCommission, order.formattedCommission),
+                  const Divider(),
+                  _buildInfoRow(AppLocalizations.of(context).repairShopGrandTotal, order.formattedFinalCost, bold: true),
+                ],
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopAttachments,
+                Icons.attach_file,
+                colorScheme,
+                [
+                  if (order.attachments.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(AppLocalizations.of(context).repairShopNoAttachments),
+                    )
+                  else
+                    ...order.attachments.map((att) {
+                      return ListTile(
+                        leading: Icon(
+                          att.fileType == 'image'
+                              ? Icons.image
+                              : att.fileType == 'video'
+                                  ? Icons.videocam
+                                  : Icons.insert_drive_file,
+                        ),
+                        title: Text(att.description ?? att.fileStorageId),
+                        subtitle: Text(att.typeLabel(AppLocalizations.of(context))),
+                        trailing: RepairShopStatus.isEditable(order.status)
+                            ? IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _deleteAttachment(att),
+                              )
+                            : null,
+                      );
+                    }),
+                  if (RepairShopStatus.isEditable(order.status))
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: OutlinedButton.icon(
+                        onPressed: _addAttachment,
+                        icon: const Icon(Icons.upload_file),
+                        label: Text(AppLocalizations.of(context).repairShopAddPhotoOrFile),
+                      ),
+                    ),
+                ],
+              ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopUsedParts,
+                Icons.inventory,
+                colorScheme,
+                [
+                  if (order.parts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(AppLocalizations.of(context).repairShopNoParts),
+                    )
+                  else
+                    ...order.parts.map((part) {
+                      return ListTile(
+                        title: Text(part.productName),
+                        subtitle: Text(
+                          AppLocalizations.of(context).repairShopPartQtyPrice(part.quantity.toString(), formatter.format(part.unitPrice)),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${formatter.format(part.totalPrice)} ${order.currencySymbol}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            if (RepairShopStatus.canAddParts(order.status))
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _removePart(part),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                ],
+              ),
+              if (order.statusHistory.isNotEmpty)
+                _buildSection(
+                  AppLocalizations.of(context).repairShopStatusHistory,
+                  Icons.timeline,
+                  colorScheme,
+                  order.statusHistory.map((status) {
+                    return ListTile(
+                      leading: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color:
+                              RepairShopStatus.color(context, status.status),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      title: Text(RepairShopStatus.label(status.status, AppLocalizations.of(context))),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(fmt(status.createdAt)),
+                          if (status.notes != null) Text(status.notes!),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              _buildSection(
+                AppLocalizations.of(context).repairShopDates,
+                Icons.calendar_today,
+                colorScheme,
+                [
+                  _buildInfoRow(AppLocalizations.of(context).repairShopReceived, fmt(order.receivedAt)),
+                  if (order.estimatedDeliveryAt != null)
+                    _buildInfoRow(
+                        AppLocalizations.of(context).repairShopEstimatedDelivery, fmtOptional(order.estimatedDeliveryAt)),
+                  if (order.completedAt != null)
+                    _buildInfoRow(
+                        AppLocalizations.of(context).repairShopCompletedAt, fmtOptional(order.completedAt)),
+                  if (order.deliveredAt != null)
+                    _buildInfoRow(AppLocalizations.of(context).repairShopDeliveredAt, fmtOptional(order.deliveredAt)),
+                ],
+              ),
+              const SizedBox(height: 24),
             ],
           ),
+        ),
+        if (_busy)
+          const Positioned.fill(
+            child: ColoredBox(
+              color: Color(0x33000000),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+      ],
+    );
+  }
 
-          const SizedBox(height: 100), // فضا برای دکمه‌های شناور
-        ],
+  Widget? _buildActionBar(ColorScheme colorScheme) {
+    final order = _order!;
+    final status = order.status;
+    final actions = <Widget>[];
+
+    if (RepairShopStatus.canAssign(status)) {
+      actions.add(_ActionChip(
+        icon: Icons.engineering,
+        label: order.assignedTechnicianId == null
+            ? AppLocalizations.of(context).repairShopAssignTechnician
+            : AppLocalizations.of(context).repairShopChangeTechnician,
+        onPressed: _assignTechnician,
+      ));
+    }
+    if (status == 'assigned') {
+      actions.add(_ActionChip(
+        icon: Icons.play_arrow,
+        label: AppLocalizations.of(context).repairShopStartRepair,
+        onPressed: () => _updateStatus('in_progress'),
+      ));
+    }
+    if (RepairShopStatus.canAddParts(status)) {
+      actions.add(_ActionChip(
+        icon: Icons.add_box_outlined,
+        label: AppLocalizations.of(context).repairShopAddPart,
+        onPressed: _openAddPartDialog,
+      ));
+    }
+    if (RepairShopStatus.canSetLabor(status)) {
+      actions.add(_ActionChip(
+        icon: Icons.handyman_outlined,
+        label: AppLocalizations.of(context).repairShopSetLabor,
+        onPressed: _setLaborCost,
+      ));
+    }
+    if (status == 'in_progress') {
+      actions.add(_ActionChip(
+        icon: Icons.hourglass_empty,
+        label: AppLocalizations.of(context).repairShopWaitingPart,
+        onPressed: () => _updateStatus('waiting_parts'),
+      ));
+      actions.add(_ActionChip(
+        icon: Icons.science_outlined,
+        label: AppLocalizations.of(context).repairShopTest,
+        onPressed: () => _updateStatus('testing'),
+      ));
+    }
+    if (status == 'waiting_parts') {
+      actions.add(_ActionChip(
+        icon: Icons.play_arrow,
+        label: AppLocalizations.of(context).repairShopContinueRepair,
+        onPressed: () => _updateStatus('in_progress'),
+      ));
+    }
+    if (RepairShopStatus.canComplete(status)) {
+      actions.add(_ActionChip(
+        icon: Icons.check_circle,
+        label: AppLocalizations.of(context).repairShopStatusCompletedFixed,
+        filled: true,
+        onPressed: () => _completeRepair(true),
+      ));
+      actions.add(_ActionChip(
+        icon: Icons.cancel_outlined,
+        label: AppLocalizations.of(context).repairShopStatusCompletedUnfixable,
+        onPressed: () => _completeRepair(false),
+      ));
+    }
+    if (RepairShopStatus.canInvoice(status) && !order.hasInvoice) {
+      actions.add(_ActionChip(
+        icon: Icons.receipt_long,
+        label: AppLocalizations.of(context).repairShopIssueInvoice,
+        filled: true,
+        onPressed: _createInvoice,
+      ));
+    }
+    if (status == 'completed_fixed') {
+      actions.add(_ActionChip(
+        icon: Icons.storefront_outlined,
+        label: AppLocalizations.of(context).repairShopReadyForPickupAction,
+        onPressed: () => _updateStatus('ready_for_pickup'),
+      ));
+    }
+    if (RepairShopStatus.canDeliver(status)) {
+      actions.add(_ActionChip(
+        icon: Icons.handshake_outlined,
+        label: AppLocalizations.of(context).repairShopDeliverToCustomerAction,
+        filled: status != 'completed_fixed' || order.hasInvoice,
+        onPressed: _deliverRepair,
+      ));
+    }
+
+    if (actions.isEmpty) return null;
+
+    return Material(
+      elevation: 8,
+      color: colorScheme.surface,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: actions),
+          ),
+        ),
       ),
     );
   }
@@ -652,10 +1174,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            '$label:',
-            style: const TextStyle(color: Colors.grey),
-          ),
+          Text('$label:', style: const TextStyle(color: Colors.grey)),
           Expanded(
             child: Text(
               value,
@@ -669,45 +1188,47 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       ),
     );
   }
+}
 
-  Widget? get _floatingActionButton {
-    if (_order == null) return null;
+class _ActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool filled;
 
-    final status = _order!.status;
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.filled = false,
+  });
 
-    // دکمه‌های عملیات بر اساس وضعیت
-    if (status == 'received') {
-      return FloatingActionButton.extended(
-        onPressed: _assignTechnician,
-        icon: const Icon(Icons.person_add),
-        label: const Text('اختصاص تعمیرکار'),
-      );
-    } else if (status == 'in_progress') {
-      return FloatingActionButton.extended(
-        onPressed: () => _completeRepair(true),
-        icon: const Icon(Icons.check_circle),
-        label: const Text('تکمیل تعمیر'),
-      );
-    } else if (status == 'completed_fixed') {
-      return FloatingActionButton.extended(
-        onPressed: _createInvoice,
-        icon: const Icon(Icons.receipt),
-        label: const Text('صدور فاکتور'),
-      );
-    }
-
-    return null;
+  @override
+  Widget build(BuildContext context) {
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 6),
+        Text(label),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 8),
+      child: filled
+          ? FilledButton(onPressed: onPressed, child: child)
+          : OutlinedButton(onPressed: onPressed, child: child),
+    );
   }
 }
 
-/// دیالوگ ورود یادداشت
 class _NotesDialog extends StatefulWidget {
   final String title;
-  final String hint;
+  final String? hint;
 
   const _NotesDialog({
     required this.title,
-    this.hint = 'یادداشت (اختیاری)',
+    this.hint,
   });
 
   @override
@@ -730,7 +1251,7 @@ class _NotesDialogState extends State<_NotesDialog> {
       content: TextField(
         controller: _controller,
         decoration: InputDecoration(
-          hintText: widget.hint,
+          hintText: widget.hint ?? AppLocalizations.of(context).repairShopOptionalNoteHint,
           border: const OutlineInputBorder(),
         ),
         maxLines: 3,
@@ -738,14 +1259,360 @@ class _NotesDialogState extends State<_NotesDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('انصراف'),
+          child: Text(AppLocalizations.of(context).cancel),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, _controller.text),
-          child: const Text('تایید'),
+          child: Text(AppLocalizations.of(context).confirm),
         ),
       ],
     );
   }
 }
 
+class _TechnicianPickDialog extends StatefulWidget {
+  final List<RepairTechnician> technicians;
+
+  const _TechnicianPickDialog({required this.technicians});
+
+  @override
+  State<_TechnicianPickDialog> createState() => _TechnicianPickDialogState();
+}
+
+class _TechnicianPickDialogState extends State<_TechnicianPickDialog> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.technicians.where((t) {
+      if (_query.trim().isEmpty) return true;
+      final q = _query.trim();
+      return t.personName.contains(q) || t.code.contains(q);
+    }).toList();
+
+    return AlertDialog(
+      title: Text(AppLocalizations.of(context).repairShopSelectTechnician),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: InputDecoration(
+                hintText: AppLocalizations.of(context).repairShopSearchNameOrCode,
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 360),
+              child: filtered.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(AppLocalizations.of(context).repairShopNoTechnicianFound),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final tech = filtered[index];
+                        return ListTile(
+                          title: Text(tech.personName),
+                          subtitle: Text(
+                            '${tech.code} · ${tech.formattedCommission(AppLocalizations.of(context))}',
+                          ),
+                          onTap: () => Navigator.pop(context, tech),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(AppLocalizations.of(context).cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _LaborCostDialog extends StatefulWidget {
+  final double initial;
+  const _LaborCostDialog({required this.initial});
+
+  @override
+  State<_LaborCostDialog> createState() => _LaborCostDialogState();
+}
+
+class _LaborCostDialogState extends State<_LaborCostDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initial > 0 ? widget.initial.toStringAsFixed(0) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(AppLocalizations.of(context).repairShopLaborTitle),
+      content: TextField(
+        controller: _controller,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: AppLocalizations.of(context).repairShopLaborAmount,
+          border: const OutlineInputBorder(),
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(AppLocalizations.of(context).cancel),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final value = double.tryParse(
+              _controller.text.replaceAll(',', '').trim(),
+            );
+            if (value == null || value < 0) {
+              SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopEnterValidAmount);
+              return;
+            }
+            Navigator.pop(context, value);
+          },
+          child: Text(AppLocalizations.of(context).repairShopRegister),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddPartDialog extends StatefulWidget {
+  final int businessId;
+  final CalendarController calendarController;
+  const _AddPartDialog({
+    required this.businessId,
+    required this.calendarController,
+  });
+
+  @override
+  State<_AddPartDialog> createState() => _AddPartDialogState();
+}
+
+class _AddPartDialogState extends State<_AddPartDialog> {
+  Map<String, dynamic>? _product;
+  int? _warehouseId;
+  List<int> _selectedInstanceIds = <int>[];
+  List<Map<String, dynamic>> _lotAllocations = <Map<String, dynamic>>[];
+  final _qtyController = TextEditingController(text: '1');
+  final _priceController = TextEditingController();
+
+  bool get _isUnique =>
+      (_product?['inventory_mode']?.toString() ?? 'bulk') == 'unique';
+  bool get _trackExpiry => _product?['track_expiry'] == true;
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(AppLocalizations.of(context).repairShopAddPartTitle),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ProductComboboxWidget(
+                businessId: widget.businessId,
+                productsOnly: true,
+                selectedProduct: _product,
+                label: AppLocalizations.of(context).repairShopPart,
+                hintText: AppLocalizations.of(context).repairShopSearchSelectPart,
+                onChanged: (product) {
+                  setState(() {
+                    _product = product;
+                    _selectedInstanceIds = <int>[];
+                    _lotAllocations = <Map<String, dynamic>>[];
+                    final price = product?['base_sales_price'];
+                    if (price != null) {
+                      _priceController.text = price.toString();
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              WarehouseComboboxWidget(
+                businessId: widget.businessId,
+                selectedWarehouseId: _warehouseId,
+                selectDefaultWhenUnset: true,
+                isRequired: false,
+                onChanged: (id) => setState(() => _warehouseId = id),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _qtyController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context).quantity,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _priceController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context).repairShopUnitPrice,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              if (_isUnique) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final pid = (_product?['id'] as num?)?.toInt();
+                      if (pid == null) return;
+                      final qty = int.tryParse(_qtyController.text.trim()) ?? 0;
+                      if (qty <= 0) {
+                        SnackBarHelper.show(
+                          context,
+                          message: AppLocalizations.of(context).repairShopEnterValidQty,
+                        );
+                        return;
+                      }
+                      final result = await showDialog<Map<String, dynamic>>(
+                        context: context,
+                        builder: (context) => UniqueProductInstanceSelectorDialog(
+                          businessId: widget.businessId,
+                          productId: pid,
+                          productName: _product?['name']?.toString() ?? '',
+                          warehouseId: _warehouseId,
+                          selectedInstanceIds: _selectedInstanceIds,
+                          requiredQuantity: qty,
+                          calendarController: widget.calendarController,
+                        ),
+                      );
+                      if (result != null && mounted) {
+                        final ids = ((result['ids'] as List?) ?? const [])
+                            .map((e) => int.tryParse(e.toString()))
+                            .whereType<int>()
+                            .toList();
+                        setState(() {
+                          _selectedInstanceIds = ids;
+                          _qtyController.text = ids.length.toString();
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.qr_code_2),
+                    label: Text(
+                      _selectedInstanceIds.isEmpty
+                          ? AppLocalizations.of(context).selectUnitTitle
+                          : AppLocalizations.of(context).uniqueUnitsSelected(_selectedInstanceIds.length),
+                    ),
+                  ),
+                ),
+              ] else if (_trackExpiry) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final pid = (_product?['id'] as num?)?.toInt();
+                      if (pid == null) return;
+                      final qty = double.tryParse(_qtyController.text.trim()) ?? 0;
+                      if (qty <= 0) {
+                        SnackBarHelper.show(
+                          context,
+                          message: AppLocalizations.of(context).repairShopEnterValidQty,
+                        );
+                        return;
+                      }
+                      final result = await showDialog<List<Map<String, dynamic>>>(
+                        context: context,
+                        builder: (context) => InvoiceLineLotPickerDialog(
+                          businessId: widget.businessId,
+                          productId: pid,
+                          productName: _product?['name']?.toString() ?? '',
+                          lineQuantity: qty,
+                          warehouseId: _warehouseId,
+                          inbound: false,
+                          calendarController: widget.calendarController,
+                          initialAllocations: _lotAllocations,
+                        ),
+                      );
+                      if (result != null && mounted) {
+                        setState(() => _lotAllocations = result);
+                      }
+                    },
+                    icon: const Icon(Icons.event),
+                    label: Text(
+                      _lotAllocations.isEmpty
+                          ? AppLocalizations.of(context).lotAndDates
+                          : '${_lotAllocations.length} ${AppLocalizations.of(context).lotAndDates}',
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(AppLocalizations.of(context).cancel),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final productId = _product?['id'];
+            final qty = double.tryParse(_qtyController.text.trim());
+            final price = double.tryParse(
+              _priceController.text.replaceAll(',', '').trim(),
+            );
+            if (productId == null) {
+              SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopSelectPart);
+              return;
+            }
+            if (qty == null || qty <= 0) {
+              SnackBarHelper.show(context, message: AppLocalizations.of(context).repairShopEnterValidQty);
+              return;
+            }
+            Navigator.pop(context, {
+              'product_id': productId,
+              'quantity': qty,
+              'unit_price': ?price,
+              'warehouse_id': ?_warehouseId,
+              if (_selectedInstanceIds.isNotEmpty)
+                'selected_instance_ids': _selectedInstanceIds,
+              if (_lotAllocations.isNotEmpty) 'lot_allocations': _lotAllocations,
+            });
+          },
+          child: Text(AppLocalizations.of(context).add),
+        ),
+      ],
+    );
+  }
+}

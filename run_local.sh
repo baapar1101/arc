@@ -29,7 +29,7 @@ CMD="${1:-serve}"
 
 case "$CMD" in
   migrate)
-    alembic upgrade head
+    python scripts/check_migration_branches.py --upgrade
     ;;
   test)
     pytest -q

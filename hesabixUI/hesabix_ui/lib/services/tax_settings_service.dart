@@ -110,6 +110,7 @@ class TaxSettingsService {
     required String providerCode,
     bool consent = false,
     Map<String, dynamic>? enrollment,
+    String? economicCode,
   }) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
@@ -118,6 +119,7 @@ class TaxSettingsService {
           'provider_code': providerCode,
           'consent': consent,
           if (enrollment != null) 'enrollment': enrollment,
+          if (economicCode != null && economicCode.isNotEmpty) 'economic_code': economicCode,
         },
       );
       final data = response.data?['data'];
@@ -140,6 +142,57 @@ class TaxSettingsService {
       throw Exception('پاسخ نامعتبر از سرور');
     } on DioException catch (e) {
       throw _extractMessage(e, defaultMessage: 'بررسی اتصال فن‌آوا ناموفق بود');
+    }
+  }
+
+  Future<Map<String, dynamic>> syncMotamedAsaAccount(int businessId) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/tax-settings/business/$businessId/motamed-asa/sync',
+      );
+      final data = response.data?['data'];
+      if (data is Map<String, dynamic>) return data;
+      throw Exception('پاسخ نامعتبر از سرور');
+    } on DioException catch (e) {
+      throw _extractMessage(e, defaultMessage: 'بررسی اتصال معتمد آسا ناموفق بود');
+    }
+  }
+
+  /// A fresh sign-up link on Motamed ASA, under `motamed_asa_onboarding.url`.
+  Future<Map<String, dynamic>> renewMotamedAsaLink(int businessId) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/tax-settings/business/$businessId/motamed-asa/link',
+      );
+      final data = response.data?['data'];
+      if (data is Map<String, dynamic>) return data;
+      throw Exception('پاسخ نامعتبر از سرور');
+    } on DioException catch (e) {
+      throw _extractMessage(e, defaultMessage: 'دریافت لینک ثبت‌نام معتمد آسا ناموفق بود');
+    }
+  }
+
+  Future<Map<String, dynamic>> saveMotamedAsaCredentials({
+    required int businessId,
+    required String clientId,
+    required String clientSecret,
+    String? economicCode,
+  }) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/tax-settings/business/$businessId/motamed-asa/credentials',
+        data: {
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'consent': true,
+          if (economicCode != null && economicCode.isNotEmpty) 'economic_code': economicCode,
+        },
+      );
+      final data = response.data?['data'];
+      if (data is Map<String, dynamic>) return data;
+      throw Exception('پاسخ نامعتبر از سرور');
+    } on DioException catch (e) {
+      throw _extractMessage(e, defaultMessage: 'ثبت کلید API معتمد آسا ناموفق بود');
     }
   }
 

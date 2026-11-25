@@ -26,7 +26,11 @@ from app.services.bom_service import (
 router = APIRouter(prefix="/boms", tags=["boms"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد BOM",
+    description="ابزار MCP: `create_bom` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_bom_endpoint(
     request: Request,
@@ -41,7 +45,11 @@ def create_bom_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.get("/business/{business_id}")
+@router.get(
+    "/business/{business_id}",
+    summary="فهرست BOM",
+    description="ابزار MCP: `list_boms`.",
+)
 @require_business_access("business_id")
 def list_boms_endpoint(
     request: Request,
@@ -56,7 +64,11 @@ def list_boms_endpoint(
     return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.get("/business/{business_id}/{bom_id}")
+@router.get(
+    "/business/{business_id}/{bom_id}",
+    summary="جزئیات BOM",
+    description="ابزار MCP: `get_bom_details`.",
+)
 @require_business_access("business_id")
 def get_bom_endpoint(
     request: Request,
@@ -73,7 +85,11 @@ def get_bom_endpoint(
     return success_response(data=format_datetime_fields({"item": item}, request), request=request)
 
 
-@router.put("/business/{business_id}/{bom_id}")
+@router.put(
+    "/business/{business_id}/{bom_id}",
+    summary="ویرایش BOM",
+    description="ابزار MCP: `update_bom` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_bom_endpoint(
     request: Request,
@@ -91,7 +107,11 @@ def update_bom_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.delete("/business/{business_id}/{bom_id}")
+@router.delete(
+    "/business/{business_id}/{bom_id}",
+    summary="حذف BOM",
+    description="ابزار MCP: `delete_bom` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_bom_endpoint(
     request: Request,
@@ -106,7 +126,11 @@ def delete_bom_endpoint(
     return success_response({"deleted": ok}, request)
 
 
-@router.post("/business/{business_id}/explode")
+@router.post(
+    "/business/{business_id}/explode",
+    summary="انفجار BOM",
+    description="ابزار MCP: `explode_bom`.",
+)
 @require_business_access("business_id")
 def explode_bom_endpoint(
     request: Request,
@@ -121,7 +145,11 @@ def explode_bom_endpoint(
     return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.post("/business/{business_id}/produce_draft")
+@router.post(
+    "/business/{business_id}/produce_draft",
+    summary="پیش‌نویس تولید از BOM",
+    description="ابزار MCP: `produce_draft_from_bom` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def produce_draft_endpoint(
     request: Request,

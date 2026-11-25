@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
 import '../../services/system_settings_service.dart';
@@ -8,6 +7,8 @@ import '../../services/currency_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_normalizer.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class NotificationSmsPricingPage extends StatefulWidget {
   const NotificationSmsPricingPage({super.key});
@@ -119,7 +120,7 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
       if (mounted) {
         setState(
           () => _error =
-              'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+              '${adminTx(context, 'بارگذاری ناموفق', 'Could not load settings')}: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
@@ -134,7 +135,7 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
     try {
       final pricePerSms = double.tryParse(_pricePerSmsController.text.trim());
       if (pricePerSms == null || pricePerSms <= 0) {
-        throw Exception('قیمت پیش‌فرض باید بزرگتر از صفر باشد');
+        throw Exception(adminTx(context, 'قیمت پیش‌فرض باید بیشتر از صفر باشد', 'Default price must be greater than zero'));
       }
 
       final eventTypePrices = <String, double>{};
@@ -156,7 +157,7 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
       );
 
       if (mounted) {
-        SnackBarHelper.show(context, message: 'تنظیمات قیمت‌گذاری با موفقیت ذخیره شد');
+        SnackBarHelper.show(context, message: adminTx(context, 'قیمت‌گذاری ذخیره شد', 'Pricing saved'));
         _load(); // Reload to get updated values
       }
     } catch (e) {
@@ -164,7 +165,7 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
         SnackBarHelper.showError(
         context,
         message:
-            'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+            '${adminTx(context, 'خطا در ذخیره تنظیمات', 'Could not save settings')}: ${ErrorExtractor.forContext(e, context)}',
       );
       }
     } finally {
@@ -177,42 +178,36 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = AppLocalizations.of(context);
 
-    if (_loading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('قیمت‌گذاری پیامک ناتیفیکیشن')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('قیمت‌گذاری پیامک ناتیفیکیشن')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _load,
-                child: const Text('تلاش مجدد'),
-              ),
-            ],
-          ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'قیمت پیامک اعلان', 'Notification SMS pricing'),
+      subtitle: adminTx(context, 'نرخ ارسال پیامک اعلان‌های سیستم', 'Rate for system notification SMS'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'ذخیره', 'Save'),
+          onPressed: (_loading || _saving || _error != null) ? null : _save,
+          icon: _saving
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.save_outlined, size: 20),
         ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('قیمت‌گذاری پیامک ناتیفیکیشن'),
-      ),
-      body: Form(
+      ],
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                      const SizedBox(height: 12),
+                      FilledButton(onPressed: _load, child: Text(adminTx(context, 'تلاش مجدد', 'Retry'))),
+                    ],
+                  ),
+                )
+              : Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: context.settingsHub.pagePadding,
           children: [
             Card(
               child: Padding(
@@ -221,26 +216,22 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'قیمت پیش‌فرض',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      adminTx(context, 'قیمت پیش‌فرض', 'Default price'),
+                      style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
-                      'این قیمت برای تمام پیامک‌های ناتیفیکیشن استفاده می‌شود مگر اینکه قیمت خاصی برای event type تعریف شده باشد.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      adminTx(context, 'برای همهٔ پیامک‌ها، مگر اینکه رویداد قیمت جدا داشته باشد.', 'Used for every SMS unless an event has its own price.'),
+                      style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _pricePerSmsController,
                       decoration: InputDecoration(
-                        labelText: 'قیمت هر پیامک (${_walletCurrencyTitle ?? 'تومان'})',
-                        hintText: 'مثلاً 500',
-                        prefixIcon: const Icon(Icons.attach_money),
-                        suffixText: _walletCurrencyTitle ?? 'تومان',
+                        labelText: adminTx(context, 'قیمت هر پیامک', 'Price per SMS') + ' (${_walletCurrencyTitle ?? adminTx(context, 'تومان', 'IRR')})',
+                        hintText: '500',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.attach_money, size: 18),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
@@ -248,11 +239,11 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
                       ],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'قیمت پیش‌فرض الزامی است';
+                          return adminTx(context, 'قیمت پیش‌فرض الزامی است', 'Default price is required');
                         }
                         final price = double.tryParse(value.trim());
                         if (price == null || price <= 0) {
-                          return 'قیمت باید بزرگتر از صفر باشد';
+                          return adminTx(context, 'قیمت باید بیشتر از صفر باشد', 'Price must be greater than zero');
                         }
                         return null;
                       },
@@ -269,24 +260,20 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'قیمت‌های خاص برای Event Types',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      adminTx(context, 'قیمت رویدادها', 'Event prices'),
+                      style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
-                      'می‌توانید برای هر نوع رویداد قیمت خاصی تعریف کنید. در غیر این صورت از قیمت پیش‌فرض استفاده می‌شود.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      adminTx(context, 'خالی یعنی همان قیمت پیش‌فرض.', 'Empty uses the default price.'),
+                      style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 16),
                     if (_eventTypes.isEmpty)
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Text(
-                          'در حال بارگذاری انواع رویدادها...',
+                          adminTx(context, 'در حال بارگذاری رویدادها...', 'Loading events...'),
                           style: theme.textTheme.bodySmall,
                         ),
                       )
@@ -302,10 +289,10 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
                             controller: controller,
                             decoration: InputDecoration(
                               labelText: name,
-                              hintText: 'خالی = استفاده از قیمت پیش‌فرض',
-                              prefixIcon: const Icon(Icons.event),
-                              suffixText: _walletCurrencyTitle ?? 'تومان',
-                              helperText: 'کد: $code',
+                              hintText: adminTx(context, 'خالی = قیمت پیش‌فرض', 'Empty = default price'),
+                              prefixIcon: const Icon(Icons.event, size: 18),
+                              isDense: true,
+                              helperText: code,
                             ),
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             inputFormatters: [
@@ -315,7 +302,7 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
                               if (value != null && value.trim().isNotEmpty) {
                                 final price = double.tryParse(value.trim());
                                 if (price == null || price <= 0) {
-                                  return 'قیمت باید بزرگتر از صفر باشد';
+                                  return adminTx(context, 'قیمت باید بیشتر از صفر باشد', 'Price must be greater than zero');
                                 }
                               }
                               return null;
@@ -341,7 +328,7 @@ class _NotificationSmsPricingPageState extends State<NotificationSmsPricingPage>
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('ذخیره تنظیمات'),
+                    : Text(adminTx(context, 'ذخیره تنظیمات', 'Save settings')),
               ),
             ),
           ],

@@ -46,6 +46,21 @@ hesabix_apply_nginx_domain_configs() {
     PGADMIN_SSL_BLOCK="$(hesabix_nginx_ssl_block_for_live_dir "${PGADMIN_LETSENCRYPT_LIVE}")"
   fi
 
+  local API_LISTEN_80="  listen 80;" UI_LISTEN_80="  listen 80;" PGADMIN_LISTEN_80="  listen 80;"
+  local API_HTTP_REDIRECT="" UI_HTTP_REDIRECT="" PGADMIN_HTTP_REDIRECT=""
+  if [[ -n "${API_SSL_BLOCK}" ]]; then
+    API_LISTEN_80=""
+    API_HTTP_REDIRECT="$(hesabix_nginx_http_to_https_redirect_server "${API_DOMAIN}")"
+  fi
+  if [[ -n "${UI_SSL_BLOCK}" ]]; then
+    UI_LISTEN_80=""
+    UI_HTTP_REDIRECT="$(hesabix_nginx_http_to_https_redirect_server "${UI_DOMAIN}")"
+  fi
+  if [[ -n "${PGADMIN_SSL_BLOCK}" ]]; then
+    PGADMIN_LISTEN_80=""
+    PGADMIN_HTTP_REDIRECT="$(hesabix_nginx_http_to_https_redirect_server "${PGADMIN4_DOMAIN}")"
+  fi
+
   if [[ "${quiet}" != "1" ]]; then
     echo ">> Updating Nginx: API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN}"
     if [[ -n "${API_SSL_BLOCK}" ]]; then
@@ -82,8 +97,8 @@ fi
 
 cat > /etc/nginx/sites-available/hesabix-api.conf <<NGINX
 # Backend API
-server {
-  listen 80;
+${API_HTTP_REDIRECT}server {
+${API_LISTEN_80}
 ${API_SSL_BLOCK}
   server_name ${API_DOMAIN};
 
@@ -121,6 +136,21 @@ ${API_SSL_BLOCK}
   # Public invoice share link: /i/{code} → backend (307 → Flutter /public/invoice-link/...)
   location /i/ {
     proxy_pass http://127.0.0.1:8000/i/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
@@ -281,7 +311,7 @@ ${API_SSL_BLOCK}
     proxy_set_header Connection "upgrade";
   }
 
-  location /api/ {
+  location ^~ /api/ {
     limit_req zone=api_limit burst=120 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
@@ -319,8 +349,8 @@ NGINX
 
 cat > /etc/nginx/sites-available/hesabix-ui.conf <<NGINX
 # Frontend (Flutter Web)
-server {
-  listen 80;
+${UI_HTTP_REDIRECT}server {
+${UI_LISTEN_80}
 ${UI_SSL_BLOCK}
   server_name ${UI_DOMAIN};
 
@@ -362,8 +392,23 @@ ${UI_SSL_BLOCK}
     proxy_send_timeout 30;
   }
 
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # Proxy /api/ and /ws/ to backend (when API and UI share same domain)
-  location /api/ {
+  location ^~ /api/ {
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
@@ -564,8 +609,8 @@ ln -sf /etc/nginx/sites-available/hesabix-ui.conf /etc/nginx/sites-enabled/
   if [[ -n "${PGADMIN4_DOMAIN:-}" ]] && [[ -f /etc/nginx/sites-available/pgadmin4.conf || "$(systemctl show pgadmin4.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
     cat > /etc/nginx/sites-available/pgadmin4.conf <<NGINX
 # pgAdmin4 (reverse proxy to Gunicorn on 127.0.0.1:5050)
-server {
-  listen 80;
+${PGADMIN_HTTP_REDIRECT}server {
+${PGADMIN_LISTEN_80}
 ${PGADMIN_SSL_BLOCK}
   server_name ${PGADMIN4_DOMAIN};
 

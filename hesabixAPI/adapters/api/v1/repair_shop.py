@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.i18n import get_request_translator
 from app.core.date_input import normalize_date_range, DateParseError
 from app.core.repair_shop_plugin_dependency import (
     check_repair_shop_plugin_active,
@@ -31,6 +32,7 @@ from adapters.api.v1.schema_models.repair_shop import (
     CalculateCostsResponse,
     CompleteRepairRequest,
     DeliverRepairRequest,
+    AddAttachmentRequest,
     RepairOrderFilters,
 )
 from app.services import repair_shop_service
@@ -39,14 +41,33 @@ from app.services import repair_shop_operations
 router = APIRouter(prefix="/repair-shop", tags=["Repair Shop"])
 
 
+def _localize_messages(data, translator):
+    if isinstance(data, list):
+        return [_localize_messages(item, translator) for item in data]
+    if isinstance(data, dict):
+        out = {}
+        for key, value in data.items():
+            if key == "message" and isinstance(value, str):
+                out[key] = translator.t(value, default=value)
+            else:
+                out[key] = _localize_messages(value, translator)
+        return out
+    return data
+
+
 def _format_response(data, request: Request):
-    """فرمت تاریخ‌ها مطابق تقویم انتخاب‌شده کاربر."""
-    return format_datetime_fields(data, request)
+    """فرمت تاریخ‌ها مطابق تقویم انتخاب‌شده کاربر و ترجمهٔ پیام‌های کلیدمحور."""
+    formatted = format_datetime_fields(data, request)
+    return _localize_messages(formatted, get_request_translator(request))
 
 
 # ========== Plugin Status ==========
 
-@router.get("/businesses/{business_id}/plugin-status")
+@router.get(
+    "/businesses/{business_id}/plugin-status",
+    summary="وضعیت افزونه تعمیرگاه",
+    description="فعال بودن لایسنس تعمیرگاه. ابزار MCP: `get_repair_shop_plugin_status`.",
+)
 def get_plugin_status(
     request: Request,
     business_id: int,
@@ -55,7 +76,7 @@ def get_plugin_status(
 ):
     """دریافت وضعیت افزونه برای کسب‌وکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     status = get_business_plugin_status(db, business_id)
     return success_response(data=_format_response(status, request), request=request)
@@ -63,7 +84,11 @@ def get_plugin_status(
 
 # ========== Settings ==========
 
-@router.get("/businesses/{business_id}/settings")
+@router.get(
+    "/businesses/{business_id}/settings",
+    summary="تنظیمات تعمیرگاه",
+    description="ابزار MCP: `get_repair_shop_settings`.",
+)
 def get_settings(
     request: Request,
     business_id: int,
@@ -72,16 +97,20 @@ def get_settings(
 ):
     """دریافت تنظیمات تعمیرگاه"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.get_repair_shop_settings(db, business_id)
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.put("/businesses/{business_id}/settings")
+@router.put(
+    "/businesses/{business_id}/settings",
+    summary="ویرایش تنظیمات تعمیرگاه",
+    description="ابزار MCP: `update_repair_shop_settings` (نیازمند تأیید).",
+)
 def update_settings(
     request: Request,
     business_id: int,
@@ -91,10 +120,10 @@ def update_settings(
 ):
     """به‌روزرسانی تنظیمات تعمیرگاه"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "manage"):
-        raise ApiError("FORBIDDEN", "دسترسی مدیریت تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.update_repair_shop_settings(
         db, business_id, settings_data.dict(exclude_unset=True)
@@ -104,7 +133,11 @@ def update_settings(
 
 # ========== Technicians ==========
 
-@router.get("/businesses/{business_id}/technicians")
+@router.get(
+    "/businesses/{business_id}/technicians",
+    summary="فهرست تعمیرکاران",
+    description="ابزار MCP: `list_repair_technicians`.",
+)
 def list_technicians(
     request: Request,
     business_id: int,
@@ -116,16 +149,20 @@ def list_technicians(
 ):
     """لیست تعمیرکاران"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.list_technicians(db, business_id, only_active, offset, limit)
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.get("/businesses/{business_id}/technicians/{technician_id}")
+@router.get(
+    "/businesses/{business_id}/technicians/{technician_id}",
+    summary="جزئیات تعمیرکار",
+    description="ابزار MCP جداگانه ندارد؛ از `list_repair_technicians` استفاده شود.",
+)
 def get_technician(
     request: Request,
     business_id: int,
@@ -135,16 +172,20 @@ def get_technician(
 ):
     """دریافت اطلاعات یک تعمیرکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.get_technician(db, business_id, technician_id)
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/technicians")
+@router.post(
+    "/businesses/{business_id}/technicians",
+    summary="ثبت تعمیرکار",
+    description="ابزار MCP: `create_repair_technician` (نیازمند تأیید).",
+)
 def create_technician(
     request: Request,
     business_id: int,
@@ -154,10 +195,10 @@ def create_technician(
 ):
     """ایجاد تعمیرکار جدید"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "manage"):
-        raise ApiError("FORBIDDEN", "دسترسی مدیریت تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.create_technician(
         db, business_id, data.dict(), ctx.user.id
@@ -165,7 +206,11 @@ def create_technician(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.put("/businesses/{business_id}/technicians/{technician_id}")
+@router.put(
+    "/businesses/{business_id}/technicians/{technician_id}",
+    summary="ویرایش تعمیرکار",
+    description="ابزار MCP: `update_repair_technician` (نیازمند تأیید).",
+)
 def update_technician(
     request: Request,
     business_id: int,
@@ -176,10 +221,10 @@ def update_technician(
 ):
     """به‌روزرسانی تعمیرکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "manage"):
-        raise ApiError("FORBIDDEN", "دسترسی مدیریت تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.update_technician(
         db, business_id, technician_id, data.dict(exclude_unset=True), ctx.user.id
@@ -187,7 +232,11 @@ def update_technician(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.delete("/businesses/{business_id}/technicians/{technician_id}")
+@router.delete(
+    "/businesses/{business_id}/technicians/{technician_id}",
+    summary="حذف تعمیرکار",
+    description="ابزار MCP: `delete_repair_technician` (نیازمند تأیید).",
+)
 def delete_technician(
     request: Request,
     business_id: int,
@@ -197,10 +246,10 @@ def delete_technician(
 ):
     """حذف (غیرفعال کردن) تعمیرکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "delete"):
-        raise ApiError("FORBIDDEN", "دسترسی حذف ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.delete_technician(
         db, business_id, technician_id, ctx.user.id
@@ -210,7 +259,11 @@ def delete_technician(
 
 # ========== Repair Orders ==========
 
-@router.get("/businesses/{business_id}/orders")
+@router.get(
+    "/businesses/{business_id}/orders",
+    summary="فهرست سفارش‌های تعمیر",
+    description="ابزار MCP: `search_repair_orders`.",
+)
 def list_repair_orders(
     request: Request,
     business_id: int,
@@ -228,10 +281,10 @@ def list_repair_orders(
 ):
     """لیست سفارشات تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     calendar_type = ctx.get_calendar_type()
     parsed_from = None
@@ -242,7 +295,7 @@ def list_repair_orders(
                 from_date, to_date, calendar_type=calendar_type
             )
         except (DateParseError, ValueError) as exc:
-            raise ApiError("INVALID_DATE", str(exc), http_status=400) from exc
+            raise ApiError("INVALID_DATE", "INVALID_DATE", http_status=400) from exc
     
     filters = {
         "status": status,
@@ -262,7 +315,11 @@ def list_repair_orders(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.get("/businesses/{business_id}/orders/{order_id}")
+@router.get(
+    "/businesses/{business_id}/orders/{order_id}",
+    summary="جزئیات سفارش تعمیر",
+    description="ابزار MCP: `get_repair_order_details`.",
+)
 def get_repair_order(
     request: Request,
     business_id: int,
@@ -272,16 +329,20 @@ def get_repair_order(
 ):
     """دریافت اطلاعات کامل یک سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.get_repair_order(db, business_id, order_id)
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders")
+@router.post(
+    "/businesses/{business_id}/orders",
+    summary="ثبت سفارش تعمیر",
+    description="ابزار MCP: `create_repair_order` (نیازمند تأیید).",
+)
 def create_repair_order(
     request: Request,
     business_id: int,
@@ -291,10 +352,10 @@ def create_repair_order(
 ):
     """ایجاد سفارش تعمیر جدید"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ثبت سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.create_repair_order(
         db, business_id, data.dict(), ctx.user.id,
@@ -303,7 +364,11 @@ def create_repair_order(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.put("/businesses/{business_id}/orders/{order_id}")
+@router.put(
+    "/businesses/{business_id}/orders/{order_id}",
+    summary="ویرایش سفارش تعمیر",
+    description="ابزار MCP: `update_repair_order` (نیازمند تأیید).",
+)
 def update_repair_order(
     request: Request,
     business_id: int,
@@ -314,10 +379,10 @@ def update_repair_order(
 ):
     """به‌روزرسانی سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.update_repair_order(
         db, business_id, order_id, data.dict(exclude_unset=True), ctx.user.id
@@ -325,7 +390,11 @@ def update_repair_order(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.delete("/businesses/{business_id}/orders/{order_id}")
+@router.delete(
+    "/businesses/{business_id}/orders/{order_id}",
+    summary="لغو سفارش تعمیر",
+    description="ابزار MCP: `cancel_repair_order` (نیازمند تأیید).",
+)
 def delete_repair_order(
     request: Request,
     business_id: int,
@@ -335,10 +404,10 @@ def delete_repair_order(
 ):
     """حذف (لغو) سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "delete"):
-        raise ApiError("FORBIDDEN", "دسترسی حذف ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.delete_repair_order(
         db, business_id, order_id, ctx.user.id
@@ -348,7 +417,11 @@ def delete_repair_order(
 
 # ========== Operations ==========
 
-@router.post("/businesses/{business_id}/orders/{order_id}/assign-technician")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/assign-technician",
+    summary="اختصاص تعمیرکار",
+    description="ابزار MCP: `assign_repair_technician` (نیازمند تأیید).",
+)
 def assign_technician(
     request: Request,
     business_id: int,
@@ -359,10 +432,10 @@ def assign_technician(
 ):
     """اختصاص تعمیرکار به سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.assign_technician_to_order(
         db, business_id, order_id, data.technician_id, ctx.user.id
@@ -370,7 +443,11 @@ def assign_technician(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/update-status")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/update-status",
+    summary="تغییر وضعیت سفارش تعمیر",
+    description="ابزار MCP: `update_repair_order_status` (نیازمند تأیید).",
+)
 def update_status(
     request: Request,
     business_id: int,
@@ -381,10 +458,10 @@ def update_status(
 ):
     """تغییر وضعیت سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.update_repair_order_status(
         db, business_id, order_id, data.status, data.notes, ctx.user.id, data.send_notification,
@@ -393,7 +470,11 @@ def update_status(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/add-parts")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/add-parts",
+    summary="افزودن قطعه به سفارش تعمیر",
+    description="ابزار MCP: `add_repair_parts` (نیازمند تأیید).",
+)
 def add_parts(
     request: Request,
     business_id: int,
@@ -404,10 +485,10 @@ def add_parts(
 ):
     """افزودن قطعات به سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     parts_list = [part.dict() for part in data.parts]
     result = repair_shop_operations.add_parts_to_repair_order(
@@ -416,7 +497,37 @@ def add_parts(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/calculate-costs")
+@router.delete(
+    "/businesses/{business_id}/orders/{order_id}/parts/{part_id}",
+    summary="حذف قطعه از سفارش تعمیر",
+    description="ابزار MCP: `remove_repair_part` (نیازمند تأیید).",
+)
+def remove_part(
+    request: Request,
+    business_id: int,
+    order_id: int,
+    part_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """حذف قطعه از سفارش"""
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
+
+    if not ctx.has_business_permission("repair_shop", "write"):
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
+
+    result = repair_shop_operations.remove_part_from_repair_order(
+        db, business_id, order_id, part_id, ctx.user.id
+    )
+    return success_response(data=_format_response(result, request), request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/calculate-costs",
+    summary="محاسبه هزینه تعمیر",
+    description="ابزار MCP: `calculate_repair_costs` (نیازمند تأیید).",
+)
 def calculate_costs(
     request: Request,
     business_id: int,
@@ -427,10 +538,10 @@ def calculate_costs(
 ):
     """محاسبه هزینه‌های نهایی"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.calculate_repair_costs(
         db, business_id, order_id, data.labor_cost, ctx.user.id
@@ -438,7 +549,11 @@ def calculate_costs(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/complete")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/complete",
+    summary="اتمام سفارش تعمیر",
+    description="ابزار MCP: `complete_repair_order` (نیازمند تأیید).",
+)
 def complete_repair(
     request: Request,
     business_id: int,
@@ -449,10 +564,10 @@ def complete_repair(
 ):
     """اتمام تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.complete_repair_order(
         db, business_id, order_id, data.is_fixed, ctx.user.id, data.notes,
@@ -461,7 +576,11 @@ def complete_repair(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/deliver")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/deliver",
+    summary="تحویل سفارش تعمیر",
+    description="ابزار MCP: `deliver_repair_order` (نیازمند تأیید).",
+)
 def deliver_repair(
     request: Request,
     business_id: int,
@@ -472,10 +591,10 @@ def deliver_repair(
 ):
     """تحویل کالا به مشتری"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.deliver_repair_order(
         db, business_id, order_id, ctx.user.id, data.notes
@@ -485,7 +604,11 @@ def deliver_repair(
 
 # ========== Accounting ==========
 
-@router.post("/businesses/{business_id}/orders/{order_id}/create-invoice")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/create-invoice",
+    summary="صدور فاکتور تعمیر",
+    description="ابزار MCP: `create_repair_invoice` (نیازمند تأیید).",
+)
 def create_repair_invoice(
     request: Request,
     business_id: int,
@@ -495,10 +618,10 @@ def create_repair_invoice(
 ):
     """صدور فاکتور تعمیر و ثبت اسناد حسابداری"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     from app.services.repair_shop_accounting import create_repair_invoice_accounting
     from adapters.db.repositories.repair_shop_repository import RepairOrderRepository
@@ -507,7 +630,7 @@ def create_repair_invoice(
     repair_order = repo.get_by_id(order_id, business_id)
     
     if not repair_order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
     
     result = create_repair_invoice_accounting(db, business_id, repair_order, ctx.user.id)
     db.commit()
@@ -515,7 +638,11 @@ def create_repair_invoice(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.get("/businesses/{business_id}/orders/{order_id}/accounting-summary")
+@router.get(
+    "/businesses/{business_id}/orders/{order_id}/accounting-summary",
+    summary="خلاصه حسابداری سفارش تعمیر",
+    description="ابزار MCP: `get_repair_accounting_summary`.",
+)
 def get_accounting_summary(
     request: Request,
     business_id: int,
@@ -525,10 +652,10 @@ def get_accounting_summary(
 ):
     """دریافت خلاصه حسابداری سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     from app.services.repair_shop_accounting import get_repair_accounting_summary
     
@@ -538,7 +665,11 @@ def get_accounting_summary(
 
 # ========== Reports ==========
 
-@router.get("/businesses/{business_id}/warranty/{warranty_code_id}/history")
+@router.get(
+    "/businesses/{business_id}/warranty/{warranty_code_id}/history",
+    summary="سوابق تعمیر با گارانتی",
+    description="ابزار MCP: `get_repair_history_by_warranty`.",
+)
 def get_warranty_repair_history(
     request: Request,
     business_id: int,
@@ -548,13 +679,61 @@ def get_warranty_repair_history(
 ):
     """تاریخچه تعمیرات براساس کد گارانتی"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.get_repair_history_by_warranty(
         db, business_id, warranty_code_id
     )
     return success_response(data=_format_response({"items": result}, request), request=request)
+
+
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/attachments",
+    summary="آپلود پیوست سفارش تعمیر",
+    description="آپلود باینری است و در MCP ثبت نشده.",
+)
+def add_attachment(
+    request: Request,
+    business_id: int,
+    order_id: int,
+    data: AddAttachmentRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """افزودن ضمیمه به سفارش تعمیر"""
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
+    if not ctx.has_business_permission("repair_shop", "write"):
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
+    result = repair_shop_service.add_repair_order_attachment(
+        db, business_id, order_id, data.dict(), ctx.user.id
+    )
+    return success_response(data=_format_response(result, request), request=request, http_status=201)
+
+
+@router.delete(
+    "/businesses/{business_id}/orders/{order_id}/attachments/{attachment_id}",
+    summary="حذف پیوست سفارش تعمیر",
+    description="عملیات پیوست باینری است و در MCP ثبت نشده.",
+)
+def delete_attachment(
+    request: Request,
+    business_id: int,
+    order_id: int,
+    attachment_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """حذف ضمیمه سفارش تعمیر"""
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
+    if not ctx.has_business_permission("repair_shop", "write"):
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
+    result = repair_shop_service.delete_repair_order_attachment(
+        db, business_id, order_id, attachment_id, ctx.user.id
+    )
+    return success_response(data=_format_response(result, request), request=request)
 

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../../services/telephony/telephony_api.dart';
 import '../../services/telephony/telephony_session_controller.dart';
+import '../../l10n/app_localizations.dart';
+import '../../utils/error_extractor.dart';
 
 Future<void> showTelephonyDialerSheet(
   BuildContext context, {
@@ -102,12 +104,14 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('در حال برقراری تماس…')),
+          SnackBar(content: Text(AppLocalizations.of(context).telephonyPlacingCall)),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _calling = false);
@@ -162,6 +166,7 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
@@ -177,13 +182,13 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
                 const SizedBox(width: 40),
                 Expanded(
                   child: Text(
-                    'شماره‌گیر',
+                    t.telephonyDialer,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'بستن',
+                  tooltip: t.close,
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close_rounded),
                 ),
@@ -208,7 +213,7 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                       decoration: InputDecoration(
-                        hintText: 'شماره را وارد کنید',
+                        hintText: t.telephonyEnterNumber,
                         hintTextDirection: TextDirection.rtl,
                         filled: true,
                         fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
@@ -284,7 +289,7 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.phone_rounded),
-                        label: const Text('تماس'),
+                        label: Text(t.telephonyCallAction),
                         style: FilledButton.styleFrom(
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
@@ -295,7 +300,7 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
                       height: 52,
                       width: 52,
                       child: IconButton.filledTonal(
-                        tooltip: 'پاک کردن',
+                        tooltip: t.clear,
                         onPressed: () {
                           if (_ctrl.text.isEmpty) return;
                           _ctrl.text = _ctrl.text.substring(0, _ctrl.text.length - 1);

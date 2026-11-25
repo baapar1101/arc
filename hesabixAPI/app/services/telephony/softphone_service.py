@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.telephony import (
@@ -96,7 +97,7 @@ def _primary_user_extension(db: Session, business_id: int, user_id: int) -> Tele
 	if not row or not row.extension_row:
 		raise ApiError(
 			"SOFTPHONE_NO_EXTENSION",
-			"برای Softphone باید داخلی به کاربر نگاشت شده باشد.",
+			"SOFTPHONE_NO_EXTENSION",
 			http_status=400,
 		)
 	return row
@@ -105,21 +106,21 @@ def _primary_user_extension(db: Session, business_id: int, user_id: int) -> Tele
 def _resolve_mode(link: TelephonyUserExtension, soft: Dict[str, Any], requested: Optional[str]) -> str:
 	mode = (requested or link.endpoint_mode or "desk").strip().lower()
 	if mode not in VALID_ENDPOINT_MODES:
-		raise ApiError("VALIDATION_ERROR", "endpoint_mode نامعتبر است.", http_status=400)
+		raise ApiError("INVALID_ENDPOINT_MODE", "INVALID_ENDPOINT_MODE", http_status=400)
 	if mode == "desk":
 		raise ApiError(
 			"SOFTPHONE_DESK_MODE",
-			"حالت این کاربر desk است؛ از Click-to-Call استفاده کنید یا حالت را به relay/direct تغییر دهید.",
+			"SOFTPHONE_DESK_MODE",
 			http_status=400,
 		)
 	if mode == "relay" and not soft.get("relay_enabled", True):
 		if link.allow_mode_fallback and soft.get("direct_enabled"):
 			return "direct"
-		raise ApiError("SOFTPHONE_RELAY_DISABLED", "حالت رله روی این PBX غیرفعال است.", http_status=400)
+		raise ApiError("SOFTPHONE_RELAY_DISABLED", "SOFTPHONE_RELAY_DISABLED", http_status=400)
 	if mode == "direct" and not soft.get("direct_enabled", False):
 		if link.allow_mode_fallback and soft.get("relay_enabled", True):
 			return "relay"
-		raise ApiError("SOFTPHONE_DIRECT_DISABLED", "حالت مستقیم روی این PBX غیرفعال است.", http_status=400)
+		raise ApiError("SOFTPHONE_DIRECT_DISABLED", "SOFTPHONE_DIRECT_DISABLED", http_status=400)
 	return mode
 
 
@@ -192,24 +193,27 @@ def create_session(
 	link = _primary_user_extension(db, business_id, user_id)
 	pbx = db.get(TelephonyPbxConnection, link.pbx_id)
 	if not pbx or not pbx.is_active:
-		raise ApiError("PBX_NOT_FOUND", "مرکز تلفن فعال یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	soft = softphone_settings_from_pbx(pbx)
 	mode = _resolve_mode(link, soft, payload.get("mode") or link.endpoint_mode)
 
 	if mode == "relay" and not media_hub.tunnel_online(pbx.id):
 		raise ApiError(
 			"SOFTPHONE_TUNNEL_OFFLINE",
-			"تونل رسانه Connector قطع است. روی سرور تلفن Connector را به‌روز و سرویس را ری‌استارت کنید.",
+			"SOFTPHONE_TUNNEL_OFFLINE",
 			http_status=503,
 		)
 
-	# پایان سشن‌های قبلی همان کاربر
+	# پایان سشن‌های قبلی همان کاربر و هر سشن فعال روی همین داخلی
 	old_rows = (
 		db.query(TelephonySoftphoneSession)
 		.filter(
 			TelephonySoftphoneSession.business_id == business_id,
-			TelephonySoftphoneSession.user_id == user_id,
 			TelephonySoftphoneSession.state.in_(ACTIVE_SESSION_STATES),
+			or_(
+				TelephonySoftphoneSession.user_id == user_id,
+				TelephonySoftphoneSession.extension == link.extension_row.extension,
+			),
 		)
 		.all()
 	)
@@ -230,7 +234,7 @@ def create_session(
 	)
 	max_sessions = int(soft.get("max_concurrent_softphone_sessions") or 50)
 	if active_count >= max_sessions:
-		raise ApiError("SOFTPHONE_CAPACITY", "سقف سشن همزمان Softphone پر است.", http_status=429)
+		raise ApiError("SOFTPHONE_CAPACITY", "SOFTPHONE_CAPACITY", http_status=429)
 
 	session_id = str(uuid.uuid4())
 	ticket = "hsx_media_" + secrets.token_urlsafe(24)
@@ -273,7 +277,7 @@ def create_session(
 def heartbeat_session(db: Session, business_id: int, user_id: int, session_id: str) -> Dict[str, Any]:
 	row = _get_user_session(db, business_id, user_id, session_id)
 	if row.state not in ACTIVE_SESSION_STATES:
-		raise ApiError("SOFTPHONE_SESSION_ENDED", "سشن Softphone پایان یافته است.", http_status=409)
+		raise ApiError("SOFTPHONE_SESSION_ENDED", "SOFTPHONE_SESSION_ENDED", http_status=409)
 	row.last_heartbeat_at = _now()
 	row.expires_at = _now() + timedelta(minutes=SESSION_TTL_MINUTES)
 	row.updated_at = _now()
@@ -317,7 +321,7 @@ def _get_user_session(
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "سشن Softphone یافت نشد.", http_status=404)
+		raise ApiError("SOFTPHONE_SESSION_NOT_FOUND", "SOFTPHONE_SESSION_NOT_FOUND", http_status=404)
 	return row
 
 
@@ -328,11 +332,11 @@ def get_session_by_ticket(db: Session, session_id: str, media_ticket: str) -> Te
 		.first()
 	)
 	if not row or row.state not in ACTIVE_SESSION_STATES:
-		raise ApiError("UNAUTHORIZED", "سشن نامعتبر است.", http_status=401)
+		raise ApiError("SOFTPHONE_INVALID_SESSION", "SOFTPHONE_INVALID_SESSION", http_status=401)
 	if row.expires_at < _now():
-		raise ApiError("UNAUTHORIZED", "سشن منقضی شده است.", http_status=401)
+		raise ApiError("SOFTPHONE_SESSION_EXPIRED", "SOFTPHONE_SESSION_EXPIRED", http_status=401)
 	if hash_api_key(media_ticket) != row.media_ticket_hash:
-		raise ApiError("UNAUTHORIZED", "بلیت رسانه نامعتبر است.", http_status=401)
+		raise ApiError("SOFTPHONE_INVALID_TICKET", "SOFTPHONE_INVALID_TICKET", http_status=401)
 	return row
 
 
@@ -412,25 +416,25 @@ def start_outbound_relay_call(
 	session_id = str(payload.get("session_id") or "").strip()
 	destination = str(payload.get("destination") or "").strip()
 	if not session_id or not destination:
-		raise ApiError("VALIDATION_ERROR", "session_id و destination الزامی است.", http_status=400)
+		raise ApiError("SESSION_AND_DESTINATION_REQUIRED", "SESSION_AND_DESTINATION_REQUIRED", http_status=400)
 
 	row = _get_user_session(db, business_id, user_id, session_id)
 	if row.mode != "relay":
-		raise ApiError("SOFTPHONE_MODE", "خروجی relay فقط در حالت relay مجاز است.", http_status=400)
+		raise ApiError("SOFTPHONE_MODE", "SOFTPHONE_MODE", http_status=400)
 	if row.state not in ("registered", "in_call"):
 		raise ApiError(
 			"SOFTPHONE_SESSION_STATE",
-			"سشن برای تماس آماده نیست. ابتدا Softphone را آنلاین کنید تا WebSocket وصل شود.",
+			"SOFTPHONE_SESSION_STATE",
 			http_status=409,
 		)
 	if not media_hub.get_client(session_id):
 		raise ApiError(
 			"SOFTPHONE_WS_REQUIRED",
-			"کانال Softphone روی Media Edge ثبت نشده است. صفحه را رفرش کنید و دوباره آنلاین شوید.",
+			"SOFTPHONE_WS_REQUIRED",
 			http_status=409,
 		)
 	if not media_hub.tunnel_online(row.pbx_id):
-		raise ApiError("SOFTPHONE_TUNNEL_OFFLINE", "تونل رسانه قطع است.", http_status=503)
+		raise ApiError("SOFTPHONE_TUNNEL_OFFLINE", "SOFTPHONE_TUNNEL_OFFLINE", http_status=503)
 
 	# از مسیر CTI موجود برای ساخت تماس/دستور استفاده می‌کنیم با payload ویژه softphone
 	from app.services.telephony.phone_normalizer import normalize_iran_phone
@@ -438,7 +442,7 @@ def start_outbound_relay_call(
 	norm = normalize_iran_phone(destination)
 	pbx = db.get(TelephonyPbxConnection, row.pbx_id)
 	if not pbx:
-		raise ApiError("PBX_NOT_FOUND", "PBX یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	soft = softphone_settings_from_pbx(pbx)
 	settings = pbx.settings or {}
 	context = settings.get("originate_context") or "from-internal"
@@ -446,6 +450,19 @@ def start_outbound_relay_call(
 
 	uniqueid = f"hsx-sf-{uuid.uuid4().hex[:16]}"
 	as_uuid = str(uuid.uuid4())
+	person_id = payload.get("person_id")
+	lead_id = payload.get("lead_id")
+	match: Dict[str, Any] = {}
+	if not person_id and not lead_id:
+		settings_row = tel.get_or_create_settings(db, business_id)
+		match = tel.match_caller(
+			db,
+			business_id,
+			destination,
+			phone_fields=settings_row.primary_phone_fields or tel.DEFAULT_PHONE_FIELDS,
+		)
+		person_id = (match.get("person") or {}).get("id")
+		lead_id = (match.get("lead") or {}).get("id")
 	call = TelephonyCall(
 		business_id=business_id,
 		pbx_id=row.pbx_id,
@@ -460,11 +477,17 @@ def start_outbound_relay_call(
 		extension=row.extension,
 		started_at=_now(),
 		assigned_user_id=user_id,
-		person_id=payload.get("person_id"),
-		lead_id=payload.get("lead_id"),
-		match_method="manual" if payload.get("person_id") or payload.get("lead_id") else None,
-		is_anonymous=False,
-		extra_info={"softphone": True, "session_id": session_id, "mode": "relay", "audiosocket_uuid": as_uuid},
+		person_id=person_id,
+		lead_id=lead_id,
+		match_method=("manual" if payload.get("person_id") or payload.get("lead_id") else match.get("match_method")),
+		is_anonymous=bool(match.get("is_anonymous")) if match else not bool(person_id or lead_id),
+		extra_info={
+			"softphone": True,
+			"session_id": session_id,
+			"mode": "relay",
+			"audiosocket_uuid": as_uuid,
+			"match": match or None,
+		},
 		created_at=_now(),
 		updated_at=_now(),
 	)
@@ -502,6 +525,10 @@ def start_outbound_relay_call(
 	db.commit()
 	db.refresh(call)
 
+	# پل رسانه را Connector بعد از AudioSocket با bridge.active می‌سازد.
+	# اینجا start_bridge صدا زده نمی‌شود: anyio.from_thread.run روی Media Edge
+	# (workers=1) event loop را قفل می‌کرد و Softphone دیگر وصل نمی‌شد.
+
 	return {
 		"call": tel.call_to_dict(call),
 		"session_id": session_id,
@@ -534,11 +561,11 @@ def enqueue_answer_inbound(
 			.first()
 		)
 	if not row:
-		raise ApiError("SOFTPHONE_NO_SESSION", "سشن Softphone فعال نیست.", http_status=409)
+		raise ApiError("SOFTPHONE_NO_SESSION", "SOFTPHONE_NO_SESSION", http_status=409)
 	if not media_hub.get_client(row.session_id):
 		raise ApiError(
 			"SOFTPHONE_WS_REQUIRED",
-			"کانال Softphone روی Media Edge ثبت نشده است. صفحه را رفرش کنید و دوباره آنلاین شوید.",
+			"SOFTPHONE_WS_REQUIRED",
 			http_status=409,
 		)
 
@@ -548,7 +575,7 @@ def enqueue_answer_inbound(
 		.first()
 	)
 	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+		raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	as_uuid = str(uuid.uuid4())
 	soft = softphone_settings_from_pbx(db.get(TelephonyPbxConnection, row.pbx_id))
@@ -601,14 +628,14 @@ def enqueue_dtmf(
 ) -> Dict[str, Any]:
 	digit = (digit or "").strip()
 	if not digit or len(digit) > 8:
-		raise ApiError("VALIDATION_ERROR", "رقم DTMF نامعتبر است.", http_status=400)
+		raise ApiError("INVALID_DTMF", "INVALID_DTMF", http_status=400)
 	call = (
 		db.query(TelephonyCall)
 		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
 		.first()
 	)
 	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+		raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	cmd = TelephonyCommand(
 		business_id=business_id,
 		pbx_id=call.pbx_id,

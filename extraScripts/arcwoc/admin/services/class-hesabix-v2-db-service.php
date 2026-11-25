@@ -40,6 +40,44 @@ class Hesabix_V2_DB_Service
 	}
 
 	/**
+	 * Freeze the first CREATE payload so all retry paths send the same operation.
+	 * WordPress options has a unique option_name per site, including on HPOS.
+	 */
+	public function get_or_start_invoice_create($order_id, ?array $payload = null)
+	{
+		global $wpdb;
+		$name = 'hesabix_v2_invoice_create_' . (int) $this->business_id . '_' . (int) $order_id;
+
+		if ($payload !== null) {
+			$payload['woo_create_key'] = wp_generate_uuid4();
+			$value = wp_json_encode($payload);
+			if (!is_string($value) || $wpdb->query($wpdb->prepare(
+				"INSERT INTO {$wpdb->options} (option_name, option_value, autoload)
+				 VALUES (%s, %s, 'no') ON DUPLICATE KEY UPDATE option_name = option_name",
+				$name,
+				$value
+			)) === false) {
+				throw new RuntimeException(__('ذخیرهٔ کلید صدور فاکتور ووکامرس ناموفق بود.', 'hesabix-v2'));
+			}
+		}
+
+		// Read the winning database value, independently of the WordPress option cache.
+		$value = $wpdb->get_var($wpdb->prepare(
+			"SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+			$name
+		));
+		$saved = is_string($value) ? json_decode($value, true) : null;
+		if (!is_array($saved) || empty($saved['woo_create_key'])) {
+			if ($value === null && $payload === null && !$wpdb->last_error) {
+				return null;
+			}
+			throw new RuntimeException(__('خواندن کلید صدور فاکتور ووکامرس ناموفق بود.', 'hesabix-v2'));
+		}
+		return $saved;
+	}
+
+
+	/**
 	 * Save mapping
 	 *
 	 * @since    2.0.0
@@ -428,6 +466,64 @@ class Hesabix_V2_DB_Service
 			WHERE entity_type = %s AND business_id = %d",
 			'product',
 			$this->business_id
+		);
+
+		$rows = $wpdb->get_results($query, ARRAY_A);
+
+		return is_array($rows) ? $rows : array();
+	}
+
+	/**
+	 * نگاشت Native: واریانت ووکامرس → ترکیب حسابیکس.
+	 *
+	 * @since 4.11.0
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_all_native_variation_mappings()
+	{
+		global $wpdb;
+
+		$query = $wpdb->prepare(
+			"SELECT wc_id, wc_parent_id, hesabix_id, hesabix_type, meta_data FROM {$this->table}
+			WHERE entity_type = %s AND hesabix_type = %s AND business_id = %d",
+			'variation',
+			'product_variant',
+			$this->business_id
+		);
+
+		$rows = $wpdb->get_results($query, ARRAY_A);
+
+		return is_array($rows) ? $rows : array();
+	}
+
+	/**
+	 * نگاشت‌های برگشت از فروش یک سفارش (کامل با wc_id=order_id یا جزئی با wc_parent_id=order_id).
+	 *
+	 * @since 4.12.6
+	 * @param int $order_id
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_order_return_mappings($order_id)
+	{
+		global $wpdb;
+
+		$order_id = absint($order_id);
+		if ($order_id < 1) {
+			return array();
+		}
+
+		$query = $wpdb->prepare(
+			"SELECT * FROM {$this->table}
+			WHERE entity_type = %s AND business_id = %d
+			AND (
+				(wc_id = %d AND wc_parent_id IS NULL)
+				OR wc_parent_id = %d
+			)
+			ORDER BY id ASC",
+			'order_return',
+			$this->business_id,
+			$order_id,
+			$order_id
 		);
 
 		$rows = $wpdb->get_results($query, ARRAY_A);

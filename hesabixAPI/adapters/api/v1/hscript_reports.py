@@ -107,6 +107,7 @@ def _run_or_enqueue(
 @router.get(
 	"/businesses/{business_id}/hscript/docs/manifest",
 	summary="مانیفست مستندات HScript برای RAG/AI",
+	description="فهرست شناسه و عنوان مستندات. ابزار MCP: `list_hscript_docs_manifest`.",
 )
 @require_business_access("business_id")
 async def docs_manifest_endpoint(
@@ -122,6 +123,7 @@ async def docs_manifest_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/plan",
 	summary="وضعیت پلن و سقف‌های HScript",
+	description="سقف گزارش ذخیره‌شده و زمان‌بندی پلن فعلی. ابزار MCP: get_hscript_plan.",
 )
 @require_business_access("business_id")
 async def plan_status_endpoint(
@@ -137,6 +139,7 @@ async def plan_status_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/catalog",
 	summary="کاتالوگ ماژول‌ها، متدهای جدول و دستورپخت‌ها",
+	description="مرجع زبان HScript برای Studio و عامل. ابزار MCP: get_hscript_catalog.",
 )
 @require_business_access("business_id")
 async def catalog_endpoint(
@@ -152,6 +155,7 @@ async def catalog_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/recipes",
 	summary="فهرست دستورپخت‌های آماده",
+	description="الگوهای آماده گزارش. ابزار MCP: list_hscript_recipes.",
 )
 @require_business_access("business_id")
 async def recipes_endpoint(
@@ -167,6 +171,7 @@ async def recipes_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/param-schema",
 	summary="استنتاج schema فرم پارامتر از اسکریپت و مقادیر",
+	description="بدون اجرا روی داده واقعی. ابزار MCP: infer_hscript_param_schema.",
 )
 @require_business_access("business_id")
 async def param_schema_endpoint(
@@ -188,6 +193,7 @@ async def param_schema_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/assist/context",
 	summary="بازیابی context مستندات برای دستیار AI",
+	description="راهنما و مستندات مرتبط. ابزار MCP: `get_hscript_assist_context`.",
 )
 @require_business_access("business_id")
 async def assist_context_endpoint(
@@ -205,6 +211,7 @@ async def assist_context_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/validate",
 	summary="اعتبارسنجی نحوی اسکریپت بدون اجرا",
+	description="بدون اجرای روی داده واقعی. ابزار MCP: `validate_hscript_source`.",
 )
 @require_business_access("business_id")
 async def validate_endpoint(
@@ -221,6 +228,7 @@ async def validate_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/run",
 	summary="اجرای اسکریپت موقت (پیش‌نمایش Studio)",
+	description="ابزار MCP: `hscript_run_preview` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def run_adhoc_endpoint(
@@ -246,6 +254,7 @@ async def run_adhoc_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/reports",
 	summary="لیست گزارش‌های HScript",
+	description="گزارش‌های ذخیره‌شده کسب‌وکار بدون سورس کامل. ابزار MCP: list_hscript_reports.",
 )
 @require_business_access("business_id")
 async def list_endpoint(
@@ -263,6 +272,7 @@ async def list_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports",
 	summary="ایجاد گزارش HScript",
+	description="ذخیره پیش‌نویس با اعتبارسنجی نحوی و سقف پلن. ابزار MCP: create_hscript_report.",
 )
 @require_business_access("business_id")
 async def create_endpoint(
@@ -290,6 +300,7 @@ async def create_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/reports/{report_id}",
 	summary="جزئیات گزارش",
+	description="ابزار MCP: `get_hscript_report`.",
 )
 @require_business_access("business_id")
 async def get_endpoint(
@@ -312,6 +323,7 @@ async def get_endpoint(
 @router.put(
 	"/businesses/{business_id}/hscript/reports/{report_id}",
 	summary="ویرایش گزارش",
+	description="ابزار MCP: `update_hscript_report` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_endpoint(
@@ -340,6 +352,7 @@ async def update_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/publish",
 	summary="انتشار گزارش",
+	description="ابزار MCP: `publish_hscript_report` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def publish_endpoint(
@@ -357,6 +370,7 @@ async def publish_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/archive",
 	summary="بایگانی گزارش",
+	description="گزارش منتشرشده را بایگانی می‌کند. ابزار MCP: archive_hscript_report.",
 )
 @require_business_access("business_id")
 async def archive_endpoint(
@@ -374,6 +388,7 @@ async def archive_endpoint(
 @router.delete(
 	"/businesses/{business_id}/hscript/reports/{report_id}",
 	summary="حذف نرم گزارش",
+	description="ابزار MCP: `delete_hscript_report` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_endpoint(
@@ -391,6 +406,7 @@ async def delete_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/reports/{report_id}/versions",
 	summary="نسخه‌های گزارش",
+	description="تاریخچه نسخ بدون سورس کامل. ابزار MCP: list_hscript_report_versions.",
 )
 @require_business_access("business_id")
 async def versions_endpoint(
@@ -408,6 +424,7 @@ async def versions_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/reports/{report_id}/versions/{version_id}",
 	summary="جزئیات یک نسخه",
+	description="سورس کامل یک نسخه متعلق به همین کسب‌وکار. ابزار MCP: get_hscript_report_version.",
 )
 @require_business_access("business_id")
 async def version_detail_endpoint(
@@ -426,6 +443,7 @@ async def version_detail_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/versions/{version_id}/restore",
 	summary="بازگردانی نسخهٔ قبلی",
+	description="سورس گزارش را به نسخه انتخابی برمی‌گرداند. ابزار MCP: restore_hscript_report_version.",
 )
 @require_business_access("business_id")
 async def restore_version_endpoint(
@@ -452,6 +470,7 @@ async def restore_version_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/reports/{report_id}/runs",
 	summary="سابقه اجرای گزارش",
+	description="اجراهای ذخیره‌شده گزارش. ابزار MCP: list_hscript_report_runs.",
 )
 @require_business_access("business_id")
 async def report_runs_endpoint(
@@ -470,6 +489,7 @@ async def report_runs_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/run",
 	summary="اجرای گزارش ذخیره‌شده",
+	description="اجرا روی داده واقعی کسب‌وکار. ابزار MCP: run_hscript_report.",
 )
 @require_business_access("business_id")
 async def run_saved_endpoint(
@@ -496,6 +516,7 @@ async def run_saved_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/pdf",
 	summary="خروجی PDF از اسکریپت یا Spec",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `hscript_run_preview` / `run_hscript_report`.",
 )
 @require_business_access("business_id")
 async def pdf_adhoc_endpoint(
@@ -530,6 +551,7 @@ async def pdf_adhoc_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/pdf",
 	summary="خروجی PDF گزارش ذخیره‌شده",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `run_hscript_report`.",
 )
 @require_business_access("business_id")
 async def pdf_saved_endpoint(
@@ -565,6 +587,7 @@ async def pdf_saved_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/excel",
 	summary="خروجی Excel از اسکریپت یا Spec",
+	description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `hscript_run_preview`.",
 )
 @require_business_access("business_id")
 async def excel_adhoc_endpoint(
@@ -599,6 +622,7 @@ async def excel_adhoc_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/excel",
 	summary="خروجی Excel گزارش ذخیره‌شده",
+	description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `run_hscript_report`.",
 )
 @require_business_access("business_id")
 async def excel_saved_endpoint(
@@ -633,6 +657,7 @@ async def excel_saved_endpoint(
 @router.get(
 	"/businesses/{business_id}/hscript/schedules",
 	summary="فهرست زمان‌بندی‌های HScript",
+	description="زمان‌بندی‌های همین کسب‌وکار. ابزار MCP: list_hscript_schedules.",
 )
 @require_business_access("business_id")
 async def list_schedules_endpoint(
@@ -652,6 +677,7 @@ async def list_schedules_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/reports/{report_id}/schedules",
 	summary="ایجاد زمان‌بندی برای گزارش منتشرشده",
+	description="گزارش باید published باشد. ابزار MCP: create_hscript_schedule.",
 )
 @require_business_access("business_id")
 async def create_schedule_endpoint(
@@ -678,6 +704,7 @@ async def create_schedule_endpoint(
 @router.put(
 	"/businesses/{business_id}/hscript/schedules/{schedule_id}",
 	summary="ویرایش زمان‌بندی",
+	description="تغییر cron/ساده یا کانال تحویل. ابزار MCP: update_hscript_schedule.",
 )
 @require_business_access("business_id")
 async def update_schedule_endpoint(
@@ -704,6 +731,7 @@ async def update_schedule_endpoint(
 @router.delete(
 	"/businesses/{business_id}/hscript/schedules/{schedule_id}",
 	summary="حذف زمان‌بندی",
+	description="زمان‌بندی متعلق به همین کسب‌وکار را حذف می‌کند. ابزار MCP: delete_hscript_schedule.",
 )
 @require_business_access("business_id")
 async def delete_schedule_endpoint(
@@ -723,6 +751,7 @@ async def delete_schedule_endpoint(
 @router.post(
 	"/businesses/{business_id}/hscript/schedules/{schedule_id}/run-now",
 	summary="اجرای فوری زمان‌بندی",
+	description="بدون انتظار برای cron اجرا می‌شود. ابزار MCP: run_hscript_schedule_now.",
 )
 @require_business_access("business_id")
 async def run_schedule_now_endpoint(

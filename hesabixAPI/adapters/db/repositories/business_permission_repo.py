@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import select, and_, text
+from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business_permission import BusinessPermission
@@ -18,31 +18,13 @@ class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
 
     def get_by_user_and_business(self, user_id: int, business_id: int) -> Optional[BusinessPermission]:
         """دریافت دسترسی‌های کاربر برای کسب و کار خاص"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        logger.info(f"=== get_by_user_and_business START ===")
-        logger.info(f"User ID: {user_id}")
-        logger.info(f"Business ID: {business_id}")
-        
         stmt = select(BusinessPermission).where(
             and_(
                 BusinessPermission.user_id == user_id,
                 BusinessPermission.business_id == business_id
             )
         )
-        
-        logger.info(f"SQL Query: {stmt}")
-        
-        result = self.db.execute(stmt).scalars().first()
-        
-        logger.info(f"Query result: {result}")
-        if result:
-            logger.info(f"Business permissions: {result.business_permissions}")
-            logger.info(f"Type: {type(result.business_permissions)}")
-        
-        logger.info(f"=== get_by_user_and_business END ===")
-        return result
+        return self.db.execute(stmt).scalars().first()
 
     def create_or_update(
         self,

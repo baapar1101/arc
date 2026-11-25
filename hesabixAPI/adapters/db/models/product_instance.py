@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime
 from sqlalchemy import (
     Column,
     Integer,
@@ -51,8 +51,10 @@ class ProductInstance(Base):
     custom_attributes = Column(JSON, nullable=True, comment="ویژگی‌های کالا مانند رنگ، سایز، مدل و ...")
     
     # تاریخ‌ها
-    entry_date = Column(Date, nullable=False, default=date.today, comment="تاریخ ورود به انبار")
+    entry_date = Column(Date, nullable=False, comment="تاریخ ورود به انبار (caller باید business_today بگذارد)")
     last_movement_date = Column(Date, nullable=True, comment="تاریخ آخرین جابجایی")
+    manufacturing_date = Column(Date, nullable=True, comment="تاریخ تولید")
+    expiry_date = Column(Date, nullable=True, comment="تاریخ انقضا")
     
     # اطلاعات فروش
     current_invoice_id = Column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True, comment="فاکتور فروش (اگر فروخته شده)")

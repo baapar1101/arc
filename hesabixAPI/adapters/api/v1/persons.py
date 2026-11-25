@@ -71,7 +71,7 @@ router = APIRouter(prefix="/persons", tags=["اشخاص و مشتریان"])
 
 @router.post("/businesses/{business_id}/persons/bulk-delete",
     summary="حذف گروهی اشخاص",
-    description="حذف چندین شخص بر اساس شناسه‌ها یا کدها",
+    description="حذف چندین شخص بر اساس شناسه‌ها (`ids`) یا کدها (`codes`). ابزار MCP: `bulk_delete_persons` (نیازمند تأیید).",
 )
 async def bulk_delete_persons_endpoint(
     request: Request,
@@ -182,7 +182,7 @@ async def bulk_delete_persons_endpoint(
         "بدنه شامل `items`: آرایه‌ای از {client_ref?, person_id?, payload}؛ payload همان فیلدهای ایجاد/ویرایش شخص "
         "(از جمله `opening_balance` در صورت نیاز)؛ "
         "می‌توانید `create_if_update_missing` برای ایجاد پس از نبودن شخص ارسال کنید (پیش‌فرض true). "
-        "حداکثر ۱۰۰۰ آیتم در هر درخواست. خروجی: results[{index, client_ref?, status, person_id?, ...}] و summary."
+        "حداکثر ۱۰۰۰ آیتم در هر درخواست (ابزار MCP حداکثر ۵۰). خروجی: results[{index, client_ref?, status, person_id?, ...}] و summary. ابزار MCP: `bulk_upsert_persons` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -199,7 +199,7 @@ async def bulk_upsert_persons_integration_endpoint(
 
 @router.post("/businesses/{business_id}/persons/create",
     summary="ایجاد شخص جدید",
-    description="ایجاد شخص جدید برای کسب و کار مشخص",
+    description="ایجاد شخص. ابزار MCP: `create_person` (نیازمند تأیید).",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -268,7 +268,7 @@ async def create_person_endpoint(
 
 @router.post("/businesses/{business_id}/persons",
     summary="لیست اشخاص کسب و کار",
-    description="دریافت لیست اشخاص یک کسب و کار با امکان جستجو و فیلتر",
+    description="جستجوی اشخاص. ابزار MCP: `search_persons`. Excel/PDF در MCP نیست.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -389,7 +389,7 @@ async def get_persons_endpoint(
 
 @router.post("/businesses/{business_id}/persons/export/excel",
     summary="خروجی Excel لیست اشخاص",
-    description="خروجی Excel لیست اشخاص با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 async def export_persons_excel(
     business_id: int,
@@ -562,7 +562,7 @@ async def export_persons_excel(
 
 @router.post("/businesses/{business_id}/persons/export/pdf",
     summary="خروجی PDF لیست اشخاص",
-    description="خروجی PDF لیست اشخاص با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 async def export_persons_pdf(
     business_id: int,
@@ -879,7 +879,7 @@ async def export_persons_pdf(
 
 @router.post("/businesses/{business_id}/persons/import/template",
     summary="دانلود تمپلیت ایمپورت اشخاص",
-    description="فایل Excel تمپلیت برای ایمپورت اشخاص را برمی‌گرداند",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 async def download_persons_import_template(
     business_id: int,
@@ -944,7 +944,7 @@ async def download_persons_import_template(
 
 @router.get("/persons/{person_id}",
     summary="جزئیات شخص",
-    description="دریافت جزئیات یک شخص",
+    description="جزئیات شخص. ابزار MCP: `get_customer_info`. مانده: `get_person_balance`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -997,7 +997,7 @@ async def get_person_endpoint(
     "/persons/{person_id}/balances-by-currency",
     summary="مانده شخص به تفکیک ارز",
     description=(
-        "مانده بومی شخص در هر ارز + معادل ارز پایه. "
+        "مانده شخص به تفکیک ارز. ابزار MCP: `get_person_balance`. "
         "برای کسب‌وکار تک‌ارزی معمولاً یک ردیف (ارز پایه) برمی‌گردد."
     ),
     response_model=SuccessResponse,
@@ -1039,7 +1039,7 @@ async def get_person_balances_by_currency_endpoint(
 
 @router.put("/persons/{person_id}",
     summary="ویرایش شخص",
-    description="ویرایش اطلاعات یک شخص",
+    description="ویرایش شخص. ابزار MCP: `update_person` (نیازمند تأیید).",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -1095,7 +1095,7 @@ async def update_person_endpoint(
 
 @router.delete("/persons/{person_id}",
     summary="حذف شخص",
-    description="حذف یک شخص",
+    description="حذف شخص. ابزار MCP: `delete_person` (نیازمند تأیید).",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -1131,6 +1131,7 @@ async def delete_person_endpoint(
 @router.get(
     "/persons/{person_id}/share-link",
     summary="وضعیت لینک اشتراک شخص",
+    description="لینک عمومی کارت حساب شخص همین کسب‌وکار. ابزار MCP: get_person_share_link.",
     response_model=SuccessResponse,
 )
 async def get_person_share_link_endpoint(
@@ -1156,6 +1157,7 @@ async def get_person_share_link_endpoint(
 @router.post(
     "/persons/{person_id}/share-link",
     summary="ایجاد یا بروزرسانی لینک اشتراک",
+    description="URL عمومی کارت حساب می‌سازد. ابزار MCP: create_person_share_link.",
     response_model=SuccessResponse,
 )
 async def create_person_share_link_endpoint(
@@ -1192,6 +1194,7 @@ async def create_person_share_link_endpoint(
 @router.delete(
     "/persons/{person_id}/share-link",
     summary="لغو لینک اشتراک شخص",
+    description="لینک فعال کارت حساب را باطل می‌کند. ابزار MCP: revoke_person_share_link.",
     response_model=SuccessResponse,
 )
 async def revoke_person_share_link_endpoint(
@@ -1221,7 +1224,7 @@ async def revoke_person_share_link_endpoint(
 
 @router.get("/businesses/{business_id}/persons/summary",
     summary="خلاصه اشخاص کسب و کار",
-    description="دریافت خلاصه آماری اشخاص یک کسب و کار",
+    description="دریافت خلاصه آماری اشخاص یک کسب و کار. ابزار MCP: `get_persons_summary`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -1248,7 +1251,7 @@ async def get_persons_summary_endpoint(
 
 @router.post("/businesses/{business_id}/persons/import/excel",
     summary="ایمپورت اشخاص از فایل Excel",
-    description="فایل اکسل را دریافت می‌کند و به‌صورت dry-run یا واقعی پردازش می‌کند",
+    description="آپلود باینری Excel است و در MCP ثبت نشده.",
 )
 async def import_persons_excel(
     business_id: int,
@@ -1574,7 +1577,7 @@ async def import_persons_excel(
 
 @router.post("/businesses/{business_id}/reports/debtors",
     summary="گزارش بدهکاران",
-    description="گزارش لیست بدهکاران با امکان فیلتر بر اساس سال مالی، تاریخ، حداقل بدهی و جستجو",
+    description="گزارش بدهکاران. ابزار MCP: `get_debtors_report`.",
 )
 async def debtors_report_endpoint(
     request: Request,
@@ -1670,10 +1673,12 @@ async def debtors_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/ar-aging",
     summary="گزارش سن بدهی مشتریان (AR Aging)",
+    description="ابزار MCP: `get_report` با report_type=ar_aging.",
 )
 @router.post(
     "/businesses/{business_id}/reports/ap-aging",
     summary="گزارش سن بستانکاری تامین‌کنندگان (AP Aging)",
+    description="ابزار MCP: `get_report` با report_type=ap_aging.",
 )
 async def ar_ap_aging_report_endpoint(
     request: Request,
@@ -1747,7 +1752,7 @@ async def ar_ap_aging_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/person-balances-by-currency",
     summary="مانده اشخاص به تفکیک ارز",
-    description="مانده بومی هر شخص در هر ارز سند + معادل ارز پایه (با رعایت تسویه بین‌ارزی و تسعیر)",
+    description="ابزار MCP: `get_report` با report_type=person_balances_by_currency.",
 )
 async def person_balances_by_currency_report_endpoint(
     request: Request,
@@ -1797,7 +1802,7 @@ async def person_balances_by_currency_report_endpoint(
 
 @router.post("/businesses/{business_id}/reports/creditors",
     summary="گزارش بستانکاران",
-    description="گزارش لیست بستانکاران با امکان فیلتر بر اساس سال مالی، تاریخ، حداقل بستانکاری و جستجو",
+    description="گزارش بستانکاران. ابزار MCP: `get_creditors_report`.",
 )
 async def creditors_report_endpoint(
     request: Request,
@@ -1892,7 +1897,7 @@ async def creditors_report_endpoint(
 
 @router.post("/businesses/{business_id}/reports/debtors/export/excel",
     summary="خروجی Excel گزارش بدهکاران",
-    description="خروجی Excel گزارش بدهکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_debtors_report_excel(
@@ -2261,7 +2266,7 @@ async def export_debtors_report_excel(
 
 @router.post("/businesses/{business_id}/reports/debtors/export/pdf",
     summary="خروجی PDF گزارش بدهکاران",
-    description="خروجی PDF گزارش بدهکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_debtors_report_pdf(
@@ -2767,7 +2772,7 @@ async def export_debtors_report_pdf(
 
 @router.post("/businesses/{business_id}/reports/creditors/export/excel",
     summary="خروجی Excel گزارش بستانکاران",
-    description="خروجی Excel گزارش بستانکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_creditors_report_excel(
@@ -3136,7 +3141,7 @@ async def export_creditors_report_excel(
 
 @router.post("/businesses/{business_id}/reports/creditors/export/pdf",
     summary="خروجی PDF گزارش بستانکاران",
-    description="خروجی PDF گزارش بستانکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_creditors_report_pdf(
@@ -3653,8 +3658,8 @@ def _people_tx_detail_level_from_body(body: Dict[str, Any]) -> str:
 @router.post("/businesses/{business_id}/reports/people-transactions",
     summary="گزارش تراکنش‌های اشخاص / معین طرف‌حساب",
     description=(
-        "گردش حساب اشخاص شامل فاکتور خرید/فروش و دریافت/پرداخت. "
-        "با detail_level=comprehensive ریز اقلام فاکتور نیز نمایش داده می‌شود."
+        "ابزار MCP: `get_report` با report_type=people_transactions. "
+        "گردش حساب اشخاص شامل فاکتور خرید/فروش و دریافت/پرداخت."
     ),
 )
 @require_business_access("business_id")
@@ -3762,7 +3767,7 @@ async def people_transactions_report_endpoint(
 
 @router.post("/businesses/{business_id}/reports/people-transactions/export/excel",
     summary="خروجی Excel گزارش تراکنش‌های اشخاص",
-    description="خروجی Excel گزارش تراکنش‌های اشخاص با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_people_transactions_report_excel(
@@ -4135,7 +4140,7 @@ async def export_people_transactions_report_excel(
 
 @router.post("/businesses/{business_id}/reports/people-transactions/export/pdf",
     summary="خروجی PDF گزارش تراکنش‌های اشخاص",
-    description="خروجی PDF گزارش تراکنش‌های اشخاص با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_people_transactions_report_pdf(

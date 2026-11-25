@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_tool_adaptive_k import (
     AdaptiveKPolicy,
     DEFAULT_ADAPTIVE_POLICY,
@@ -31,9 +31,10 @@ from app.services.ai.ai_tool_hybrid import (
 )
 from app.services.ai.ai_tool_intent import iterations_for_query
 
-ADAPTIVE_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/tool-adaptive-k")
-HYBRID_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/tool-hybrid")
-PHASE8_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/phase-8")
+_EVALS_ROOT = docs_root() / "ai-agent" / "evals"
+ADAPTIVE_DIR = _EVALS_ROOT / "tool-adaptive-k"
+HYBRID_DIR = _EVALS_ROOT / "tool-hybrid"
+PHASE8_DIR = _EVALS_ROOT / "phase-8"
 
 TARGET_RECALL = 0.95
 

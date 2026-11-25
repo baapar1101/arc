@@ -123,6 +123,9 @@ async def public_storage_share_file(
 		f = db.query(FileStorage).filter(FileStorage.id == share.file_storage_id).first()
 		if not f or f.deleted_at is not None:
 			raise ApiError("FILE_NOT_FOUND", "فایل دیگر در دسترس نیست", http_status=404)
+		from app.services.oa_document_service import refuse_external_oa_file
+
+		refuse_external_oa_file(db, str(f.id), public=True)
 
 		access_raw = _access_from_request(request, access_token)
 		if share.password_hash:

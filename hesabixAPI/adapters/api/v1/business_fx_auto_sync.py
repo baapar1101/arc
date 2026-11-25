@@ -22,6 +22,7 @@ router = APIRouter(tags=["currency_revaluation", "حسابداری"], prefix="")
 @router.get(
 	"/businesses/{business_id}/fx-auto-sync",
 	summary="تنظیمات زمان‌بندی خودکار نرخ تسعیر",
+	description="بازه ساعتی یا ساعات روزانه، آفست هر ارز و وضعیت اجرا. کسب‌وکار باید چندارزی باشد. ابزار MCP: get_fx_auto_sync_settings.",
 )
 def get_fx_auto_sync(
 	request: Request,
@@ -41,6 +42,7 @@ def get_fx_auto_sync(
 @router.put(
 	"/businesses/{business_id}/fx-auto-sync",
 	summary="ذخیره تنظیمات زمان‌بندی خودکار نرخ تسعیر",
+	description="فعال‌سازی زمان‌بندی و آفست ارزهای فرعی. ابزار MCP: update_fx_auto_sync_settings.",
 )
 def put_fx_auto_sync(
 	request: Request,
@@ -62,6 +64,7 @@ def put_fx_auto_sync(
 @router.get(
 	"/businesses/{business_id}/fx-auto-sync/preview",
 	summary="پیش‌نمایش نرخ مرجع و نرخ نهایی پس از آفست",
+	description="ابزار MCP: `preview_fx_auto_sync`.",
 )
 def preview_fx_auto_sync(
 	request: Request,
@@ -81,6 +84,7 @@ def preview_fx_auto_sync(
 @router.post(
 	"/businesses/{business_id}/fx-auto-sync/preview",
 	summary="پیش‌نمایش با پیش‌نویس تنظیمات (بدون ذخیره)",
+	description="ابزار MCP: `preview_fx_auto_sync`.",
 )
 def preview_fx_auto_sync_draft(
 	request: Request,
@@ -101,6 +105,7 @@ def preview_fx_auto_sync_draft(
 @router.post(
 	"/businesses/{business_id}/fx-auto-sync/run-now",
 	summary="اجرای فوری ثبت نرخ از اسنپ‌شات مرکزی با آفست‌ها",
+	description="ابزار MCP: `run_fx_auto_sync` (نیازمند تأیید).",
 )
 def run_fx_auto_sync_now(
 	request: Request,

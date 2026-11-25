@@ -22,8 +22,10 @@ from adapters.db.models.document_line import DocumentLine
 from app.services.invoice_profit_ledger_service import (
     LEDGER_BASIS_SALES_INVOICE_DOCUMENT,
     LEDGER_BASIS_WAREHOUSE_DOCUMENT_POSTING,
+    apply_cancelled_issue_cost,
     document_has_any_posted_warehouse,
     normalize_invoice_profit_ledger_basis,
+    single_sales_issue_cost_scope,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,32 +93,26 @@ def _evaluate_should_have_cogs_gl(db: Session, document: Document) -> bool:
             return True
         # اگر ثبت انبار از فاکتور غیرفعال است، حواله‌ای برای شناسایی وجود ندارد؛
         # COGS باید هم‌زمان با ثبت فاکتور قطعی در دفتر کل بیاید.
-        extra_info = document.extra_info if isinstance(document.extra_info, dict) else {}
+        raw_extra_info = getattr(document, "extra_info", None)
+        extra_info = raw_extra_info if isinstance(raw_extra_info, dict) else {}
         return not bool(extra_info.get("post_inventory", True))
     return False
 
 
-def _total_cost_from_profit_data(profit_data: Dict[str, Any]) -> Decimal:
-    """استخراج بهای تمام‌شده کل از خروجی محاسبه سود (با fallback به جمع خطوط)."""
+def _total_cost_from_profit_data(profit_data: dict[str, Any]) -> Decimal | None:
+    """Extract an explicitly known cost, preserving zero."""
     raw_total = profit_data.get("total_cost")
     if raw_total is not None:
-        total_cost = Decimal(str(raw_total or 0))
-    else:
-        total_cost = Decimal(0)
-        for line in profit_data.get("line_profits") or []:
-            total_cost += Decimal(str(line.get("total_cost", 0) or 0))
-    if total_cost < 0:
-        total_cost = abs(total_cost)
-    return total_cost
+        return abs(Decimal(str(raw_total)))
+    costs = [
+        Decimal(str(line["total_cost"])) for line in profit_data.get("line_profits") or ()
+        if line.get("total_cost") is not None
+    ]
+    return abs(sum(costs, Decimal(0))) if costs else None
 
 
 def _recognized_ledger_cogs_total_from_document(db: Session, document_id: int) -> Decimal:
-    """
-    جمع بهای تمام‌شده شناسایی‌شده روی خطوط فاکتور (ستون ledger_line_cogs).
-
-    وقتی محاسبهٔ زندهٔ سود (مثلاً fifo_jbfn) مقدار صفر برمی‌گرداند ولی شناسایی قطعی
-    قبلاً روی خطوط ذخیره شده، مبنای ثبت COGS در دفتر کل همان مقادیر شناسایی‌شده است.
-    """
+    """Sum previously recognized COGS for legacy fallback."""
     from adapters.db.models.invoice_item_line import InvoiceItemLine
 
     rows = (
@@ -168,8 +164,10 @@ def _calculate_invoice_cogs_amount_for_gl(
         fifo_shortage_mode=getattr(biz, "invoice_profit_fifo_shortage_mode", None),
     )
 
+    single_issue, cancelled_ids = single_sales_issue_cost_scope(db, document_id)
+    apply_cancelled_issue_cost(profit_data, cancelled_ids)
     calculated = _total_cost_from_profit_data(profit_data)
-    if calculated > 0:
+    if calculated is not None and (single_issue or calculated > 0):
         return calculated
     return _recognized_ledger_cogs_total_from_document(db, int(document_id))
 
@@ -188,6 +186,31 @@ def _resolve_cogs_gl_accounts(db: Session, document: Document) -> Tuple[Account,
 
 def _amounts_close(a: Decimal, b: Decimal, tolerance: Decimal = Decimal("0.01")) -> bool:
     return abs(a - b) <= tolerance
+
+
+def _base_cogs_to_document_currency(
+    db: Session,
+    document: Document,
+    amount_base: Decimal,
+) -> Decimal:
+    from app.core.responses import ApiError
+    from app.services.currency_quant import get_currency_quant_and_round
+    from app.services.document_line_fx_service import quantize_money, resolve_document_fx_rate
+
+    rate, _source = resolve_document_fx_rate(
+        db,
+        document,
+        allow_infer=True,
+        fallback_one_on_missing=False,
+    )
+    if rate is None or rate <= 0:
+        raise ApiError(
+            "INVOICE_FX_RATE_REQUIRED_FOR_COGS",
+            "نرخ تبدیل ارز سند برای ثبت بهای تمام‌شده موجود نیست",
+            http_status=409,
+        )
+    quant, round_on = get_currency_quant_and_round(db, int(document.currency_id))
+    return quantize_money(amount_base / rate, quant, round_on=round_on)
 
 
 def _post_cogs_gl_lines(
@@ -269,14 +292,16 @@ def resync_invoice_cogs_gl_lines(db: Session, document_id: int) -> bool:
             remove_invoice_cogs_gl_lines(db, int(document_id))
         return False
 
-    new_amount = _calculate_invoice_cogs_amount_for_gl(
+    new_amount_base = _calculate_invoice_cogs_amount_for_gl(
         db, int(document.business_id), int(document.id)
     )
 
-    if new_amount <= 0:
+    if new_amount_base <= 0:
         if existing_amount > 0:
             remove_invoice_cogs_gl_lines(db, int(document_id))
         return False
+
+    new_amount = _base_cogs_to_document_currency(db, document, new_amount_base)
 
     if _amounts_close(existing_amount, new_amount):
         return True
@@ -383,6 +408,21 @@ def on_warehouse_invoice_cogs_gl_cancel_sync(
     if str(source_type or "").strip().lower() != "invoice" or not source_document_id:
         return
     try:
+        from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+        # The application Session has autoflush disabled.
+        db.flush()
+        _, cancelled_ids = single_sales_issue_cost_scope(db, int(source_document_id))
+        if cancelled_ids:
+            rows = db.query(InvoiceItemLine).filter(
+                InvoiceItemLine.document_id == int(source_document_id),
+                InvoiceItemLine.id.in_(cancelled_ids),
+            ).all()
+            for row in rows:
+                if row.ledger_line_gross_profit is not None and row.ledger_line_cogs is not None:
+                    row.ledger_line_gross_profit += row.ledger_line_cogs
+                row.ledger_unit_cogs = row.ledger_line_cogs = Decimal(0)
+            db.flush()
         resync_invoice_cogs_gl_lines(db, int(source_document_id))
     except Exception as exc:
         logger.warning(

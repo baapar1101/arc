@@ -1,8 +1,16 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'document_policy_guard.dart';
+
+AppLocalizations _docL10n() {
+  final loc = ApiClient.currentLocale;
+  if (loc != null) return lookupAppLocalizations(loc);
+  return lookupAppLocalizations(const Locale('fa'));
+}
 
 /// سرویس مدیریت اسناد حسابداری
 class DocumentService {
@@ -252,7 +260,7 @@ class DocumentService {
         return DocumentModel.fromJson(response.data['data'] as Map<String, dynamic>);
       }
 
-      throw Exception(response.data['message'] ?? 'خطا در ایجاد سند');
+      throw Exception(response.data['message'] ?? _docL10n().documentCreateFailed);
     } on DioException {
       rethrow;
     }
@@ -283,7 +291,7 @@ class DocumentService {
         return DocumentModel.fromJson(response.data['data'] as Map<String, dynamic>);
       }
 
-      throw Exception(response.data['message'] ?? 'خطا در ویرایش سند');
+      throw Exception(response.data['message'] ?? _docL10n().documentUpdateFailed);
     } on DioException {
       rethrow;
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""اسکریپت برای اضافه کردن ستون‌های trial به جداول marketplace_plugins و business_plugins"""
+"""اسکریپت برای اضافه کردن ستون‌های trial و فعال‌سازی سراسری به جداول بازار افزونه."""
 import sys
 import os
 
@@ -36,6 +36,32 @@ def main():
             print("  ✓ ستون trial_allowed اضافه شد")
         else:
             print("  ✓ ستون trial_allowed از قبل وجود دارد")
+
+        if "listed_in_marketplace" not in marketplace_columns:
+            print("  اضافه کردن ستون listed_in_marketplace...")
+            db.execute(
+                text(
+                    "ALTER TABLE marketplace_plugins "
+                    "ADD COLUMN listed_in_marketplace BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            db.commit()
+            print("  ✓ ستون listed_in_marketplace اضافه شد")
+        else:
+            print("  ✓ ستون listed_in_marketplace از قبل وجود دارد")
+
+        if "enabled_for_all_businesses" not in marketplace_columns:
+            print("  اضافه کردن ستون enabled_for_all_businesses...")
+            db.execute(
+                text(
+                    "ALTER TABLE marketplace_plugins "
+                    "ADD COLUMN enabled_for_all_businesses BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            db.commit()
+            print("  ✓ ستون enabled_for_all_businesses اضافه شد")
+        else:
+            print("  ✓ ستون enabled_for_all_businesses از قبل وجود دارد")
         
         # ========== business_plugins ==========
         print("\nبررسی جدول business_plugins...")

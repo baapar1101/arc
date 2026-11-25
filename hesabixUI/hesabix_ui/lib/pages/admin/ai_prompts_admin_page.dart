@@ -5,9 +5,11 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
 
 class AIPromptsAdminPage extends StatefulWidget {
-  const AIPromptsAdminPage({super.key});
+  final bool embedded;
+  const AIPromptsAdminPage({super.key, this.embedded = false});
 
   @override
   State<AIPromptsAdminPage> createState() => _AIPromptsAdminPageState();
@@ -20,16 +22,39 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
   List<AIPrompt> _prompts = [];
   String? _selectedCategory;
 
-  static const _categories = <String, String>{
-    'chat': 'چت اصلی',
-    'auxiliary': 'کمکی',
-    'support': 'پشتیبانی',
-    'crm': 'CRM',
-    'moderation': 'بررسی محتوا',
-    'scheduled': 'زمان‌بندی‌شده',
-    'insight': 'بینش و پیشنهاد',
-    'memory': 'حافظه',
-  };
+  static const _categoryKeys = [
+    'chat',
+    'auxiliary',
+    'support',
+    'crm',
+    'moderation',
+    'scheduled',
+    'insight',
+    'memory',
+  ];
+
+  String _categoryLabel(String? key) {
+    switch (key) {
+      case 'chat':
+        return adminTx(context, 'چت اصلی', 'Main chat');
+      case 'auxiliary':
+        return adminTx(context, 'کمکی', 'Auxiliary');
+      case 'support':
+        return adminTx(context, 'پشتیبانی', 'Support');
+      case 'crm':
+        return 'CRM';
+      case 'moderation':
+        return adminTx(context, 'بررسی محتوا', 'Moderation');
+      case 'scheduled':
+        return adminTx(context, 'زمان‌بندی‌شده', 'Scheduled');
+      case 'insight':
+        return adminTx(context, 'بینش و پیشنهاد', 'Insight');
+      case 'memory':
+        return adminTx(context, 'حافظه', 'Memory');
+      default:
+        return key ?? '—';
+    }
+  }
 
   @override
   void initState() {
@@ -109,21 +134,24 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('کلید: $promptKey'),
+                        Text('${adminTx(context, 'کلید', 'Key')}: $promptKey'),
                         const SizedBox(height: 8),
-                        Text('دسته: ${_categories[prompt.category] ?? prompt.category ?? '-'}'),
+                        Text('${adminTx(context, 'دسته', 'Category')}: ${_categoryLabel(prompt.category)}'),
                         const SizedBox(height: 8),
-                        Text('منبع: ${prompt.source == 'database' ? 'دیتابیس' : 'پیش‌فرض کد'}'),
-                        const SizedBox(height: 16),
+                        Text(
+                          '${adminTx(context, 'منبع', 'Source')}: ${prompt.source == 'database' ? adminTx(context, 'دیتابیس', 'Database') : adminTx(context, 'پیش‌فرض کد', 'Code default')}',
+                        ),
+                        const SizedBox(height: 12),
                         TextFormField(
                           controller: contentController,
-                          decoration: const InputDecoration(
-                            labelText: 'محتوای Prompt',
+                          decoration: InputDecoration(
+                            isDense: true,
+                            labelText: adminTx(context, 'متن پرامپت', 'Prompt text'),
                             alignLabelWithHint: true,
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                           maxLines: 18,
-                          validator: (v) => v?.isEmpty ?? true ? 'الزامی است' : null,
+                          validator: (v) => (v?.isEmpty ?? true) ? adminTx(context, 'الزامی است', 'Required') : null,
                         ),
                       ],
                     ),
@@ -137,7 +165,7 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('لغو'),
+                      child: Text(adminTx(context, 'لغو', 'Cancel')),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton(
@@ -147,16 +175,16 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                           if (!context.mounted) return;
                           Navigator.pop(context);
                           _load(category: _selectedCategory);
-                          SnackBarHelper.showSuccess(context, message: 'به پیش‌فرض کد بازگردانده شد');
+                          SnackBarHelper.showSuccess(context, message: adminTx(context, 'به پیش‌فرض کد بازگشت', 'Restored to the code default'));
                         } catch (e) {
                           if (!context.mounted) return;
                           SnackBarHelper.showError(
                             context,
-                            message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+                            message: '${adminTx(context, 'خطا', 'Error')}: ${ErrorExtractor.forContext(e, context)}',
                           );
                         }
                       },
-                      child: const Text('بازگشت به پیش‌فرض'),
+                      child: Text(adminTx(context, 'بازگشت به پیش‌فرض', 'Restore default')),
                     ),
                     const SizedBox(width: 12),
                     FilledButton(
@@ -170,16 +198,16 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                           if (!context.mounted) return;
                           Navigator.pop(context);
                           _load(category: _selectedCategory);
-                          SnackBarHelper.showSuccess(context, message: 'ذخیره شد');
+                          SnackBarHelper.showSuccess(context, message: adminTx(context, 'ذخیره شد', 'Saved'));
                         } catch (e) {
                           if (!context.mounted) return;
                           SnackBarHelper.showError(
                             context,
-                            message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+                            message: '${adminTx(context, 'خطا', 'Error')}: ${ErrorExtractor.forContext(e, context)}',
                           );
                         }
                       },
-                      child: const Text('ذخیره'),
+                      child: Text(adminTx(context, 'ذخیره', 'Save')),
                     ),
                   ],
                 ),
@@ -197,14 +225,18 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Prompt های پیش‌فرض AI')),
+        appBar: aiHubAppBar(
+          embedded: widget.embedded,
+          title: Text(adminTx(context, 'پرامپت‌های پیش‌فرض', 'Default prompts')),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Prompt های پیش‌فرض AI'),
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
+        title: Text(adminTx(context, 'پرامپت‌های پیش‌فرض', 'Default prompts')),
       ),
       body: Column(
         children: [
@@ -218,17 +250,19 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text('فیلتر دسته:'),
+                Text(adminTx(context, 'دسته', 'Category')),
                 ChoiceChip(
-                  label: const Text('همه'),
+                  label: Text(adminTx(context, 'همه', 'All')),
+                  visualDensity: VisualDensity.compact,
                   selected: _selectedCategory == null,
                   onSelected: (_) => _load(),
                 ),
-                ..._categories.entries.map(
-                  (entry) => ChoiceChip(
-                    label: Text(entry.value),
-                    selected: _selectedCategory == entry.key,
-                    onSelected: (_) => _load(category: entry.key),
+                ..._categoryKeys.map(
+                  (key) => ChoiceChip(
+                    label: Text(_categoryLabel(key)),
+                    visualDensity: VisualDensity.compact,
+                    selected: _selectedCategory == key,
+                    onSelected: (_) => _load(category: key),
                   ),
                 ),
               ],
@@ -240,11 +274,11 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('خطا: $_error'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
+                        Text('${adminTx(context, 'خطا', 'Error')}: $_error'),
+                        const SizedBox(height: 12),
+                        FilledButton(
                           onPressed: () => _load(category: _selectedCategory),
-                          child: const Text('تلاش مجدد'),
+                          child: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
                         ),
                       ],
                     ),
@@ -257,13 +291,15 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                       itemBuilder: (context, index) {
                         final prompt = _prompts[index];
                         final sourceLabel =
-                            prompt.source == 'database' ? 'دیتابیس' : 'پیش‌فرض کد';
+                            prompt.source == 'database'
+                                ? adminTx(context, 'دیتابیس', 'Database')
+                                : adminTx(context, 'پیش‌فرض کد', 'Code default');
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ExpansionTile(
                             title: Text(prompt.title ?? prompt.promptKey ?? '-'),
                             subtitle: Text(
-                              '${_categories[prompt.category] ?? prompt.category ?? '-'} • $sourceLabel • ${prompt.promptKey ?? ''}',
+                              '${_categoryLabel(prompt.category)} • $sourceLabel • ${prompt.promptKey ?? ''}',
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.edit),

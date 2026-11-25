@@ -1,4 +1,5 @@
 Imports System.Collections.Concurrent
+Imports System.Collections.Generic
 Imports System.Net
 Imports System.Threading
 Imports Newtonsoft.Json.Linq
@@ -16,6 +17,12 @@ Friend Class DocumentTransferService
     Private Const WarehouseChunk As Integer = 100
     Private Const ReceiptChunk As Integer = 50
     Private Const ExpenseChunk As Integer = 40
+    Private _applyMutations As Boolean
+    Private ReadOnly _liveInvoiceKeys As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly _liveReceiptKeys As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly _liveExpenseKeys As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly _liveManualKeys As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly _liveCheckKeys As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
 
     ''' <summary>اگر >0 باشد، از هر ماژول اسناد فقط همین تعداد نمونه منتقل می‌شود (تست سریع).</summary>
     Public Property SampleLimit As Integer = 0
@@ -36,8 +43,15 @@ Friend Class DocumentTransferService
         selectedModules As IEnumerable(Of MigrationModule),
         currencyId As Integer,
         Optional resetCheckpoint As Boolean = False,
-        Optional ct As CancellationToken = Nothing
+        Optional ct As CancellationToken = Nothing,
+        Optional applyMutations As Boolean = False
     ) As Task(Of String)
+        _applyMutations = applyMutations AndAlso SampleLimit <= 0
+        _liveInvoiceKeys.Clear()
+        _liveReceiptKeys.Clear()
+        _liveExpenseKeys.Clear()
+        _liveManualKeys.Clear()
+        _liveCheckKeys.Clear()
         Dim businessId = session.SelectedBusiness.Id
         Dim store As New CheckpointStore(businessId, session.SelectedDatabase)
         If resetCheckpoint Then
@@ -191,6 +205,10 @@ Friend Class DocumentTransferService
         If mods.Contains(MigrationModule.Invoices) AndAlso SampleLimit <= 0 AndAlso invoiceMap.Failed.Count = 0 Then
             invoiceMap.Completed = True
             store.Save(cp)
+        End If
+
+        If _applyMutations Then
+            Await DeleteMissingDocuments(api, businessId, mods, cp, store, ct).ConfigureAwait(False)
         End If
 
         Return store.FilePath
@@ -695,7 +713,19 @@ Friend Class DocumentTransferService
         Dim settleMap = Await Task.Run(
             Function() _docs.ReadSettlementHintsForSanads(session.SqlSettings, rows.Select(Function(r) r.SanadCode)),
             ct).ConfigureAwait(False)
-        Dim pendingRaw = rows.Where(Function(r) Not invoiceMap.Done.ContainsKey(r.Key)).ToList()
+        Dim pendingRaw As New List(Of HolooInvoiceHeader)()
+        Dim pendingFp As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+        Dim pendingUpdate As New Dictionary(Of String, Boolean)(StringComparer.OrdinalIgnoreCase)
+        For Each inv In rows
+            If _applyMutations Then _liveInvoiceKeys.Add(inv.Key)
+            Dim fp = FingerprintUtil.ForInvoice(inv)
+            Dim isUpd As Boolean
+            If NeedsSend(invoiceMap, inv.Key, fp, isUpd) Then
+                pendingRaw.Add(inv)
+                pendingFp(inv.Key) = fp
+                pendingUpdate(inv.Key) = isUpd
+            End If
+        Next
         Dim pending As List(Of HolooInvoiceHeader)
         If SampleLimit > 0 AndAlso pendingRaw.Count > SampleLimit Then
             ' از هر Fac_Type تا SampleLimit نمونه (مثلاً ۲ فروش + ۲ خرید)
@@ -729,9 +759,16 @@ Friend Class DocumentTransferService
                 RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "رد: " & inv.Key & " — " & invoiceMap.Failed(inv.Key), True)
                 Continue For
             End If
+            Dim existingId As Integer = 0
+            Dim isUpd As Boolean
+            If pendingUpdate.TryGetValue(inv.Key, isUpd) AndAlso isUpd Then
+                invoiceMap.Done.TryGetValue(inv.Key, existingId)
+            End If
             queue.Enqueue(New PreparedInvoiceItem With {
                 .Key = inv.Key,
-                .Payload = payload
+                .Payload = payload,
+                .Fingerprint = If(pendingFp.ContainsKey(inv.Key), pendingFp(inv.Key), Nothing),
+                .ExistingId = existingId
             })
         Next
 
@@ -766,6 +803,8 @@ Friend Class DocumentTransferService
     Private Class PreparedInvoiceItem
         Public Property Key As String
         Public Property Payload As JObject
+        Public Property Fingerprint As String
+        Public Property ExistingId As Integer
     End Class
 
     Private Class InvoiceParallelState
@@ -799,12 +838,16 @@ Friend Class DocumentTransferService
 
             Dim items As New JArray()
             Dim keys As New List(Of String)()
+            Dim fps As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
             For Each it In batch
-                items.Add(New JObject From {
+                Dim jo As New JObject From {
                     {"client_ref", it.Key},
                     {"payload", it.Payload}
-                })
+                }
+                If it.ExistingId > 0 Then jo("invoice_id") = it.ExistingId
+                items.Add(jo)
                 keys.Add(it.Key)
+                If Not String.IsNullOrWhiteSpace(it.Fingerprint) Then fps(it.Key) = it.Fingerprint
             Next
 
             Dim localProcessed As New IntHolder With {.Value = 0}
@@ -834,6 +877,10 @@ Friend Class DocumentTransferService
                     If localMap.Done.TryGetValue(k, doneId) AndAlso doneId > 0 Then
                         invoiceMap.Done(k) = doneId
                         invoiceMap.Failed.Remove(k)
+                        Dim fp As String = Nothing
+                        If fps.TryGetValue(k, fp) AndAlso Not String.IsNullOrWhiteSpace(fp) Then
+                            invoiceMap.Fingerprints(k) = fp
+                        End If
                         state.CreatedIds.Add(doneId)
                         state.SuccessSinceSave += 1
                     ElseIf localMap.Failed.TryGetValue(k, failMsg) Then
@@ -1276,7 +1323,20 @@ Friend Class DocumentTransferService
     ) As Task
         Dim modCp = cp.EnsureModule(MigrationModule.ReceiptsPayments.ToString())
         Dim rows = Await Task.Run(Function() _docs.ReadReceiptLikeSanadsInRange(session.SqlSettings, fy.StartDate, fy.EndDate), ct).ConfigureAwait(False)
-        Dim pending = ApplySample(rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList(), "دریافت/پرداخت " & fy.Title)
+        Dim pendingRaw As New List(Of HolooReceiptLikeSanad)()
+        Dim pendingFp As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+        Dim pendingUpdate As New Dictionary(Of String, Boolean)(StringComparer.OrdinalIgnoreCase)
+        For Each r In rows
+            If _applyMutations Then _liveReceiptKeys.Add(r.Key)
+            Dim fp = FingerprintUtil.ForReceipt(r)
+            Dim isUpd As Boolean
+            If NeedsSend(modCp, r.Key, fp, isUpd) Then
+                pendingRaw.Add(r)
+                pendingFp(r.Key) = fp
+                pendingUpdate(r.Key) = isUpd
+            End If
+        Next
+        Dim pending = ApplySample(pendingRaw, "دریافت/پرداخت " & fy.Title)
         RaiseProgress("دریافت/پرداخت " & fy.Title, modCp.Done.Count, rows.Count, "ارسال " & pending.Count.ToString() & " سند...")
 
         Dim offset = 0
@@ -1302,7 +1362,13 @@ Friend Class DocumentTransferService
                     processed += 1
                     Continue For
                 End If
-                items.Add(New JObject From {{"client_ref", row.Key}, {"payload", payload}})
+                Dim item As New JObject From {{"client_ref", row.Key}, {"payload", payload}}
+                Dim isUpd As Boolean
+                Dim existingId As Integer
+                If pendingUpdate.TryGetValue(row.Key, isUpd) AndAlso isUpd AndAlso modCp.Done.TryGetValue(row.Key, existingId) AndAlso existingId > 0 Then
+                    item("document_id") = existingId
+                End If
+                items.Add(item)
                 keys.Add(row.Key)
             Next
 
@@ -1331,6 +1397,7 @@ Friend Class DocumentTransferService
                             processed += 1
                             modCp.Done(k) = r.EntityId
                             modCp.Failed.Remove(k)
+                            If pendingFp.ContainsKey(k) Then modCp.Fingerprints(k) = pendingFp(k)
                         Else
                             Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
                             If IsTransientFailureMessage(If(msg, "")) AndAlso attempt < 3 Then
@@ -1456,6 +1523,9 @@ Friend Class DocumentTransferService
         Dim rows = Await Task.Run(Function() _docs.ReadChecksInRange(session.SqlSettings, fy.StartDate, fy.EndDate), ct).ConfigureAwait(False)
 
         ' ایجاد در سال صدور؛ چک‌های قبل از اولین سال کشف‌شده در سال اول ثبت می‌شوند
+        For Each liveRow In rows
+            If Not liveRow.IsVoid AndAlso _applyMutations Then _liveCheckKeys.Add(liveRow.Key)
+        Next
         Dim toCreate = ApplySample(rows.Where(Function(r) Not r.IsVoid AndAlso Not modCp.Done.ContainsKey(r.Key) AndAlso (
             (r.IssueDate >= fy.StartDate AndAlso r.IssueDate <= fy.EndDate) OrElse
             (isFirstYear AndAlso r.IssueDate < earliestStart)
@@ -1543,6 +1613,7 @@ Friend Class DocumentTransferService
             If createdId > 0 Then
                 modCp.Done(row.Key) = createdId
                 modCp.Failed.Remove(row.Key)
+                modCp.Fingerprints(row.Key) = FingerprintUtil.ForCheckContent(row)
                 RaiseProgress("چک " & fy.Title, i, toCreate.Count, "ایجاد: " & CStr(payload("check_number")))
                 If row.IsReturned Then
                     Try
@@ -1559,6 +1630,47 @@ Friend Class DocumentTransferService
             End If
             store.Save(cp)
         Next
+
+        If _applyMutations Then
+            For Each row In rows
+                ct.ThrowIfCancellationRequested()
+                If row.IsVoid Then Continue For
+                Dim checkId As Integer
+                If Not modCp.Done.TryGetValue(row.Key, checkId) OrElse checkId <= 0 Then Continue For
+                Dim fp = FingerprintUtil.ForCheckContent(row)
+                Dim oldFp As String = Nothing
+                If Not modCp.Fingerprints.TryGetValue(row.Key, oldFp) OrElse String.IsNullOrWhiteSpace(oldFp) Then
+                    modCp.Fingerprints(row.Key) = fp
+                    Continue For
+                End If
+                If String.Equals(oldFp, fp, StringComparison.Ordinal) Then Continue For
+                Try
+                    Dim personCode = If(row.IsPayable, If(row.DestPersonCode, row.SourcePersonCode), row.SourcePersonCode)
+                    Dim personId = mapper.ResolvePerson(personCode)
+                    If personId <= 0 Then personId = ResolvePersonByMoien(personMap, personCode)
+                    Dim issue = row.IssueDate
+                    Dim due = row.DueDate
+                    If due < issue Then due = issue
+                    Dim upd As New JObject From {
+                        {"person_id", personId},
+                        {"issue_date", ApiDateFormat.ToIsoDate(issue)},
+                        {"due_date", ApiDateFormat.ToIsoDate(due)},
+                        {"amount", Math.Round(row.Amount, 2)},
+                        {"document_description", If(String.IsNullOrWhiteSpace(row.Comment), "Holoo " & row.Key, row.Comment)}
+                    }
+                    If Not String.IsNullOrWhiteSpace(row.CheckNumber) Then upd("check_number") = row.CheckNumber.Trim()
+                    If Not String.IsNullOrWhiteSpace(row.BankName) Then upd("bank_name") = row.BankName
+                    Await api.UpdateCheckAsync(checkId, upd, ct).ConfigureAwait(False)
+                    modCp.Fingerprints(row.Key) = fp
+                    modCp.Failed.Remove(row.Key)
+                    RaiseProgress("چک " & fy.Title, 0, 0, "ویرایش: " & row.Key)
+                Catch ex As Exception
+                    modCp.Failed(row.Key) = "ویرایش: " & ex.Message
+                    RaiseProgress("چک", 0, 0, "خطای ویرایش " & row.Key & " — " & ex.Message, True)
+                End Try
+                store.Save(cp)
+            Next
+        End If
 
         ' عودت چک‌هایی که قبلاً ایجاد شده و در این سال برگشت خورده‌اند
         Dim returnCp = clearCp
@@ -1689,7 +1801,20 @@ Friend Class DocumentTransferService
         Dim expenses = Await Task.Run(Function() _docs.ReadExpenseIncomeSanadsInRange(session.SqlSettings, fy.StartDate, fy.EndDate, False), ct).ConfigureAwait(False)
         Dim incomes = Await Task.Run(Function() _docs.ReadExpenseIncomeSanadsInRange(session.SqlSettings, fy.StartDate, fy.EndDate, True), ct).ConfigureAwait(False)
         Dim rows = expenses.Concat(incomes).OrderBy(Function(r) r.SanadDate).ThenBy(Function(r) r.SanadCode).ToList()
-        Dim pending = ApplySample(rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList(), "هزینه/درآمد " & fy.Title)
+        Dim pendingRaw As New List(Of HolooExpenseIncomeSanad)()
+        Dim pendingFp As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+        Dim pendingUpdate As New Dictionary(Of String, Boolean)(StringComparer.OrdinalIgnoreCase)
+        For Each r In rows
+            If _applyMutations Then _liveExpenseKeys.Add(r.Key)
+            Dim fp = FingerprintUtil.ForExpenseIncome(r)
+            Dim isUpd As Boolean
+            If NeedsSend(modCp, r.Key, fp, isUpd) Then
+                pendingRaw.Add(r)
+                pendingFp(r.Key) = fp
+                pendingUpdate(r.Key) = isUpd
+            End If
+        Next
+        Dim pending = ApplySample(pendingRaw, "هزینه/درآمد " & fy.Title)
         RaiseProgress("هزینه/درآمد " & fy.Title, modCp.Done.Count, rows.Count, "ارسال " & pending.Count.ToString() & " سند متوازن...")
 
         Dim offset = 0
@@ -1710,7 +1835,13 @@ Friend Class DocumentTransferService
                     processed += 1
                     Continue For
                 End If
-                items.Add(New JObject From {{"client_ref", row.Key}, {"payload", payload}})
+                Dim item As New JObject From {{"client_ref", row.Key}, {"payload", payload}}
+                Dim isUpd As Boolean
+                Dim existingId As Integer
+                If pendingUpdate.TryGetValue(row.Key, isUpd) AndAlso isUpd AndAlso modCp.Done.TryGetValue(row.Key, existingId) AndAlso existingId > 0 Then
+                    item("document_id") = existingId
+                End If
+                items.Add(item)
                 keys.Add(row.Key)
             Next
 
@@ -1739,6 +1870,7 @@ Friend Class DocumentTransferService
                             processed += 1
                             modCp.Done(k) = r.EntityId
                             modCp.Failed.Remove(k)
+                            If pendingFp.ContainsKey(k) Then modCp.Fingerprints(k) = pendingFp(k)
                         Else
                             Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
                             If IsTransientFailureMessage(If(msg, "")) AndAlso attempt < 3 Then
@@ -1965,7 +2097,20 @@ Friend Class DocumentTransferService
         End If
         If catalog Is Nothing Then catalog = New SarfaslCatalog(api, businessId, accountCodeMap)
         Dim rows = Await Task.Run(Function() _docs.ReadManualJournalsInRange(session.SqlSettings, fy.StartDate, fy.EndDate), ct).ConfigureAwait(False)
-        Dim pending = ApplySample(rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList(), "اسناد دستی " & fy.Title)
+        Dim pendingRaw As New List(Of HolooManualJournal)()
+        Dim pendingFp As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+        Dim pendingUpdate As New Dictionary(Of String, Boolean)(StringComparer.OrdinalIgnoreCase)
+        For Each r In rows
+            If _applyMutations Then _liveManualKeys.Add(r.Key)
+            Dim fp = FingerprintUtil.ForManual(r)
+            Dim isUpd As Boolean
+            If NeedsSend(modCp, r.Key, fp, isUpd) Then
+                pendingRaw.Add(r)
+                pendingFp(r.Key) = fp
+                pendingUpdate(r.Key) = isUpd
+            End If
+        Next
+        Dim pending = ApplySample(pendingRaw, "اسناد دستی " & fy.Title)
         RaiseProgress("اسناد دستی " & fy.Title, modCp.Done.Count, rows.Count, "ارسال " & pending.Count.ToString() & " سند متوازن...")
 
         Dim i = 0
@@ -1988,12 +2133,21 @@ Friend Class DocumentTransferService
                 Continue For
             End If
             Try
-                Dim docId = Await api.CreateManualDocumentAsync(businessId, payload, ct).ConfigureAwait(False)
-                If docId > 0 Then
-                    modCp.Done(row.Key) = docId
+                Dim isUpd As Boolean
+                Dim existingId As Integer
+                If pendingUpdate.TryGetValue(row.Key, isUpd) AndAlso isUpd AndAlso modCp.Done.TryGetValue(row.Key, existingId) AndAlso existingId > 0 Then
+                    Await api.UpdateManualDocumentAsync(existingId, payload, ct).ConfigureAwait(False)
                     modCp.Failed.Remove(row.Key)
+                    If pendingFp.ContainsKey(row.Key) Then modCp.Fingerprints(row.Key) = pendingFp(row.Key)
                 Else
-                    modCp.Failed(row.Key) = "شناسه سند برنگشت"
+                    Dim docId = Await api.CreateManualDocumentAsync(businessId, payload, ct).ConfigureAwait(False)
+                    If docId > 0 Then
+                        modCp.Done(row.Key) = docId
+                        modCp.Failed.Remove(row.Key)
+                        If pendingFp.ContainsKey(row.Key) Then modCp.Fingerprints(row.Key) = pendingFp(row.Key)
+                    Else
+                        modCp.Failed(row.Key) = "شناسه سند برنگشت"
+                    End If
                 End If
             Catch ex As Exception
                 modCp.Failed(row.Key) = ex.Message
@@ -2246,6 +2400,142 @@ Friend Class DocumentTransferService
         End If
         Return Nothing
     End Function
+
+    Private Function NeedsSend(modCp As ModuleCheckpoint, key As String, fingerprint As String, ByRef isUpdate As Boolean) As Boolean
+        isUpdate = False
+        If modCp Is Nothing OrElse String.IsNullOrWhiteSpace(key) Then Return False
+        modCp.EnsureCollections()
+        If Not modCp.Done.ContainsKey(key) Then Return True
+        If Not _applyMutations Then Return False
+        Dim oldFp As String = Nothing
+        If Not modCp.Fingerprints.TryGetValue(key, oldFp) OrElse String.IsNullOrWhiteSpace(oldFp) Then
+            If Not String.IsNullOrWhiteSpace(fingerprint) Then modCp.Fingerprints(key) = fingerprint
+            Return False
+        End If
+        If String.Equals(oldFp, fingerprint, StringComparison.Ordinal) Then Return False
+        isUpdate = True
+        Return True
+    End Function
+
+    Private Async Function DeleteMissingDocuments(
+        api As HesabixApiClient,
+        businessId As Integer,
+        mods As List(Of MigrationModule),
+        cp As TransferCheckpoint,
+        store As CheckpointStore,
+        ct As CancellationToken
+    ) As Task
+        If mods.Contains(MigrationModule.Invoices) Then
+            Await DeleteMissingByKeys(
+                "فاکتور",
+                cp.EnsureModule(MigrationModule.Invoices.ToString()),
+                _liveInvoiceKeys,
+                Function(k) k.IndexOf(":"c) >= 0 AndAlso Not k.StartsWith("INVWH:", StringComparison.OrdinalIgnoreCase),
+                Function(id) api.DeleteInvoiceAsync(businessId, id, ct),
+                store, cp, ct).ConfigureAwait(False)
+        End If
+        If mods.Contains(MigrationModule.ReceiptsPayments) Then
+            Await DeleteMissingByKeys(
+                "دریافت/پرداخت",
+                cp.EnsureModule(MigrationModule.ReceiptsPayments.ToString()),
+                _liveReceiptKeys,
+                Function(k) k.StartsWith("SND20:", StringComparison.OrdinalIgnoreCase),
+                Function(id) api.DeleteReceiptPaymentAsync(id, ct),
+                store, cp, ct).ConfigureAwait(False)
+        End If
+        If mods.Contains(MigrationModule.ExpenseIncome) Then
+            Await DeleteMissingByKeys(
+                "هزینه/درآمد",
+                cp.EnsureModule(MigrationModule.ExpenseIncome.ToString()),
+                _liveExpenseKeys,
+                Function(k) k.StartsWith("EXP:", StringComparison.OrdinalIgnoreCase) OrElse k.StartsWith("INC:", StringComparison.OrdinalIgnoreCase),
+                Function(id) api.DeleteExpenseIncomeAsync(id, ct),
+                store, cp, ct).ConfigureAwait(False)
+        End If
+        If mods.Contains(MigrationModule.ManualJournals) Then
+            Await DeleteMissingByKeys(
+                "اسناد دستی",
+                cp.EnsureModule(MigrationModule.ManualJournals.ToString()),
+                _liveManualKeys,
+                Function(k) k.StartsWith("JRN:", StringComparison.OrdinalIgnoreCase),
+                Function(id) api.DeleteManualDocumentAsync(id, ct),
+                store, cp, ct).ConfigureAwait(False)
+        End If
+        If mods.Contains(MigrationModule.Checks) Then
+            Dim checkCp = cp.EnsureModule(MigrationModule.Checks.ToString())
+            Dim clearCp = cp.EnsureModule("ChecksClear")
+            Await DeleteMissingByKeys(
+                "چک",
+                checkCp,
+                _liveCheckKeys,
+                Function(k) k.StartsWith("CHK:", StringComparison.OrdinalIgnoreCase),
+                Function(id) api.DeleteCheckAsync(id, ct),
+                store, cp, ct).ConfigureAwait(False)
+            StripOrphanCheckStates(checkCp, clearCp)
+            store.Save(cp)
+        End If
+    End Function
+
+    Private Async Function DeleteMissingByKeys(
+        title As String,
+        modCp As ModuleCheckpoint,
+        liveKeys As HashSet(Of String),
+        keyFilter As Func(Of String, Boolean),
+        deleter As Func(Of Integer, Task),
+        store As CheckpointStore,
+        cp As TransferCheckpoint,
+        ct As CancellationToken
+    ) As Task
+        If modCp Is Nothing Then Return
+        modCp.EnsureCollections()
+        Dim candidates = modCp.Done.Keys.Where(Function(k) keyFilter(k) AndAlso Not liveKeys.Contains(k)).ToList()
+        If candidates.Count = 0 Then Return
+        If liveKeys.Count = 0 AndAlso modCp.Done.Count > 0 Then
+            RaiseProgress(title, 0, 0, "حذف رد شد: در هلو هیچ سندی از این ماژول دیده نشد (محافظ انبوه).", True)
+            Return
+        End If
+        Dim removed = 0
+        For Each key In candidates
+            ct.ThrowIfCancellationRequested()
+            Dim id As Integer
+            If Not modCp.Done.TryGetValue(key, id) OrElse id <= 0 Then
+                modCp.Done.Remove(key)
+                modCp.Fingerprints.Remove(key)
+                Continue For
+            End If
+            Try
+                Await deleter(id).ConfigureAwait(False)
+                modCp.Done.Remove(key)
+                modCp.Failed.Remove(key)
+                modCp.Fingerprints.Remove(key)
+                removed += 1
+                RaiseProgress(title, removed, candidates.Count, "حذف در حسابیکس: " & key)
+            Catch ex As Exception
+                modCp.Failed(key) = "حذف: " & ex.Message
+                RaiseProgress(title, removed, candidates.Count, "خطای حذف " & key & " — " & ex.Message, True)
+            End Try
+            If removed Mod 10 = 0 Then store.Save(cp)
+        Next
+        store.Save(cp)
+        RaiseProgress(title, removed, candidates.Count, "حذف‌شده: " & removed.ToString() & " از " & candidates.Count.ToString())
+    End Function
+
+    Private Shared Sub StripOrphanCheckStates(checkCp As ModuleCheckpoint, clearCp As ModuleCheckpoint)
+        If checkCp Is Nothing OrElse clearCp Is Nothing Then Return
+        checkCp.EnsureCollections()
+        clearCp.EnsureCollections()
+        Dim stale As New List(Of String)()
+        For Each k In clearCp.Done.Keys
+            Dim code = k
+            Dim prefixEnd = k.IndexOf(":"c)
+            If prefixEnd > 0 Then code = "CHK:" & k.Substring(prefixEnd + 1)
+            If Not checkCp.Done.ContainsKey(code) Then stale.Add(k)
+        Next
+        For Each k In stale
+            clearCp.Done.Remove(k)
+            clearCp.Failed.Remove(k)
+        Next
+    End Sub
 
     Private Sub RaiseProgress(moduleTitle As String, current As Integer, total As Integer, message As String, Optional isError As Boolean = False)
         RaiseEvent ProgressChanged(Me, New TransferProgressEventArgs With {

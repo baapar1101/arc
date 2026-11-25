@@ -21,6 +21,8 @@ import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/bom_explosion_widget.dart';
 import '../../widgets/invoice/product_bundle_picker_dialog.dart';
 import '../../services/bom_service.dart';
+import '../../services/production_order_service.dart';
+import '../../models/production_order_models.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import '../../utils/number_formatters.dart';
@@ -52,18 +54,23 @@ import '../../utils/invoice_form_prefill.dart';
 import '../../utils/invoice_adjustments_account_filter.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/barcode_label/label_print_from_invoice.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
-
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
   final CalendarController calendarController;
+
   /// پر کردن فرم با دادهٔ این فاکتور؛ ذخیره، سند تازه می‌سازد.
   final int? copyFromInvoiceId;
+
   /// پیش‌انتخاب مشتری (مثلاً از ویزیت میدانی).
   final int? initialPersonId;
+
+  /// پیش‌انتخاب سفارش تولید در حال اجرا برای فاکتور تولید.
+  final int? initialProductionOrderId;
 
   const NewInvoicePage({
     super.key,
@@ -72,24 +79,27 @@ class NewInvoicePage extends StatefulWidget {
     required this.calendarController,
     this.copyFromInvoiceId,
     this.initialPersonId,
+    this.initialProductionOrderId,
   });
 
   @override
   State<NewInvoicePage> createState() => _NewInvoicePageState();
 }
 
-class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProviderStateMixin {
+class _NewInvoicePageState extends State<NewInvoicePage>
+    with SingleTickerProviderStateMixin {
   // تنظیمات انبار / حواله (none | draft | posted)
   String _invoiceWarehouseReleaseMode = 'draft';
   bool _warehouseReleaseModeFromLocal = false;
-  int? _documentWarehouseId; // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
+  int?
+  _documentWarehouseId; // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
   VoidCallback? _restoreDesktopRailAfterQuit;
 
   bool get _postInventory => _invoiceWarehouseReleaseMode != 'none';
   late TabController _tabController;
   // نادیده گرفتن اعتبار مشتری برای این فاکتور
   bool _ignoreCreditCheck = false;
-  
+
   InvoiceType? _selectedInvoiceType;
   bool _isDraft = false;
   bool _isSaving = false;
@@ -104,7 +114,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Person? _selectedSupplier; // برای فاکتورهای خرید
   double? _customerBalance;
   String? _customerStatus;
-  Map<String, dynamic>? _customerCreditInfo; // credit_limit, effective_credit_limit, credit_check_enabled
+  Map<String, dynamic>?
+  _customerCreditInfo; // credit_limit, effective_credit_limit, credit_check_enabled
   double? _commissionPercentage;
   double? _commissionAmount;
   CommissionType? _commissionType;
@@ -129,14 +140,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   num _sumDiscount = 0;
   num _sumTax = 0;
   num _sumTotal = 0;
-  InvoiceGlobalDiscountPolicy _globalDiscountPolicy = const InvoiceGlobalDiscountPolicy();
+  InvoiceGlobalDiscountPolicy _globalDiscountPolicy =
+      const InvoiceGlobalDiscountPolicy();
   String _globalDiscountType = 'percent';
-  final TextEditingController _globalDiscountValueController = TextEditingController();
-  
+  final TextEditingController _globalDiscountValueController =
+      TextEditingController();
+  final TextEditingController _loyaltyPointsController = TextEditingController();
+  final TextEditingController _clubVoucherCodeController = TextEditingController();
+
   // تنظیمات چاپ و ارسال
   bool _printAfterSave = false;
   String? _selectedPaperSize;
   bool _showStampOnPrint = true;
+
   /// فقط اگر در تنظیمات چاپ کسب‌وکار برای این نوع سند فعال باشد
   bool _businessPrintAllowsShareQr = false;
   bool _showShareQrOnPrint = false;
@@ -149,7 +165,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<Map<String, dynamic>> _availablePrintTemplates = const [];
   List<Map<String, dynamic>> _availableReceiptPrintTemplates = const [];
   bool _isLoadingPrintTemplates = false;
-  
+
   // تراکنش‌های فاکتور
   List<InvoiceTransaction> _transactions = [];
   // اضافات و کسورات (فقط فروش/خرید)
@@ -162,7 +178,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Set<int> _bomIds = <int>{};
   // هزینه عملیات/سربار تولید
   double? _productionOperationsTotal;
-  
+  // سفارش تولید اختیاری برای کنترل رزرو/مصرف
+  int? _productionOrderId;
+  List<ProductionOrder> _productionOrderOptions = const [];
+  ProductionOrder? _linkedProductionOrder;
+  bool _loadingProductionOrders = false;
+
   // فروش اقساطی (MVP)
   bool _useInstallments = false;
   int? _numInstallments;
@@ -180,7 +201,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   /// بارگذاری اول دادهٔ کپی از فاکتور دیگر (API)
   bool _copyFromLoading = false;
   String? _copyFromErrorMessage;
-  
+
   // Controller های فیلدهای اقساطی برای جلوگیری از از دست رفتن فوکوس
   late final TextEditingController _numInstallmentsController;
   late final TextEditingController _downPaymentController;
@@ -227,16 +248,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   num get _adjustmentsTaxSum => sumSignedAdjustmentsTax(_adjustmentRows);
 
-  num get _invoiceGrandTotal =>
-      invoiceAdjustmentsRound2(_sumTotal + _adjustmentsNetSum + _adjustmentsTaxSum);
+  num get _invoiceGrandTotal => invoiceAdjustmentsRound2(
+    _sumTotal + _adjustmentsNetSum + _adjustmentsTaxSum,
+  );
 
   bool get _isSalesOrReturn =>
-      _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
+      _selectedInvoiceType == InvoiceType.sales ||
+      _selectedInvoiceType == InvoiceType.salesReturn;
 
   bool get _isCreditLimitExceededApprox {
     if (!_isSalesOrReturn) return false;
     if (_customerCreditInfo == null || _customerBalance == null) return false;
-    final effectiveLimit = (_customerCreditInfo!['effective_credit_limit'] as num?)?.toDouble();
+    final effectiveLimit =
+        (_customerCreditInfo!['effective_credit_limit'] as num?)?.toDouble();
     if (effectiveLimit == null) return false;
     // بدهی فعلی (تراز منفی یعنی بدهکار)
     double currentDebt = 0;
@@ -284,7 +308,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   String get _baseCurrencyUnitLabel {
     final defId = _defaultBusinessCurrencyId;
-    return currencyUnitLabelForBusinessCurrencyIdOrNull(defId, _businessCurrenciesCache) ??
+    return currencyUnitLabelForBusinessCurrencyIdOrNull(
+          defId,
+          _businessCurrenciesCache,
+        ) ??
         'پایه';
   }
 
@@ -319,7 +346,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
     _attachTabListener();
     // تنظیم نوع فاکتور پیش‌فرض
-    _selectedInvoiceType = _canAccessInvoiceType(InvoiceType.sales, action: 'add')
+    _selectedInvoiceType =
+        _canAccessInvoiceType(InvoiceType.sales, action: 'add')
         ? InvoiceType.sales
         : InvoiceType.values.firstWhere(
             (e) => _canAccessInvoiceType(e, action: 'add'),
@@ -370,6 +398,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.copyFromInvoiceId != null) {
         await _loadInvoiceCopyFrom(widget.copyFromInvoiceId!);
+      } else if (widget.initialProductionOrderId != null) {
+        await _applyInitialProductionOrder(widget.initialProductionOrderId!);
       } else if (widget.initialPersonId != null) {
         await _loadInitialPerson(widget.initialPersonId!);
       }
@@ -378,6 +408,121 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         await _syncReservedInvoiceCode();
       }
     });
+  }
+
+  Future<void> _loadProductionOrderOptions() async {
+    if (_selectedInvoiceType != InvoiceType.production) return;
+    setState(() => _loadingProductionOrders = true);
+    try {
+      final items = await ProductionOrderService().listOrders(
+        businessId: widget.businessId,
+        status: 'in_progress',
+        take: 100,
+      );
+      if (!mounted) return;
+      setState(() {
+        _productionOrderOptions = items;
+        if (_productionOrderId != null) {
+          _linkedProductionOrder = items.cast<ProductionOrder?>().firstWhere(
+            (o) => o?.id == _productionOrderId,
+            orElse: () => _linkedProductionOrder,
+          );
+        }
+      });
+    } catch (_) {
+      // انتخاب دستی سفارش اختیاری است؛ خطا را بی‌صدا رد می‌کنیم.
+    } finally {
+      if (mounted) setState(() => _loadingProductionOrders = false);
+    }
+  }
+
+  Future<void> _applyInitialProductionOrder(int orderId) async {
+    if (!_canAccessInvoiceType(InvoiceType.production, action: 'add')) return;
+    try {
+      final order = await ProductionOrderService().getById(
+        businessId: widget.businessId,
+        orderId: orderId,
+      );
+      if (!mounted) return;
+      if (!order.isInProgress) {
+        SnackBarHelper.showError(
+          context,
+          message: 'فقط سفارش در حال اجرا قابل اتصال به فاکتور تولید است',
+        );
+        return;
+      }
+      setState(() {
+        _selectedInvoiceType = InvoiceType.production;
+        _productionOrderId = order.id;
+        _linkedProductionOrder = order;
+        _bomIds
+          ..clear()
+          ..add(order.bomId);
+        // The invoice-level warehouse is the output warehouse. Component
+        // rows carry their own planned material warehouse.
+        _documentWarehouseId = order.outputWarehouseId;
+        _lineItems = <InvoiceLineItem>[];
+        _productionOperationsTotal = null;
+      });
+      _tabController.dispose();
+      _tabController = TabController(
+        length: _getTabCountForType(InvoiceType.production),
+        vsync: this,
+      );
+      _attachTabListener();
+      await _loadProductionOrderOptions();
+      _loadLocalSettingsForCurrentType();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _selectProductionOrder(int? orderId) async {
+    if (orderId == null) {
+      setState(() {
+        _productionOrderId = null;
+        _linkedProductionOrder = null;
+        _bomIds.clear();
+        _lineItems = <InvoiceLineItem>[];
+        _productionOperationsTotal = null;
+      });
+      return;
+    }
+    try {
+      final order = await ProductionOrderService().getById(
+        businessId: widget.businessId,
+        orderId: orderId,
+      );
+      if (!mounted) return;
+      if (!order.isInProgress) {
+        SnackBarHelper.showError(
+          context,
+          message: 'فقط سفارش در حال اجرا قابل اتصال به فاکتور تولید است',
+        );
+        return;
+      }
+      if (_productionOrderId == order.id) return;
+      setState(() {
+        _productionOrderId = order.id;
+        _linkedProductionOrder = order;
+        _bomIds
+          ..clear()
+          ..add(order.bomId);
+        _documentWarehouseId = order.outputWarehouseId;
+        _lineItems = <InvoiceLineItem>[];
+        _productionOperationsTotal = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
   }
 
   Future<void> _loadInitialPerson(int personId) async {
@@ -438,7 +583,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       Account? acc;
       if (aid != null) {
         try {
-          final j = await svc.getAccount(businessId: widget.businessId, accountId: aid);
+          final j = await svc.getAccount(
+            businessId: widget.businessId,
+            accountId: aid,
+          );
           acc = Account.fromJson(j);
         } catch (_) {}
       }
@@ -504,14 +652,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
 
     try {
-      final data = await InvoiceService(apiClient: ApiClient()).getInvoice(
-        businessId: widget.businessId,
-        invoiceId: sourceInvoiceId,
-      );
+      final data = await InvoiceService(
+        apiClient: ApiClient(),
+      ).getInvoice(businessId: widget.businessId, invoiceId: sourceInvoiceId);
       final item = Map<String, dynamic>.from(data['item'] ?? const {});
       final String docType = (item['document_type']?.toString() ?? '');
-      final String typeValue =
-          docType.startsWith('invoice_') ? docType.substring('invoice_'.length) : docType;
+      final String typeValue = docType.startsWith('invoice_')
+          ? docType.substring('invoice_'.length)
+          : docType;
       final invType = InvoiceType.fromValue(typeValue) ?? InvoiceType.sales;
       final ei = Map<String, dynamic>.from(item['extra_info'] ?? const {});
 
@@ -527,7 +675,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (oldDocDate != null && dueRaw != null) {
         final parsedDue = _parseInvoiceIsoDay(dueRaw);
         if (parsedDue != null) {
-          dueOut = invoiceDateToday.add(parsedDue.difference(_dateOnly(oldDocDate)));
+          dueOut = invoiceDateToday.add(
+            parsedDue.difference(_dateOnly(oldDocDate)),
+          );
         }
       } else {
         final fb = _parseInvoiceIsoDay(dueRaw);
@@ -552,16 +702,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       final autop = ei['auto_post_warehouse'];
       final pinv = postOk is bool ? postOk : true;
       final autoPostResolved = autop is bool ? autop : false;
-      final warehouseMode =
-          pinv ? (autoPostResolved ? 'posted' : 'draft') : 'none';
+      final warehouseMode = pinv
+          ? (autoPostResolved ? 'posted' : 'draft')
+          : 'none';
 
       int? fxRateIdExtra;
       final fxx = ei['fx'];
       if (fxx is Map && fxx['mode']?.toString() == 'selected') {
         final rrid = fxx['rate_row_id'];
         if (rrid != null) {
-          fxRateIdExtra =
-              rrid is num ? rrid.toInt() : int.tryParse(rrid.toString());
+          fxRateIdExtra = rrid is num
+              ? rrid.toInt()
+              : int.tryParse(rrid.toString());
         }
       }
 
@@ -574,7 +726,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         try {
           final ps = PersonService(apiClient: ApiClient());
           final person = await ps.getPerson(personId);
-          if (invType == InvoiceType.sales || invType == InvoiceType.salesReturn) {
+          if (invType == InvoiceType.sales ||
+              invType == InvoiceType.salesReturn) {
             cust = Customer(
               id: person.id!,
               name: person.displayName,
@@ -596,13 +749,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       final sellerId = sellerRaw == null
           ? null
           : (sellerRaw is num
-              ? sellerRaw.toInt()
-              : int.tryParse(sellerRaw.toString()));
-      if ((invType == InvoiceType.sales || invType == InvoiceType.salesReturn) &&
+                ? sellerRaw.toInt()
+                : int.tryParse(sellerRaw.toString()));
+      if ((invType == InvoiceType.sales ||
+              invType == InvoiceType.salesReturn) &&
           sellerId != null) {
         try {
-          seller =
-              await PersonService(apiClient: ApiClient()).getPerson(sellerId);
+          seller = await PersonService(
+            apiClient: ApiClient(),
+          ).getPerson(sellerId);
         } catch (_) {}
       }
 
@@ -638,7 +793,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         if (gv != null) gdText = gv.toString();
       }
 
-      final hydrateInstall = installmentPlanPresentInExtra(ei) &&
+      final hydrateInstall =
+          installmentPlanPresentInExtra(ei) &&
           (invType == InvoiceType.sales || invType == InvoiceType.salesReturn);
 
       _disposeInstallmentRowControllersFully();
@@ -676,18 +832,23 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             final per = planSnap['period']?.toString().toLowerCase();
             ipHydr = per == 'days' ? 'days' : 'monthly';
             final ipdex = planSnap['period_days'];
-            ipdHydr = (ipdex is num ? ipdex.toInt() : int.tryParse(ipdex?.toString() ?? '')) ??
+            ipdHydr =
+                (ipdex is num
+                    ? ipdex.toInt()
+                    : int.tryParse(ipdex?.toString() ?? '')) ??
                 (_installmentPeriodDays ?? 30);
           }
 
           DateTime baseFirstDue = invoiceDateToday;
           final fd = planSnap['first_due_date']?.toString();
           if (fd != null && fd.length >= 10 && oldDocDate != null) {
-            final oldFirst =
-                DateTime.tryParse(fd.length >= 10 ? fd.substring(0, 10) : fd);
+            final oldFirst = DateTime.tryParse(
+              fd.length >= 10 ? fd.substring(0, 10) : fd,
+            );
             if (oldFirst != null) {
-              baseFirstDue =
-                  invoiceDateToday.add(oldFirst.difference(_dateOnly(oldDocDate)));
+              baseFirstDue = invoiceDateToday.add(
+                oldFirst.difference(_dateOnly(oldDocDate)),
+              );
             }
           }
           firstDueHydr = baseFirstDue;
@@ -705,8 +866,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 due = DateTime.tryParse(ds.substring(0, 10));
               }
               if (due != null && oldDocDate != null) {
-                final delta =
-                    _dateOnly(due).difference(_dateOnly(oldDocDate));
+                final delta = _dateOnly(due).difference(_dateOnly(oldDocDate));
                 due = invoiceDateToday.add(delta);
               }
               rows.add({
@@ -714,7 +874,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 'due_date': due ?? firstDueHydr ?? invoiceDateToday,
                 'principal': (m['principal'] as num?)?.toDouble() ?? 0.0,
                 'interest': (m['interest'] as num?)?.toDouble() ?? 0.0,
-                'total': (m['total'] as num?)?.toDouble() ??
+                'total':
+                    (m['total'] as num?)?.toDouble() ??
                     (((m['principal'] as num?)?.toDouble() ?? 0) +
                         ((m['interest'] as num?)?.toDouble() ?? 0)),
                 'paid_amount': 0.0,
@@ -748,8 +909,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           if (id != null && id > 0) bomResolved.add(id);
         }
       }
-      double? prodOp =
-          (ei['production_operations_total'] as num?)?.toDouble();
+      double? prodOp = (ei['production_operations_total'] as num?)?.toDouble();
+      final prodOrderRaw = ei['production_order_id'];
+      final prodOrderId = prodOrderRaw == null
+          ? null
+          : (prodOrderRaw is num
+                ? prodOrderRaw.toInt()
+                : int.tryParse(prodOrderRaw.toString()));
 
       if (!mounted) return;
 
@@ -769,26 +935,30 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         _selectedTagIds = tagIds;
         _invoiceTitle =
             item['description']?.toString().trim().isNotEmpty == true
-                ? item['description'].toString()
-                : null;
+            ? item['description'].toString()
+            : null;
         _invoiceTitleController.text = _invoiceTitle ?? '';
 
         _invoiceWarehouseReleaseMode = warehouseMode;
         final wid = ei['warehouse_id'];
-        _documentWarehouseId =
-            wid == null ? null : (wid is num ? wid.toInt() : int.tryParse(wid.toString()));
+        _documentWarehouseId = wid == null
+            ? null
+            : (wid is num ? wid.toInt() : int.tryParse(wid.toString()));
 
         _manualFxRateId = fxRateIdExtra;
 
         _lineItems = mappedLines;
 
-        _globalDiscountType =
-            gdTyp == 'percent' || gdTyp == 'amount' ? gdTyp : 'percent';
+        _globalDiscountType = gdTyp == 'percent' || gdTyp == 'amount'
+            ? gdTyp
+            : 'percent';
         _globalDiscountValueController.text = gdText;
 
         _bomIds.clear();
         _bomIds.addAll(bomResolved);
         _productionOperationsTotal = prodOp;
+        _productionOrderId = prodOrderId;
+        _linkedProductionOrder = null;
 
         _useInstallments = useInstallmentsLoad;
         if (_useInstallments && hydrateInstall) {
@@ -799,12 +969,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           _installmentPeriodDays = ipdHydr;
           _firstInstallmentDueDate = firstDueHydr ?? invoiceDateToday;
           _installmentRows = instalRowsOut;
-          _numInstallmentsController.text =
-              formatNumberForInput(_numInstallments, decimalPlaces: 0);
+          _numInstallmentsController.text = formatNumberForInput(
+            _numInstallments,
+            decimalPlaces: 0,
+          );
           _downPaymentController.text = formatNumberForInput(_downPayment);
           _interestRateController.text = formatNumberForInput(_interestRate);
-          _installmentPeriodDaysController.text =
-              formatNumberForInput(ipdHydr, decimalPlaces: 0);
+          _installmentPeriodDaysController.text = formatNumberForInput(
+            ipdHydr,
+            decimalPlaces: 0,
+          );
           for (int idx = 0; idx < _installmentRows.length; idx++) {
             final principal =
                 (_installmentRows[idx]['principal'] as num?)?.toDouble() ?? 0.0;
@@ -812,14 +986,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 (_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0;
             final total =
                 (_installmentRows[idx]['total'] as num?)?.toDouble() ?? 0.0;
-            _getInstallmentController(_installmentPrincipalControllers, idx,
-                principal,
-                updateIfChanged: false);
-            _getInstallmentController(_installmentInterestControllers, idx,
-                interest,
-                updateIfChanged: false);
-            _getInstallmentController(_installmentTotalControllers, idx, total,
-                updateIfChanged: false);
+            _getInstallmentController(
+              _installmentPrincipalControllers,
+              idx,
+              principal,
+              updateIfChanged: false,
+            );
+            _getInstallmentController(
+              _installmentInterestControllers,
+              idx,
+              interest,
+              updateIfChanged: false,
+            );
+            _getInstallmentController(
+              _installmentTotalControllers,
+              idx,
+              total,
+              updateIfChanged: false,
+            );
           }
         } else {
           _downPayment = null;
@@ -830,8 +1014,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           _numInstallmentsController.clear();
           _downPaymentController.clear();
           _interestRateController.clear();
-          _installmentPeriodDaysController.text =
-              formatNumberForInput(_installmentPeriodDays ?? 30, decimalPlaces: 0);
+          _installmentPeriodDaysController.text = formatNumberForInput(
+            _installmentPeriodDays ?? 30,
+            decimalPlaces: 0,
+          );
         }
 
         _commissionType = commType;
@@ -854,6 +1040,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (mounted) {
         setState(_applyCurrencyMetaFromCache);
       }
+      if (invType == InvoiceType.production) {
+        await _loadProductionOrderOptions();
+        if (_productionOrderId != null) {
+          await _selectProductionOrder(_productionOrderId);
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       showErr(ErrorExtractor.forContext(e, context));
@@ -874,7 +1066,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   void _attachTabListener() {
     _tabController.addListener(() {
       try {
-        final isSettingsSelected = _tabController.index == (_tabController.length - 1);
+        final isSettingsSelected =
+            _tabController.index == (_tabController.length - 1);
         if (isSettingsSelected) {
           // بارگذاری تازه پلن‌ها هنگام ورود به تب تنظیمات
           _loadInstallmentPlans();
@@ -885,7 +1078,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   Future<void> _loadInstallmentPlans() async {
     try {
-      final items = await CreditApiService.listInstallmentPlans(widget.businessId, onlyActive: true);
+      final items = await CreditApiService.listInstallmentPlans(
+        widget.businessId,
+        onlyActive: true,
+      );
       setState(() {
         _installmentPlans = items;
       });
@@ -936,15 +1132,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   List<Map<String, dynamic>> get _printTemplatesForCurrentPaper =>
       isInvoiceReceiptPaper(_selectedPaperSize)
-          ? _availableReceiptPrintTemplates
-          : _availablePrintTemplates;
+      ? _availableReceiptPrintTemplates
+      : _availablePrintTemplates;
 
   void _syncPrintTemplateWithPaperSize() {
     final ids = _printTemplatesForCurrentPaper
         .map((tpl) => tpl['id']?.toString())
         .whereType<String>()
         .toSet();
-    if (_selectedPrintTemplate != null && !ids.contains(_selectedPrintTemplate)) {
+    if (_selectedPrintTemplate != null &&
+        !ids.contains(_selectedPrintTemplate)) {
       _selectedPrintTemplate = null;
     }
     if (isInvoiceReceiptPaper(_selectedPaperSize)) {
@@ -955,7 +1152,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Future<void> _loadPrintSettings() async {
     try {
       final data = await BusinessApiService.getPrintSettings(widget.businessId);
-      final defaultSettings = (data['default'] as Map?)?.cast<String, dynamic>();
+      final defaultSettings = (data['default'] as Map?)
+          ?.cast<String, dynamic>();
       final perTypeRaw = (data['per_type'] as Map?)?.cast<String, dynamic>();
       final perType = <String, Map<String, dynamic>>{};
       perTypeRaw?.forEach((key, value) {
@@ -1069,8 +1267,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         if (sendTax != null) {
           _sendToTaxFolder = sendTax;
         }
-        final modeRaw = data['invoice_warehouse_release_mode']?.toString().trim().toLowerCase();
-        if (modeRaw != null && (modeRaw == 'none' || modeRaw == 'draft' || modeRaw == 'posted')) {
+        final modeRaw = data['invoice_warehouse_release_mode']
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (modeRaw != null &&
+            (modeRaw == 'none' || modeRaw == 'draft' || modeRaw == 'posted')) {
           _invoiceWarehouseReleaseMode = modeRaw;
           _warehouseReleaseModeFromLocal = true;
         } else {
@@ -1082,7 +1284,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         }
         final documentWarehouseId = data['document_warehouse_id'];
         if (documentWarehouseId != null) {
-          _documentWarehouseId = (documentWarehouseId is num) ? documentWarehouseId.toInt() : int.tryParse(documentWarehouseId.toString());
+          _documentWarehouseId = (documentWarehouseId is num)
+              ? documentWarehouseId.toInt()
+              : int.tryParse(documentWarehouseId.toString());
         }
         final ignoreCredit = _parseBool(data['ignore_credit_check']);
         if (ignoreCredit != null) {
@@ -1141,10 +1345,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (value is String) {
       final normalized = value.trim().toLowerCase();
       if (normalized.isEmpty) return null;
-      if (normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'on') {
+      if (normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'yes' ||
+          normalized == 'on') {
         return true;
       }
-      if (normalized == 'false' || normalized == '0' || normalized == 'no' || normalized == 'off') {
+      if (normalized == 'false' ||
+          normalized == '0' ||
+          normalized == 'no' ||
+          normalized == 'off') {
         return false;
       }
     }
@@ -1162,7 +1372,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Future<void> _loadCustomerCreditIfNeeded() async {
     if (_selectedCustomer == null) return;
     try {
-      final data = await CreditApiService.getPersonCredit(widget.businessId, _selectedCustomer!.id);
+      final data = await CreditApiService.getPersonCredit(
+        widget.businessId,
+        _selectedCustomer!.id,
+      );
       setState(() {
         _customerCreditInfo = data;
       });
@@ -1172,7 +1385,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   // متد helper برای ایجاد یا دریافت Controller برای فیلدهای جدول اقساط
-  TextEditingController _getInstallmentController(Map<int, TextEditingController> controllers, int index, double value, {bool updateIfChanged = true}) {
+  TextEditingController _getInstallmentController(
+    Map<int, TextEditingController> controllers,
+    int index,
+    double value, {
+    bool updateIfChanged = true,
+  }) {
     if (!controllers.containsKey(index)) {
       controllers[index] = TextEditingController(
         text: formatNumberForInput(value, decimalPlaces: 0),
@@ -1206,10 +1424,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       final n = _numInstallments ?? 0;
       if (n <= 0) return;
       final start = _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now();
-      final periodDays = (_installmentPeriod == 'monthly') ? 30 : (_installmentPeriodDays ?? 30);
+      final periodDays = (_installmentPeriod == 'monthly')
+          ? 30
+          : (_installmentPeriodDays ?? 30);
       // محاسبه اصل با لحاظ پیش‌پرداخت (مبلغ نهایی فاکتور شامل اضافات/کسورات)
       final totalNet = _invoiceGrandTotal.toDouble();
-      final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
+      final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(
+        0,
+        double.infinity,
+      );
       final principalTotal = principalTarget;
 
       final method = _selectedInstallmentPlan?.method ?? 'flat';
@@ -1258,15 +1481,31 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             final principal = rows[idx]['principal'] as double? ?? 0.0;
             final interest = rows[idx]['interest'] as double? ?? 0.0;
             final total = rows[idx]['total'] as double? ?? 0.0;
-            _getInstallmentController(_installmentPrincipalControllers, idx, principal, updateIfChanged: false);
-            _getInstallmentController(_installmentInterestControllers, idx, interest, updateIfChanged: false);
-            _getInstallmentController(_installmentTotalControllers, idx, total, updateIfChanged: false);
+            _getInstallmentController(
+              _installmentPrincipalControllers,
+              idx,
+              principal,
+              updateIfChanged: false,
+            );
+            _getInstallmentController(
+              _installmentInterestControllers,
+              idx,
+              interest,
+              updateIfChanged: false,
+            );
+            _getInstallmentController(
+              _installmentTotalControllers,
+              idx,
+              total,
+              updateIfChanged: false,
+            );
           }
           _cleanupInstallmentControllers();
         });
       } else {
         // روش ساده flat: تقسیم مساوی اصل و سود کل
-        final principalTotalRounded = principalTotal.round(); // کل اصل بدون اعشار
+        final principalTotalRounded = principalTotal
+            .round(); // کل اصل بدون اعشار
         final basePrincipal = principalTotalRounded ~/ n;
         int remainderPrincipal = principalTotalRounded - (basePrincipal * n);
         final interestTotal = ((principalTotal * (rate / 100.0))).round();
@@ -1293,9 +1532,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             final principal = rows[idx]['principal'] as double? ?? 0.0;
             final interest = rows[idx]['interest'] as double? ?? 0.0;
             final total = rows[idx]['total'] as double? ?? 0.0;
-            _getInstallmentController(_installmentPrincipalControllers, idx, principal, updateIfChanged: false);
-            _getInstallmentController(_installmentInterestControllers, idx, interest, updateIfChanged: false);
-            _getInstallmentController(_installmentTotalControllers, idx, total, updateIfChanged: false);
+            _getInstallmentController(
+              _installmentPrincipalControllers,
+              idx,
+              principal,
+              updateIfChanged: false,
+            );
+            _getInstallmentController(
+              _installmentInterestControllers,
+              idx,
+              interest,
+              updateIfChanged: false,
+            );
+            _getInstallmentController(
+              _installmentTotalControllers,
+              idx,
+              total,
+              updateIfChanged: false,
+            );
           }
           _cleanupInstallmentControllers();
         });
@@ -1316,7 +1570,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   items: _installmentPlans.map((p) {
                     return DropdownMenuItem(
                       value: p,
-                      child: Text('${p.name} • ${p.numInstallments} ${AppLocalizations.of(context).installmentsCount} / ${p.periodDays} ${AppLocalizations.of(context).installmentDaysLength}'),
+                      child: Text(
+                        '${p.name} • ${p.numInstallments} ${AppLocalizations.of(context).installmentsCount} / ${p.periodDays} ${AppLocalizations.of(context).installmentDaysLength}',
+                      ),
                     );
                   }).toList(),
                   onChanged: (v) {
@@ -1330,17 +1586,33 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         _installmentPeriodDays = plan.periodDays;
                         _interestRate = plan.interestRate ?? 0.0;
                         final dpPercent = plan.downPaymentPercent ?? 0.0;
-                        _downPayment = (_invoiceGrandTotal.toDouble() * dpPercent / 100.0);
+                        _downPayment =
+                            (_invoiceGrandTotal.toDouble() * dpPercent / 100.0);
                         // به‌روزرسانی Controller ها
-                        _numInstallmentsController.text = formatNumberForInput(_numInstallments, decimalPlaces: 0);
-                        _downPaymentController.text = formatNumberForInput(_downPayment);
-                        _interestRateController.text = formatNumberForInput(_interestRate);
-                        _installmentPeriodDaysController.text = formatNumberForInput(_installmentPeriodDays, decimalPlaces: 0);
+                        _numInstallmentsController.text = formatNumberForInput(
+                          _numInstallments,
+                          decimalPlaces: 0,
+                        );
+                        _downPaymentController.text = formatNumberForInput(
+                          _downPayment,
+                        );
+                        _interestRateController.text = formatNumberForInput(
+                          _interestRate,
+                        );
+                        _installmentPeriodDaysController.text =
+                            formatNumberForInput(
+                              _installmentPeriodDays,
+                              decimalPlaces: 0,
+                            );
                       }
                     });
                     autoDistribute();
                   },
-                  decoration: InputDecoration(labelText: AppLocalizations.of(context).selectInstallmentPlan),
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(
+                      context,
+                    ).selectInstallmentPlan,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1356,13 +1628,25 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     _interestRate = plan.interestRate ?? 0.0;
                     // محاسبه پیش‌پرداخت از درصد پلن بر اساس جمع کنونی
                     final dpPercent = plan.downPaymentPercent ?? 0.0;
-                    _downPayment = (_invoiceGrandTotal.toDouble() * dpPercent / 100.0);
+                    _downPayment =
+                        (_invoiceGrandTotal.toDouble() * dpPercent / 100.0);
                     _firstInstallmentDueDate = _invoiceDate ?? DateTime.now();
                     // به‌روزرسانی Controller ها
-                    _numInstallmentsController.text = formatNumberForInput(_numInstallments, decimalPlaces: 0);
-                    _downPaymentController.text = formatNumberForInput(_downPayment);
-                    _interestRateController.text = formatNumberForInput(_interestRate);
-                    _installmentPeriodDaysController.text = formatNumberForInput(_installmentPeriodDays, decimalPlaces: 0);
+                    _numInstallmentsController.text = formatNumberForInput(
+                      _numInstallments,
+                      decimalPlaces: 0,
+                    );
+                    _downPaymentController.text = formatNumberForInput(
+                      _downPayment,
+                    );
+                    _interestRateController.text = formatNumberForInput(
+                      _interestRate,
+                    );
+                    _installmentPeriodDaysController.text =
+                        formatNumberForInput(
+                          _installmentPeriodDays,
+                          decimalPlaces: 0,
+                        );
                   });
                   autoDistribute();
                 },
@@ -1384,11 +1668,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       Expanded(
                         child: TextFormField(
                           controller: _numInstallmentsController,
-                          decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentsCount, border: const OutlineInputBorder()),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(
+                              context,
+                            ).installmentsCount,
+                            border: const OutlineInputBorder(),
+                          ),
                           keyboardType: TextInputType.number,
                           inputFormatters: const [
                             EnglishDigitsFormatter(),
-                            ThousandsSeparatorInputFormatter(allowDecimal: false),
+                            ThousandsSeparatorInputFormatter(
+                              allowDecimal: false,
+                            ),
                           ],
                           onChanged: (v) {
                             final n = parseFormattedInt(v);
@@ -1401,11 +1692,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       Expanded(
                         child: TextFormField(
                           controller: _downPaymentController,
-                          decoration: InputDecoration(labelText: AppLocalizations.of(context).downPayment, border: const OutlineInputBorder()),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(context).downPayment,
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: const [
                             EnglishDigitsFormatter(),
-                            ThousandsSeparatorInputFormatter(allowDecimal: true),
+                            ThousandsSeparatorInputFormatter(
+                              allowDecimal: true,
+                            ),
                           ],
                           onChanged: (v) {
                             final d = parseFormattedDouble(v);
@@ -1423,11 +1721,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       Expanded(
                         child: TextFormField(
                           controller: _interestRateController,
-                          decoration: InputDecoration(labelText: AppLocalizations.of(context).interestRatePercent, border: const OutlineInputBorder()),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(
+                              context,
+                            ).interestRatePercent,
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: const [
                             EnglishDigitsFormatter(),
-                            ThousandsSeparatorInputFormatter(allowDecimal: true),
+                            ThousandsSeparatorInputFormatter(
+                              allowDecimal: true,
+                            ),
                           ],
                           onChanged: (v) {
                             final r = parseFormattedDouble(v);
@@ -1440,10 +1747,29 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _installmentPeriod,
-                          decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentsPeriod, border: const OutlineInputBorder()),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(
+                              context,
+                            ).installmentsPeriod,
+                            border: const OutlineInputBorder(),
+                          ),
                           items: [
-                            DropdownMenuItem(value: 'monthly', child: Text(AppLocalizations.of(context).installmentsMonthly)),
-                            DropdownMenuItem(value: 'days', child: Text(AppLocalizations.of(context).installmentsDaysBased)),
+                            DropdownMenuItem(
+                              value: 'monthly',
+                              child: Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).installmentsMonthly,
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'days',
+                              child: Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).installmentsDaysBased,
+                              ),
+                            ),
                           ],
                           onChanged: (v) {
                             setState(() {
@@ -1458,7 +1784,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   if (_installmentPeriod == 'days')
                     TextFormField(
                       controller: _installmentPeriodDaysController,
-                      decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentDaysLength, border: const OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(
+                          context,
+                        ).installmentDaysLength,
+                        border: const OutlineInputBorder(),
+                      ),
                       keyboardType: TextInputType.number,
                       inputFormatters: const [
                         EnglishDigitsFormatter(),
@@ -1477,8 +1808,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     child: SizedBox(
                       width: 320,
                       child: DateInputField(
-                        labelText: AppLocalizations.of(context).firstInstallmentDueDate,
-                        value: _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now(),
+                        labelText: AppLocalizations.of(
+                          context,
+                        ).firstInstallmentDueDate,
+                        value:
+                            _firstInstallmentDueDate ??
+                            _invoiceDate ??
+                            DateTime.now(),
                         onChanged: (d) {
                           setState(() => _firstInstallmentDueDate = d);
                         },
@@ -1506,49 +1842,89 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           Text('مشتری: ${_selectedCustomer!.name}'),
                           if (_customerCreditInfo != null) ...[
                             const SizedBox(height: 4),
-                            Builder(builder: (context) {
-                              final effectiveLimit = (_customerCreditInfo!['effective_credit_limit'] as num?)?.toDouble();
-                              final used = (_customerBalance ?? 0) < 0 ? -_customerBalance! : 0;
-                              final remaining = effectiveLimit != null ? (effectiveLimit - used) : null;
-                              final creditEnabled = _customerCreditInfo!['credit_check_enabled'];
-                              final enabledText = (creditEnabled == null)
-                                  ? 'پیروی از تنظیمات سیستم'
-                                  : (creditEnabled == true ? 'کنترل اعتبار فعال' : 'کنترل اعتبار غیرفعال');
-                              final limitExceeded = _isCreditLimitExceededApprox;
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (effectiveLimit != null)
-                                    Text('سقف اعتبار مؤثر: ${effectiveLimit.toStringAsFixed(0)}'),
-                                  if (remaining != null)
-                                    Text('اعتبار باقیمانده تقریبی: ${remaining.toStringAsFixed(0)}'),
-                                  Text(enabledText, style: Theme.of(context).textTheme.bodySmall),
-                                  if (limitExceeded && !_ignoreCreditCheck)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        'ثبت این فاکتور احتمالاً از سقف اعتبار عبور می‌کند و توسط سیستم رد می‌شود مگر این‌که گزینه نادیده گرفتن اعتبار را فعال کنید.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SemanticColorResolver.negative(context)),
+                            Builder(
+                              builder: (context) {
+                                final effectiveLimit =
+                                    (_customerCreditInfo!['effective_credit_limit']
+                                            as num?)
+                                        ?.toDouble();
+                                final used = (_customerBalance ?? 0) < 0
+                                    ? -_customerBalance!
+                                    : 0;
+                                final remaining = effectiveLimit != null
+                                    ? (effectiveLimit - used)
+                                    : null;
+                                final creditEnabled =
+                                    _customerCreditInfo!['credit_check_enabled'];
+                                final enabledText = (creditEnabled == null)
+                                    ? 'پیروی از تنظیمات سیستم'
+                                    : (creditEnabled == true
+                                          ? 'کنترل اعتبار فعال'
+                                          : 'کنترل اعتبار غیرفعال');
+                                final limitExceeded =
+                                    _isCreditLimitExceededApprox;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (effectiveLimit != null)
+                                      Text(
+                                        'سقف اعتبار مؤثر: ${effectiveLimit.toStringAsFixed(0)}',
                                       ),
-                                    ),
-                                  if (limitExceeded && _ignoreCreditCheck)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        'هشدار: این فاکتور با وجود عبور از سقف اعتبار، به دلیل فعال بودن نادیده گرفتن اعتبار ثبت خواهد شد.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SemanticColorResolver.warning(context)),
+                                    if (remaining != null)
+                                      Text(
+                                        'اعتبار باقیمانده تقریبی: ${remaining.toStringAsFixed(0)}',
                                       ),
+                                    Text(
+                                      enabledText,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
-                                ],
-                              );
-                            }),
+                                    if (limitExceeded && !_ignoreCreditCheck)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          'ثبت این فاکتور احتمالاً از سقف اعتبار عبور می‌کند و توسط سیستم رد می‌شود مگر این‌که گزینه نادیده گرفتن اعتبار را فعال کنید.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color:
+                                                    SemanticColorResolver.negative(
+                                                      context,
+                                                    ),
+                                              ),
+                                        ),
+                                      ),
+                                    if (limitExceeded && _ignoreCreditCheck)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          'هشدار: این فاکتور با وجود عبور از سقف اعتبار، به دلیل فعال بودن نادیده گرفتن اعتبار ثبت خواهد شد.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color:
+                                                    SemanticColorResolver.warning(
+                                                      context,
+                                                    ),
+                                              ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
                           ],
                         ],
                       ),
                     ),
-                    if (_customerBalance != null) Text('تراز: ${_customerBalance!.toStringAsFixed(0)}'),
+                    if (_customerBalance != null)
+                      Text('تراز: ${_customerBalance!.toStringAsFixed(0)}'),
                     const SizedBox(width: 8),
-                    if (_customerStatus != null) Chip(label: Text(_customerStatus!)),
+                    if (_customerStatus != null)
+                      Chip(label: Text(_customerStatus!)),
                   ],
                 ),
               ),
@@ -1570,15 +1946,30 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     final newIndex = _installmentRows.length;
                     _installmentRows.add({
                       'seq': idx,
-                      'due_date': _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now(),
+                      'due_date':
+                          _firstInstallmentDueDate ??
+                          _invoiceDate ??
+                          DateTime.now(),
                       'principal': 0.0,
                       'interest': 0.0,
                       'total': 0.0,
                     });
                     // ایجاد Controller های جدید برای ردیف اضافه شده
-                    _getInstallmentController(_installmentPrincipalControllers, newIndex, 0.0);
-                    _getInstallmentController(_installmentInterestControllers, newIndex, 0.0);
-                    _getInstallmentController(_installmentTotalControllers, newIndex, 0.0);
+                    _getInstallmentController(
+                      _installmentPrincipalControllers,
+                      newIndex,
+                      0.0,
+                    );
+                    _getInstallmentController(
+                      _installmentInterestControllers,
+                      newIndex,
+                      0.0,
+                    );
+                    _getInstallmentController(
+                      _installmentTotalControllers,
+                      newIndex,
+                      0.0,
+                    );
                   });
                 },
                 icon: const Icon(Icons.add),
@@ -1591,19 +1982,32 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   final n = _installmentRows.length;
                   if (n == 0) return;
                   final totalNet = _invoiceGrandTotal.toDouble();
-                  final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
+                  final principalTarget = (totalNet - (_downPayment ?? 0))
+                      .clamp(0, double.infinity);
                   double sumPrincipal = 0;
                   for (final r in _installmentRows) {
                     sumPrincipal += (r['principal'] as num?)?.toDouble() ?? 0.0;
                   }
                   double remaining = sumPrincipal - principalTarget;
-                  for (int idx = n - 1; idx >= 0 && remaining.abs() > 0.0001; idx--) {
-                    final current = (_installmentRows[idx]['principal'] as num?)?.toDouble() ?? 0.0;
+                  for (
+                    int idx = n - 1;
+                    idx >= 0 && remaining.abs() > 0.0001;
+                    idx--
+                  ) {
+                    final current =
+                        (_installmentRows[idx]['principal'] as num?)
+                            ?.toDouble() ??
+                        0.0;
                     double newPrincipal;
                     if (remaining > 0) {
                       final canReduce = current;
-                      final reduce = remaining > canReduce ? canReduce : remaining;
-                      newPrincipal = (current - reduce).clamp(0, double.infinity);
+                      final reduce = remaining > canReduce
+                          ? canReduce
+                          : remaining;
+                      newPrincipal = (current - reduce).clamp(
+                        0,
+                        double.infinity,
+                      );
                       remaining -= reduce;
                     } else {
                       newPrincipal = current + (-remaining);
@@ -1611,10 +2015,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     }
                     _installmentRows[idx]['principal'] = newPrincipal;
                     _installmentRows[idx]['total'] =
-                        newPrincipal + ((_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0);
+                        newPrincipal +
+                        ((_installmentRows[idx]['interest'] as num?)
+                                ?.toDouble() ??
+                            0.0);
                   }
                   setState(() {});
-                  SnackBarHelper.show(context, message: 'اختلاف اصل اقساط تراز شد');
+                  SnackBarHelper.show(
+                    context,
+                    message: 'اختلاف اصل اقساط تراز شد',
+                  );
                 },
                 icon: const Icon(Icons.tune),
                 label: const Text('تراز اختلاف اصل'),
@@ -1629,7 +2039,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 children: [
                   Row(
                     children: const [
-                      SizedBox(width: 50, child: Text('ردیف', textAlign: TextAlign.center)),
+                      SizedBox(
+                        width: 50,
+                        child: Text('ردیف', textAlign: TextAlign.center),
+                      ),
                       Expanded(child: Text('تاریخ سررسید')),
                       Expanded(child: Text('اصل')),
                       Expanded(child: Text('سود')),
@@ -1643,9 +2056,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     final r = entry.value;
                     final seq = (r['seq'] as int?) ?? (i + 1);
                     final due = (r['due_date'] as DateTime?) ?? DateTime.now();
-                    final principal = (r['principal'] as num?)?.toDouble() ?? 0.0;
+                    final principal =
+                        (r['principal'] as num?)?.toDouble() ?? 0.0;
                     final interest = (r['interest'] as num?)?.toDouble() ?? 0.0;
-                    final total = (r['total'] as num?)?.toDouble() ?? (principal + interest);
+                    final total =
+                        (r['total'] as num?)?.toDouble() ??
+                        (principal + interest);
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
@@ -1667,59 +2083,106 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               labelText: 'تاریخ',
                               isDense: true,
                               onChanged: (d) {
-                                setState(() => _installmentRows[i]['due_date'] = d ?? due);
+                                setState(
+                                  () => _installmentRows[i]['due_date'] =
+                                      d ?? due,
+                                );
                               },
                             ),
                           ),
                           Expanded(
                             child: TextFormField(
-                              controller: _getInstallmentController(_installmentPrincipalControllers, i, principal),
+                              controller: _getInstallmentController(
+                                _installmentPrincipalControllers,
+                                i,
+                                principal,
+                              ),
                               keyboardType: TextInputType.number,
                               inputFormatters: const [
                                 EnglishDigitsFormatter(),
-                                ThousandsSeparatorInputFormatter(allowDecimal: false),
+                                ThousandsSeparatorInputFormatter(
+                                  allowDecimal: false,
+                                ),
                               ],
                               onChanged: (v) {
                                 final pInt = parseFormattedInt(v) ?? 0;
                                 final p = pInt.toDouble();
                                 _installmentRows[i]['principal'] = p;
-                                _installmentRows[i]['total'] = p + (( _installmentRows[i]['interest'] as num?)?.toDouble() ?? 0.0);
+                                _installmentRows[i]['total'] =
+                                    p +
+                                    ((_installmentRows[i]['interest'] as num?)
+                                            ?.toDouble() ??
+                                        0.0);
                                 // به‌روزرسانی Controller جمع
-                                final newTotal = _installmentRows[i]['total'] as double? ?? 0.0;
-                                _getInstallmentController(_installmentTotalControllers, i, newTotal);
+                                final newTotal =
+                                    _installmentRows[i]['total'] as double? ??
+                                    0.0;
+                                _getInstallmentController(
+                                  _installmentTotalControllers,
+                                  i,
+                                  newTotal,
+                                );
                                 // بدون setState برای جلوگیری از rebuild
                               },
-                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
                             ),
                           ),
                           Expanded(
                             child: TextFormField(
-                              controller: _getInstallmentController(_installmentInterestControllers, i, interest),
+                              controller: _getInstallmentController(
+                                _installmentInterestControllers,
+                                i,
+                                interest,
+                              ),
                               keyboardType: TextInputType.number,
                               inputFormatters: const [
                                 EnglishDigitsFormatter(),
-                                ThousandsSeparatorInputFormatter(allowDecimal: false),
+                                ThousandsSeparatorInputFormatter(
+                                  allowDecimal: false,
+                                ),
                               ],
                               onChanged: (v) {
                                 final sInt = parseFormattedInt(v) ?? 0;
                                 final s = sInt.toDouble(); // سود بدون اعشار
                                 _installmentRows[i]['interest'] = s;
-                                _installmentRows[i]['total'] = s + (( _installmentRows[i]['principal'] as num?)?.toDouble() ?? 0.0);
+                                _installmentRows[i]['total'] =
+                                    s +
+                                    ((_installmentRows[i]['principal'] as num?)
+                                            ?.toDouble() ??
+                                        0.0);
                                 // به‌روزرسانی Controller جمع
-                                final newTotal = _installmentRows[i]['total'] as double? ?? 0.0;
-                                _getInstallmentController(_installmentTotalControllers, i, newTotal);
+                                final newTotal =
+                                    _installmentRows[i]['total'] as double? ??
+                                    0.0;
+                                _getInstallmentController(
+                                  _installmentTotalControllers,
+                                  i,
+                                  newTotal,
+                                );
                                 // بدون setState برای جلوگیری از rebuild
                               },
-                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
                             ),
                           ),
                           Expanded(
                             child: TextFormField(
-                              controller: _getInstallmentController(_installmentTotalControllers, i, total),
+                              controller: _getInstallmentController(
+                                _installmentTotalControllers,
+                                i,
+                                total,
+                              ),
                               keyboardType: TextInputType.number,
                               inputFormatters: const [
                                 EnglishDigitsFormatter(),
-                                ThousandsSeparatorInputFormatter(allowDecimal: false),
+                                ThousandsSeparatorInputFormatter(
+                                  allowDecimal: false,
+                                ),
                               ],
                               onChanged: (v) {
                                 final totInt = parseFormattedInt(v) ?? 0;
@@ -1727,7 +2190,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 _installmentRows[i]['total'] = tot;
                                 // بدون setState برای جلوگیری از rebuild
                               },
-                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
                             ),
                           ),
                           IconButton(
@@ -1740,31 +2206,71 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 _installmentPrincipalControllers.remove(i);
                                 _installmentInterestControllers.remove(i);
                                 _installmentTotalControllers.remove(i);
-                                
+
                                 // حذف ردیف
                                 _installmentRows.removeAt(i);
-                                
+
                                 // بازسازی Controller ها برای ردیف‌های باقی‌مانده با index جدید
                                 // ابتدا همه Controller های بعدی را dispose کن
-                                for (int idx = i; idx < _installmentRows.length + 10; idx++) {
-                                  if (_installmentPrincipalControllers.containsKey(idx)) {
-                                    _installmentPrincipalControllers[idx]?.dispose();
-                                    _installmentInterestControllers[idx]?.dispose();
-                                    _installmentTotalControllers[idx]?.dispose();
-                                    _installmentPrincipalControllers.remove(idx);
+                                for (
+                                  int idx = i;
+                                  idx < _installmentRows.length + 10;
+                                  idx++
+                                ) {
+                                  if (_installmentPrincipalControllers
+                                      .containsKey(idx)) {
+                                    _installmentPrincipalControllers[idx]
+                                        ?.dispose();
+                                    _installmentInterestControllers[idx]
+                                        ?.dispose();
+                                    _installmentTotalControllers[idx]
+                                        ?.dispose();
+                                    _installmentPrincipalControllers.remove(
+                                      idx,
+                                    );
                                     _installmentInterestControllers.remove(idx);
                                     _installmentTotalControllers.remove(idx);
                                   }
                                 }
-                                
+
                                 // حالا Controller های جدید برای ردیف‌های باقی‌مانده بساز
-                                for (int idx = 0; idx < _installmentRows.length; idx++) {
-                                  final principal = (_installmentRows[idx]['principal'] as num?)?.toDouble() ?? 0.0;
-                                  final interest = (_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0;
-                                  final total = (_installmentRows[idx]['total'] as num?)?.toDouble() ?? 0.0;
-                                  _getInstallmentController(_installmentPrincipalControllers, idx, principal, updateIfChanged: false);
-                                  _getInstallmentController(_installmentInterestControllers, idx, interest, updateIfChanged: false);
-                                  _getInstallmentController(_installmentTotalControllers, idx, total, updateIfChanged: false);
+                                for (
+                                  int idx = 0;
+                                  idx < _installmentRows.length;
+                                  idx++
+                                ) {
+                                  final principal =
+                                      (_installmentRows[idx]['principal']
+                                              as num?)
+                                          ?.toDouble() ??
+                                      0.0;
+                                  final interest =
+                                      (_installmentRows[idx]['interest']
+                                              as num?)
+                                          ?.toDouble() ??
+                                      0.0;
+                                  final total =
+                                      (_installmentRows[idx]['total'] as num?)
+                                          ?.toDouble() ??
+                                      0.0;
+                                  _getInstallmentController(
+                                    _installmentPrincipalControllers,
+                                    idx,
+                                    principal,
+                                    updateIfChanged: false,
+                                  );
+                                  _getInstallmentController(
+                                    _installmentInterestControllers,
+                                    idx,
+                                    interest,
+                                    updateIfChanged: false,
+                                  );
+                                  _getInstallmentController(
+                                    _installmentTotalControllers,
+                                    idx,
+                                    total,
+                                    updateIfChanged: false,
+                                  );
                                 }
                               });
                             },
@@ -1782,21 +2288,41 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       final sumPrincipal = _installmentsPrincipalTotal;
                       final sumInterest = _installmentsInterestTotal;
                       final sumTotal = _installmentsTotal;
-                      final targetPrincipal = (_invoiceGrandTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
+                      final targetPrincipal =
+                          (_invoiceGrandTotal.toDouble() - (_downPayment ?? 0))
+                              .clamp(0, double.infinity);
                       final diff = sumPrincipal - targetPrincipal;
-                      final diffColor = diff.abs() <= 1 ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context);
+                      final diffColor = diff.abs() <= 1
+                          ? SemanticColorResolver.positive(context)
+                          : SemanticColorResolver.warning(context);
                       return Align(
                         alignment: Alignment.centerRight,
                         child: Wrap(
                           spacing: 12,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Chip(label: Text('جمع اصل: ${formatWithThousands(sumPrincipal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}')),
-                            Chip(label: Text('جمع سود: ${formatWithThousands(sumInterest, decimalPlaces: _invoiceCurrencyDecimalPlaces)}')),
-                            Chip(label: Text('جمع اقساط: ${formatWithThousands(sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}')),
                             Chip(
-                              label: Text('اختلاف اصل: ${formatWithThousands(diff, decimalPlaces: _invoiceCurrencyDecimalPlaces)}'),
-                              backgroundColor: diffColor.withValues(alpha: 0.12),
+                              label: Text(
+                                'جمع اصل: ${formatWithThousands(sumPrincipal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                              ),
+                            ),
+                            Chip(
+                              label: Text(
+                                'جمع سود: ${formatWithThousands(sumInterest, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                              ),
+                            ),
+                            Chip(
+                              label: Text(
+                                'جمع اقساط: ${formatWithThousands(sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                              ),
+                            ),
+                            Chip(
+                              label: Text(
+                                'اختلاف اصل: ${formatWithThousands(diff, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                              ),
+                              backgroundColor: diffColor.withValues(
+                                alpha: 0.12,
+                              ),
                               labelStyle: TextStyle(color: diffColor),
                             ),
                           ],
@@ -1812,6 +2338,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       ),
     );
   }
+
   void _applyCurrencyMetaFromCache() {
     final id = _selectedCurrencyId;
     var dp = 2;
@@ -1836,7 +2363,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Future<void> _loadBusinessCurrenciesAndMeta() async {
     try {
       final currencyService = CurrencyService(ApiClient());
-      final currencies = await currencyService.listBusinessCurrencies(businessId: widget.businessId);
+      final currencies = await currencyService.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
       if (!mounted) return;
       int? defId;
       for (final raw in currencies) {
@@ -1907,7 +2436,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       final items = (res['items'] as List<dynamic>?) ?? const [];
       if (!mounted) return;
       setState(() {
-        _fxRateRows = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _fxRateRows = items
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         _loadingFxRates = false;
       });
     } catch (_) {
@@ -1919,7 +2450,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
     }
   }
-
 
   /// تب تراکنش‌ها همان منطق [ _shouldShowTransactionsTab ] ولی برای آرگومان [type].
   bool _transactionsTabVisibleForType(InvoiceType? type) {
@@ -1951,8 +2481,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       return 3; // اطلاعات فاکتور، کالاها و خدمات، تنظیمات
     }
     var n = 3; // اطلاعات، کالاها، تنظیمات
-    if (_transactionsTabVisibleForType(type)) n += 1; // تراکنش‌ها بین کالاها و اقساط/تنظیمات
-    if (_adjustmentsTabVisibleForType(type)) n += 1; // اضافات/کسورات قبل از اقساط/تنظیمات
+    if (_transactionsTabVisibleForType(type))
+      n += 1; // تراکنش‌ها بین کالاها و اقساط/تنظیمات
+    if (_adjustmentsTabVisibleForType(type))
+      n += 1; // اضافات/کسورات قبل از اقساط/تنظیمات
     if (_installmentsTabVisibleForType(type)) n += 1; // اقساط قبل از تنظیمات
     return n;
   }
@@ -1985,14 +2517,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         (_adjustmentsTabVisibleForType(type) ? 1 : 0);
   }
 
-
   // بررسی اینکه آیا تب تراکنش‌ها باید نمایش داده شود
   bool get _shouldShowTransactionsTab {
     // اگر پیش‌فاکتور است، تب تراکنش‌ها نمایش داده نمی‌شود
     if (_isDraft) return false;
-    return _selectedInvoiceType != InvoiceType.waste && 
-           _selectedInvoiceType != InvoiceType.directConsumption && 
-           _selectedInvoiceType != InvoiceType.production;
+    return _selectedInvoiceType != InvoiceType.waste &&
+        _selectedInvoiceType != InvoiceType.directConsumption &&
+        _selectedInvoiceType != InvoiceType.production;
   }
 
   void _recalculateTotalsFromLines() {
@@ -2004,7 +2535,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     if (!invoiceTypeSupportsGlobalDiscount(type) || gv <= 0) {
       _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
-      _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
+      _sumDiscount = _lineItems.fold<num>(
+        0,
+        (acc, e) => acc + e.discountAmount,
+      );
       _sumTax = _lineItems.fold<num>(0, (acc, e) => acc + e.taxAmount);
       _sumTotal = _lineItems.fold<num>(0, (acc, e) => acc + e.total);
       return;
@@ -2040,6 +2574,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     _adjustmentRows = [];
     _tabController.dispose();
     _globalDiscountValueController.dispose();
+    _loyaltyPointsController.dispose();
+    _clubVoucherCodeController.dispose();
     _invoiceTitleController.dispose();
     // Dispose کردن Controller های اقساطی
     _numInstallmentsController.dispose();
@@ -2091,7 +2627,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       return Scaffold(
         appBar: AppBar(
           title: Text(t.invoiceCopyOpenNew),
-          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+          leading: hesabixBackAppBarLeading(
+            context,
+            businessId: widget.businessId,
+          ),
         ),
         body: Center(
           child: Column(
@@ -2101,10 +2640,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  t.invoiceCopyLoading,
-                  textAlign: TextAlign.center,
-                ),
+                child: Text(t.invoiceCopyLoading, textAlign: TextAlign.center),
               ),
             ],
           ),
@@ -2116,12 +2652,30 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       appBar: AppBar(
         title: Text(t.addInvoice),
         toolbarHeight: 56,
-        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        leading: hesabixBackAppBarLeading(
+          context,
+          businessId: widget.businessId,
+        ),
         actions: [
+          if (_selectedInvoiceType == InvoiceType.purchase)
+            IconButton(
+              tooltip: t.barcodeLabelPrintFromInvoice,
+              onPressed: _isSaving
+                  ? null
+                  : () => showBarcodePrintFromInvoiceLines(
+                      context: context,
+                      businessId: widget.businessId,
+                      authStore: widget.authStore,
+                      lines: _lineItems,
+                    ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
           Tooltip(
             message: t.saveInvoice,
             child: IconButton(
-              onPressed: (_isSaving || _isAutoInvoiceNumberBlocked) ? null : _saveInvoice,
+              onPressed: (_isSaving || _isAutoInvoiceNumberBlocked)
+                  ? null
+                  : _saveInvoice,
               icon: _isSaving
                   ? const SizedBox(
                       width: 22,
@@ -2137,12 +2691,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           controller: _tabController,
           tabs: [
             Tab(icon: const Icon(Icons.info_outline), text: t.invoiceInfoTab),
-            Tab(icon: const Icon(Icons.inventory_2_outlined), text: t.productsServicesTab),
+            Tab(
+              icon: const Icon(Icons.inventory_2_outlined),
+              text: t.productsServicesTab,
+            ),
             if (_shouldShowTransactionsTab)
-              Tab(icon: const Icon(Icons.receipt_long_outlined), text: t.transactionsTab),
+              Tab(
+                icon: const Icon(Icons.receipt_long_outlined),
+                text: t.transactionsTab,
+              ),
             if (_adjustmentsTabVisibleForType(_selectedInvoiceType))
               const Tab(icon: Icon(Icons.tune), text: 'اضافات و کسورات'),
-            if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn))
+            if (_useInstallments &&
+                (_selectedInvoiceType == InvoiceType.sales ||
+                    _selectedInvoiceType == InvoiceType.salesReturn))
               const Tab(icon: Icon(Icons.payments_outlined), text: 'اقساط'),
             Tab(icon: const Icon(Icons.settings_outlined), text: t.settingsTab),
           ],
@@ -2154,17 +2716,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             child: TabBarView(
               controller: _tabController,
               children: [
-          // تب اطلاعات فاکتور
-          _buildInvoiceInfoTab(),
-          // تب کالاها و خدمات
-          _buildProductsTab(),
-          // تب تراکنش‌ها (فقط اگر باید نمایش داده شود)
-          if (_shouldShowTransactionsTab) _buildTransactionsTab(),
-          if (_adjustmentsTabVisibleForType(_selectedInvoiceType)) _buildAdjustmentsTab(),
-          // تب اقساط (در صورت فعال بودن)
-          if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)) _buildInstallmentsTab(),
-          // تب تنظیمات
-          _buildSettingsTab(),
+                // تب اطلاعات فاکتور
+                _buildInvoiceInfoTab(),
+                // تب کالاها و خدمات
+                _buildProductsTab(),
+                // تب تراکنش‌ها (فقط اگر باید نمایش داده شود)
+                if (_shouldShowTransactionsTab) _buildTransactionsTab(),
+                if (_adjustmentsTabVisibleForType(_selectedInvoiceType))
+                  _buildAdjustmentsTab(),
+                // تب اقساط (در صورت فعال بودن)
+                if (_useInstallments &&
+                    (_selectedInvoiceType == InvoiceType.sales ||
+                        _selectedInvoiceType == InvoiceType.salesReturn))
+                  _buildInstallmentsTab(),
+                // تب تنظیمات
+                _buildSettingsTab(),
               ],
             ),
           ),
@@ -2238,7 +2804,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: ResponsiveHelper.isDesktop(context) ? 1600 : double.infinity,
+            maxWidth: ResponsiveHelper.isDesktop(context)
+                ? 1600
+                : double.infinity,
           ),
           child: InvoiceInfoForm(
             businessId: widget.businessId,
@@ -2344,6 +2912,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 _invoiceTitle = value.trim().isEmpty ? null : value.trim();
               });
             },
+            loyaltyPointsController: _loyaltyPointsController,
+            voucherCodeController: _clubVoucherCodeController,
           ),
         ),
       ),
@@ -2365,7 +2935,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
 
     final bomService = BomService();
-    
+
     // بررسی برای هر فرمول تولید
     for (final bomId in _bomIds) {
       try {
@@ -2395,9 +2965,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         final missingOutputs = <String>[];
         for (final output in bom.outputs) {
           if (!outputProductIdsInInvoice.contains(output.outputProductId)) {
-            final productName = output.outputProductName ?? 
-                               output.outputProductCode ?? 
-                               'کالا #${output.outputProductId}';
+            final productName =
+                output.outputProductName ??
+                output.outputProductCode ??
+                'کالا #${output.outputProductId}';
             missingOutputs.add(productName);
           }
         }
@@ -2405,8 +2976,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         if (missingOutputs.isNotEmpty) {
           final missingNames = missingOutputs.join('، ');
           return 'خروجی‌های فرمول تولید "${bom.name}" (نسخه: ${bom.version}) '
-                 'که در فاکتور وجود ندارند: $missingNames. '
-                 'لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.';
+              'که در فاکتور وجود ندارند: $missingNames. '
+              'لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.';
         }
       } catch (e) {
         // در صورت خطا در دریافت فرمول، ادامه می‌دهیم (اعتبارسنجی در بک‌اند انجام می‌شود)
@@ -2448,7 +3019,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
       try {
         final service = InvoiceService(apiClient: ApiClient());
-        final result = await service.createInvoice(businessId: widget.businessId, payload: payload);
+        final result = await service.createInvoice(
+          businessId: widget.businessId,
+          payload: payload,
+        );
         final invoiceId = (result['id'] as num?)?.toInt();
         final invoiceCode = result['code']?.toString();
 
@@ -2520,21 +3094,27 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         invoiceId: invoiceId,
         query: query.isEmpty ? null : query,
       );
-      final result = await _saveInvoicePdf(bytes, invoiceCode ?? 'invoice_$invoiceId');
+      final result = await _saveInvoicePdf(
+        bytes,
+        invoiceCode ?? 'invoice_$invoiceId',
+      );
       if (!mounted) return;
       BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
-      _showError(
-        'خطا در چاپ فاکتور: ${ErrorExtractor.forContext(e, context)}',
-      );
+      _showError('خطا در چاپ فاکتور: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
-  Future<BytesExportResult> _saveInvoicePdf(List<int> bytes, String filename) async {
+  Future<BytesExportResult> _saveInvoicePdf(
+    List<int> bytes,
+    String filename,
+  ) async {
     final trimmed = filename.trim();
     final safeName = trimmed.isEmpty ? 'invoice.pdf' : trimmed;
-    final finalName = safeName.toLowerCase().endsWith('.pdf') ? safeName : '$safeName.pdf';
+    final finalName = safeName.toLowerCase().endsWith('.pdf')
+        ? safeName
+        : '$safeName.pdf';
     return BytesExportService.export(
       bytes: bytes,
       filename: finalName,
@@ -2548,7 +3128,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   bool get _isAutoInvoiceNumberBlocked =>
       _autoGenerateInvoiceNumber &&
-      (_loadingReservedCode || _codeReservationId == null || _reserveCodeError != null);
+      (_loadingReservedCode ||
+          _codeReservationId == null ||
+          _reserveCodeError != null);
 
   String? _invoiceDateIso() {
     final d = _invoiceDate;
@@ -2708,43 +3290,43 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (_lineItems.isEmpty) {
       return 'حداقل یک ردیف کالا/خدمت وارد کنید';
     }
-    
+
     // اعتبارسنجی ویژه برای فاکتور تولید
     if (_selectedInvoiceType == InvoiceType.production) {
       // بررسی اینکه حداقل یک فرمول منفجر شده باشد
       if (_bomIds.isEmpty) {
         return 'برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید';
       }
-      
+
       // بررسی وجود movement در تمام ردیف‌ها
       int hasOutCount = 0;
       int hasInCount = 0;
       for (int i = 0; i < _lineItems.length; i++) {
         final r = _lineItems[i];
         final movement = r.extraInfo?['movement']?.toString();
-        
+
         if (movement == null || (movement != 'in' && movement != 'out')) {
           return 'ردیف ${i + 1} باید movement مشخص داشته باشد (in یا out)';
         }
-        
+
         if (movement == 'out') {
           hasOutCount++;
         } else if (movement == 'in') {
           hasInCount++;
         }
       }
-      
+
       // بررسی وجود حداقل یک ردیف با movement: "out" (مواد اولیه)
       if (hasOutCount == 0) {
         return 'فاکتور تولید باید حداقل یک ردیف با movement: "out" داشته باشد (مواد اولیه)';
       }
-      
+
       // بررسی وجود حداقل یک ردیف با movement: "in" (محصول نهایی)
       if (hasInCount == 0) {
         return 'فاکتور تولید باید حداقل یک ردیف با movement: "in" داشته باشد (محصول نهایی)';
       }
     }
-    
+
     // اعتبارسنجی ردیف‌ها
     for (int i = 0; i < _lineItems.length; i++) {
       final r = _lineItems[i];
@@ -2757,22 +3339,28 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (r.unitPrice < 0) {
         return 'قیمت واحد ردیف ${i + 1} نمی‌تواند منفی باشد';
       }
-      if (r.discountType == 'percent' && (r.discountValue < 0 || r.discountValue > 100)) {
+      if (r.discountType == 'percent' &&
+          (r.discountValue < 0 || r.discountValue > 100)) {
         return 'درصد تخفیف ردیف ${i + 1} باید بین 0 تا 100 باشد';
       }
       if (r.taxRate < 0 || r.taxRate > 100) {
         return 'درصد مالیات ردیف ${i + 1} باید بین 0 تا 100 باشد';
       }
-      // الزام انبار در حالت ثبت اسناد انبار و کالاهای تحت کنترل موجودی
-      if (_postInventory && r.trackInventory) {
-        final isOut = _selectedInvoiceType == InvoiceType.sales ||
-                      _selectedInvoiceType == InvoiceType.purchaseReturn ||
-                      _selectedInvoiceType == InvoiceType.directConsumption ||
-                      _selectedInvoiceType == InvoiceType.waste ||
-                      (_selectedInvoiceType == InvoiceType.production && (r.extraInfo?['movement']?.toString() == 'out'));
-        final isIn = _selectedInvoiceType == InvoiceType.purchase ||
-                     _selectedInvoiceType == InvoiceType.salesReturn ||
-                     (_selectedInvoiceType == InvoiceType.production && (r.extraInfo?['movement']?.toString() == 'in'));
+      // الزام انبار در حالت ثبت اسناد انبار و کالاهای تحت کنترل موجودی.
+      // سطر سرمایه‌ای اموال حواله/کاردکس ندارد؛ فیلد انبار هم مخفی می‌شود.
+      if (_postInventory && r.trackInventory && !r.isFixedAssetCapital) {
+        final isOut =
+            _selectedInvoiceType == InvoiceType.sales ||
+            _selectedInvoiceType == InvoiceType.purchaseReturn ||
+            _selectedInvoiceType == InvoiceType.directConsumption ||
+            _selectedInvoiceType == InvoiceType.waste ||
+            (_selectedInvoiceType == InvoiceType.production &&
+                (r.extraInfo?['movement']?.toString() == 'out'));
+        final isIn =
+            _selectedInvoiceType == InvoiceType.purchase ||
+            _selectedInvoiceType == InvoiceType.salesReturn ||
+            (_selectedInvoiceType == InvoiceType.production &&
+                (r.extraInfo?['movement']?.toString() == 'in'));
         if ((isOut || isIn) && r.warehouseId == null) {
           return 'انبار ردیف ${i + 1} الزامی است';
         }
@@ -2781,7 +3369,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
     final invTypeVal = _selectedInvoiceType?.value;
     if (invoiceTypeSupportsGlobalDiscount(invTypeVal)) {
-      final graw = _globalDiscountValueController.text.replaceAll(',', '').trim();
+      final graw = _globalDiscountValueController.text
+          .replaceAll(',', '')
+          .trim();
       if (graw.isNotEmpty) {
         final gv = num.tryParse(graw);
         if (gv == null) return t.invoiceGlobalDiscountValueInvalid;
@@ -2794,8 +3384,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
     }
 
-    final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
-    final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn;
+    final isSalesOrReturn =
+        _selectedInvoiceType == InvoiceType.sales ||
+        _selectedInvoiceType == InvoiceType.salesReturn;
+    final isPurchaseOrReturn =
+        _selectedInvoiceType == InvoiceType.purchase ||
+        _selectedInvoiceType == InvoiceType.purchaseReturn;
 
     final adjValidationMsg = validateAdjustmentRows(
       _adjustmentRows,
@@ -2836,6 +3430,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     };
     extraInfo['post_inventory'] = _invoiceWarehouseReleaseMode != 'none';
     extraInfo['auto_post_warehouse'] = _invoiceWarehouseReleaseMode == 'posted';
+    if (widget.copyFromInvoiceId != null) {
+      extraInfo['copy_from_invoice_id'] = widget.copyFromInvoiceId;
+      if (_selectedInvoiceType == InvoiceType.salesReturn) {
+        extraInfo['returned_from_invoice_id'] = widget.copyFromInvoiceId;
+      }
+    }
     // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
     if (_documentWarehouseId != null) {
       extraInfo['warehouse_id'] = _documentWarehouseId;
@@ -2843,7 +3443,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // نادیده گرفتن اعتبار مشتری (فقط در فروش معنادار است؛ اما در payload همیشه ارسال می‌شود)
     extraInfo['ignore_credit_check'] = _ignoreCreditCheck;
     if (invoiceTypeSupportsGlobalDiscount(_selectedInvoiceType?.value)) {
-      final graw = _globalDiscountValueController.text.replaceAll(',', '').trim();
+      final graw = _globalDiscountValueController.text
+          .replaceAll(',', '')
+          .trim();
       if (graw.isNotEmpty) {
         final gv = num.tryParse(graw) ?? 0;
         if (gv > 0) {
@@ -2877,16 +3479,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } else {
       extraInfo.remove('invoice_adjustments');
     }
-    
+
     // افزودن اطلاعات فروشنده و کارمزد (اختیاری)
     if (isSalesOrReturn && _selectedSeller != null) {
       extraInfo['seller_id'] = _selectedSeller!.id;
       if (_commissionType != null) {
         extraInfo['commission'] = {
-          'type': _commissionType == CommissionType.percentage ? 'percentage' : 'amount',
-          if (_commissionType == CommissionType.percentage && _commissionPercentage != null)
+          'type': _commissionType == CommissionType.percentage
+              ? 'percentage'
+              : 'amount',
+          if (_commissionType == CommissionType.percentage &&
+              _commissionPercentage != null)
             'value': _commissionPercentage,
-          if (_commissionType == CommissionType.amount && _commissionAmount != null)
+          if (_commissionType == CommissionType.amount &&
+              _commissionAmount != null)
             'value': _commissionAmount,
         };
       }
@@ -2899,7 +3505,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       // اگر برنامه اقساط دستی است، مجموع اصل اقساط باید با (جمع فاکتور - پیش‌پرداخت) برابر باشد
       if (_installmentRows.isNotEmpty) {
         final totalNet = _invoiceGrandTotal.toDouble();
-        final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
+        final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(
+          0,
+          double.infinity,
+        );
         double sumPrincipal = 0;
         for (final r in _installmentRows) {
           sumPrincipal += (r['principal'] as num?)?.toDouble() ?? 0.0;
@@ -2918,8 +3527,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         'num_installments': _numInstallments,
         'first_due_date': due0,
         if (_installmentPeriod == 'monthly') 'period': 'monthly',
-        if (_installmentPeriod == 'days') 'period_days': _installmentPeriodDays ?? 30,
-        if (_interestRate != null && _installmentRows.isEmpty) 'interest_rate': _interestRate,
+        if (_installmentPeriod == 'days')
+          'period_days': _installmentPeriodDays ?? 30,
+        if (_interestRate != null && _installmentRows.isEmpty)
+          'interest_rate': _interestRate,
         'method': 'flat',
       };
       // اگر برنامه دستی تعریف شده، اضافه کن
@@ -2928,13 +3539,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         double interestTotal = 0;
         for (var i = 0; i < _installmentRows.length; i++) {
           final r = _installmentRows[i];
-          final dueDate = (r['due_date'] as DateTime? ?? _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now())
-              .toIso8601String()
-              .split('T')
-              .first;
+          final dueDate =
+              (r['due_date'] as DateTime? ??
+                      _firstInstallmentDueDate ??
+                      _invoiceDate ??
+                      DateTime.now())
+                  .toIso8601String()
+                  .split('T')
+                  .first;
           final principal = (r['principal'] as num?)?.toDouble() ?? 0.0;
           final interest = (r['interest'] as num?)?.toDouble() ?? 0.0;
-          final total = (r['total'] as num?)?.toDouble() ?? (principal + interest);
+          final total =
+              (r['total'] as num?)?.toDouble() ?? (principal + interest);
           interestTotal += interest;
           rows.add({
             'seq': (r['seq'] as int?) ?? (i + 1),
@@ -2949,36 +3565,49 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
       extraInfo['installment_plan'] = plan;
     }
-    
+
     // افزودن bom_ids برای فاکتور تولید
     if (_selectedInvoiceType == InvoiceType.production && _bomIds.isNotEmpty) {
       extraInfo['bom_ids'] = _bomIds.toList();
     }
-    
+
+    if (_selectedInvoiceType == InvoiceType.production &&
+        _productionOrderId != null) {
+      extraInfo['production_order_id'] = _productionOrderId;
+    }
+
     // افزودن هزینه عملیات/سربار تولید
-    if (_selectedInvoiceType == InvoiceType.production && 
-        _productionOperationsTotal != null && 
+    if (_selectedInvoiceType == InvoiceType.production &&
+        _productionOperationsTotal != null &&
         _productionOperationsTotal! > 0) {
       extraInfo['production_operations_total'] = _productionOperationsTotal;
     }
-    
+
     // ساخت payload
     final payload = <String, dynamic>{
       'invoice_type': _convertInvoiceTypeToApi(_selectedInvoiceType!),
-      'document_date': _invoiceDate!.toIso8601String().split('T')[0], // فقط تاریخ بدون زمان
+      'document_date': _invoiceDate!.toIso8601String().split(
+        'T',
+      )[0], // فقط تاریخ بدون زمان
       'currency_id': _selectedCurrencyId,
       'is_proforma': _isDraft,
       'extra_info': extraInfo,
       if (manualInvoiceCode != null) 'code': manualInvoiceCode,
       if (_autoGenerateInvoiceNumber && _codeReservationId != null)
         'code_reservation_id': _codeReservationId,
-      if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
+      if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty)
+        'description': _invoiceTitle,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       if (_selectedTagIds.isNotEmpty) 'tag_ids': _selectedTagIds,
-      if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
+      if (_showInvoiceFxField && _manualFxRateId != null)
+        'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+      if (_loyaltyPointsController.text.trim().isNotEmpty)
+        'loyalty_redemption_points': double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0,
+      if (_clubVoucherCodeController.text.trim().isNotEmpty)
+        'customer_club_voucher_code': _clubVoucherCodeController.text.trim().toUpperCase(),
     };
-    
+
     // تراکنش‌ها فقط برای فاکتور قطعی (هم‌راستا با بک‌اند و edit_invoice_page)
     if (!_isDraft && _transactions.isNotEmpty) {
       final baseCur = _defaultBusinessCurrencyId;
@@ -2992,36 +3621,36 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           )
           .toList();
     }
-    
+
     return payload;
   }
 
   Map<String, dynamic> _serializeLineItem(InvoiceLineItem e) {
     // تعیین movement بر اساس نوع فاکتور یا از extra_info
     String? movement;
-    
+
     // اول از extra_info استفاده می‌کنیم (اگر از BOM آمده باشد)
     if (e.extraInfo != null && e.extraInfo!['movement'] != null) {
       movement = e.extraInfo!['movement'].toString();
     } else {
       // در غیر این صورت از نوع فاکتور تعیین می‌کنیم
-      if (_selectedInvoiceType == InvoiceType.sales || 
+      if (_selectedInvoiceType == InvoiceType.sales ||
           _selectedInvoiceType == InvoiceType.purchaseReturn ||
           _selectedInvoiceType == InvoiceType.directConsumption ||
           _selectedInvoiceType == InvoiceType.waste) {
         movement = 'out';
-      } else if (_selectedInvoiceType == InvoiceType.purchase || 
-                 _selectedInvoiceType == InvoiceType.salesReturn) {
+      } else if (_selectedInvoiceType == InvoiceType.purchase ||
+          _selectedInvoiceType == InvoiceType.salesReturn) {
         movement = 'in';
       }
     }
     // برای production، movement باید در extra_info تعیین شده باشد
-    
+
     // محاسبه مقادیر
     final lineDiscount = e.discountAmount;
     final taxAmount = e.taxAmount;
     final lineTotal = e.total;
-    
+
     // extra_info مبدأ (کپی فاکتور) ممکن است unit_price قدیمی داشته باشد؛
     // مثل صفحه ویرایش، مقادیر زندهٔ فرم باید آخر نوشته شوند.
     final extraInfo = <String, dynamic>{};
@@ -3047,16 +3676,25 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (e.warehouseId != null) {
       extraInfo['warehouse_id'] = e.warehouseId;
     }
-    
+
     // اضافه کردن selected_instance_ids به extra_info برای کالاهای یونیک
     if (e.selectedInstanceIds != null && e.selectedInstanceIds!.isNotEmpty) {
       extraInfo['selected_instance_ids'] = e.selectedInstanceIds;
+    } else if (_selectedInvoiceType == InvoiceType.salesReturn) {
+      final returned = extraInfo['returned_from_instance_ids'];
+      if (returned is List && returned.isNotEmpty) {
+        extraInfo['selected_instance_ids'] = returned;
+      }
     }
-    
+
+    final allocations = extraInfo['allocations'];
+    final lotAllocations = extraInfo['lot_allocations'];
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
+      if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
+      if (lotAllocations is List && lotAllocations.isNotEmpty) 'lot_allocations': lotAllocations,
       'extra_info': extraInfo,
     };
   }
@@ -3072,6 +3710,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     return sanitized;
   }
 
+  InvoiceLineItem _hydrateSalesReturnSourceLots(InvoiceLineItem item) {
+    if (item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty) {
+      return item;
+    }
+    final returned = item.extraInfo?['returned_from_instance_ids'];
+    if (returned is! List || returned.isEmpty) return item;
+    final ids = returned
+        .map((e) => e is int ? e : int.tryParse(e.toString()))
+        .whereType<int>()
+        .toList();
+    if (ids.isEmpty) return item;
+    return item.copyWith(selectedInstanceIds: ids);
+  }
+
   void _showError(String message) {
     SnackBarHelper.showError(context, message: message);
   }
@@ -3084,47 +3736,57 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       _showError('دسترسی به این نوع فاکتور برای شما فعال نیست');
       return;
     }
-    
+
     final oldType = _selectedInvoiceType;
-    final hasBomLines = _lineItems.any((item) => 
-      item.extraInfo?['bom_id'] != null || 
-      item.extraInfo?['movement'] == 'out' || 
-      item.extraInfo?['movement'] == 'in'
+    final hasBomLines = _lineItems.any(
+      (item) =>
+          item.extraInfo?['bom_id'] != null ||
+          item.extraInfo?['movement'] == 'out' ||
+          item.extraInfo?['movement'] == 'in',
     );
     var insertedDefaultLineAfterProductionClear = false;
 
     setState(() {
       _selectedInvoiceType = newType;
+      if (newType == InvoiceType.salesReturn && oldType == InvoiceType.sales) {
+        _lineItems = [
+          for (final item in _lineItems) _hydrateSalesReturnSourceLots(item),
+        ];
+      }
       _hasUserCustomizedSettings = false;
       if (!invoiceTypeSupportsGlobalDiscount(newType.value)) {
         _globalDiscountValueController.clear();
       }
 
       // اگر نوع فاکتور از تولید به نوع دیگری تغییر می‌کند
-      if (oldType == InvoiceType.production && newType != InvoiceType.production) {
+      if (oldType == InvoiceType.production &&
+          newType != InvoiceType.production) {
         // پاک کردن bom_ids
         _bomIds.clear();
-        
+
         // پاک کردن هزینه عملیات/سربار تولید
         _productionOperationsTotal = null;
-        
+        _productionOrderId = null;
+        _linkedProductionOrder = null;
+        _productionOrderOptions = const [];
+
         // پاک کردن ردیف‌هایی که از BOM آمده‌اند یا movement دارند
         _lineItems.removeWhere((item) {
           final extraInfo = item.extraInfo;
           if (extraInfo == null) return false;
-          
+
           // حذف ردیف‌هایی که bom_id دارند
           if (extraInfo['bom_id'] != null) return true;
-          
+
           // حذف ردیف‌هایی که movement دارند (مخصوص فاکتور تولید)
           final movement = extraInfo['movement'];
           if (movement == 'out' || movement == 'in') return true;
-          
+
           return false;
         });
-        
+
         _recalculateTotalsFromLines();
-        
+
         // اگر هیچ ردیفی باقی نماند، یک ردیف پیش‌فرض اضافه کن
         if (_lineItems.isEmpty) {
           insertedDefaultLineAfterProductionClear = true;
@@ -3142,13 +3804,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         // اگر نوع جدید تولید نیست، bom_ids را پاک کن (برای اطمینان)
         _bomIds.clear();
         _productionOperationsTotal = null;
+        _productionOrderId = null;
+        _linkedProductionOrder = null;
+        _productionOrderOptions = const [];
       }
-      
+
       // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
-      if (newType == InvoiceType.purchase || newType == InvoiceType.purchaseReturn) {
+      if (newType == InvoiceType.purchase ||
+          newType == InvoiceType.purchaseReturn) {
         _selectedCustomer = null;
         _selectedSeller = null;
-      } else if (newType == InvoiceType.sales || newType == InvoiceType.salesReturn) {
+      } else if (newType == InvoiceType.sales ||
+          newType == InvoiceType.salesReturn) {
         _selectedSupplier = null;
       } else {
         _selectedCustomer = null;
@@ -3160,7 +3827,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         disposeInvoiceAdjustmentRows(_adjustmentRows);
         _adjustmentRows = [];
       }
-      
+
       // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
       final newTabCount = _getTabCountForType(newType);
       final prevTabIndex = _tabController.index;
@@ -3185,26 +3852,39 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         });
       });
     }
-    
+
     // نمایش هشدار به کاربر در صورت وجود ردیف‌های BOM
     if (hasBomLines && newType != InvoiceType.production) {
       SnackBarHelper.showInfo(
         context,
-        message: 'ردیف‌های مربوط به فرمول تولید حذف شدند زیرا نوع فاکتور تغییر کرد.',
+        message:
+            'ردیف‌های مربوط به فرمول تولید حذف شدند زیرا نوع فاکتور تغییر کرد.',
       );
     }
-    
+
     _applyPrintSettingsForCurrentType();
     unawaited(_syncReservedInvoiceCode());
+    if (newType == InvoiceType.production) {
+      unawaited(_loadProductionOrderOptions());
+    }
   }
 
   Widget _buildProductsTab() {
     final t = AppLocalizations.of(context);
-    final showGlobalDisc = invoiceTypeSupportsGlobalDiscount(_selectedInvoiceType?.value);
-    final lineDiscOnly = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
-    final filledProductLines = _lineItems.where((e) => e.productId != null).toList();
-    final summaryTotalQuantity =
-        filledProductLines.fold<num>(0, (a, e) => a + e.quantity);
+    final showGlobalDisc = invoiceTypeSupportsGlobalDiscount(
+      _selectedInvoiceType?.value,
+    );
+    final lineDiscOnly = _lineItems.fold<num>(
+      0,
+      (acc, e) => acc + e.discountAmount,
+    );
+    final filledProductLines = _lineItems
+        .where((e) => e.productId != null)
+        .toList();
+    final summaryTotalQuantity = filledProductLines.fold<num>(
+      0,
+      (a, e) => a + e.quantity,
+    );
     final summaryTotalQtyStr = summaryTotalQuantity.remainder(1) == 0
         ? summaryTotalQuantity.truncate().toString()
         : summaryTotalQuantity.toString();
@@ -3229,13 +3909,91 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               ],
               // ویجت انفجار فرمول (فقط برای فاکتور تولید)
               if (_selectedInvoiceType == InvoiceType.production) ...[
+                Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'اتصال به سفارش تولید (اختیاری)',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'اگر سفارش در حال اجرا انتخاب شود، مصرف و تولید در سقف برنامهٔ همان سفارش کنترل می‌شود.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loadingProductionOrders)
+                          const LinearProgressIndicator()
+                        else
+                          DropdownButtonFormField<int?>(
+                            value: _productionOrderId,
+                            decoration: const InputDecoration(
+                              labelText: 'سفارش تولید',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: [
+                              const DropdownMenuItem<int?>(
+                                value: null,
+                                child: Text('بدون سفارش (مسیر قدیمی)'),
+                              ),
+                              ..._productionOrderOptions.map(
+                                (o) => DropdownMenuItem<int?>(
+                                  value: o.id,
+                                  child: Text(
+                                    '${o.code} — ${o.productName ?? o.productId} '
+                                    '(${formatWithThousands(o.producedQuantity)}/${formatWithThousands(o.plannedQuantity)})',
+                                  ),
+                                ),
+                              ),
+                              if (_productionOrderId != null &&
+                                  !_productionOrderOptions.any(
+                                    (o) => o.id == _productionOrderId,
+                                  ))
+                                DropdownMenuItem<int?>(
+                                  value: _productionOrderId,
+                                  child: Text(
+                                    _linkedProductionOrder?.code ??
+                                        'سفارش #$_productionOrderId',
+                                  ),
+                                ),
+                            ],
+                            onChanged: (id) =>
+                                unawaited(_selectProductionOrder(id)),
+                          ),
+                        if (_linkedProductionOrder != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'BOM #${_linkedProductionOrder!.bomId} · انبار مواد #${_linkedProductionOrder!.warehouseId} · انبار محصول #${_linkedProductionOrder!.outputWarehouseId}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
                 BomExplosionWidget(
+                  key: ValueKey(
+                    'production-bom-${_productionOrderId ?? "legacy"}',
+                  ),
                   businessId: widget.businessId,
+                  productionOrder: _linkedProductionOrder,
                   productionOperationsTotal: _productionOperationsTotal,
                   onExploded: (newItems, bomId) {
                     setState(() {
-                      // افزودن ردیف‌های جدید به لیست موجود
-                      _lineItems = [..._lineItems, ...newItems];
+                      // سفارش متصل یک مجموعه خط مصرف/خروجی واحد دارد؛ انفجار مجدد باید آن را جایگزین کند.
+                      _lineItems = _productionOrderId == null
+                          ? [..._lineItems, ...newItems]
+                          : newItems;
                       // افزودن bom_id به لیست
                       _bomIds.add(bomId);
                       _recalculateTotalsFromLines();
@@ -3266,7 +4024,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           child: Text(
                             'برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onErrorContainer,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onErrorContainer,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -3303,7 +4063,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         }
 
                         // حذف bom_id هایی که دیگر در ردیف‌ها نیستند
-                        _bomIds.removeWhere((bomId) => !bomIdsInRows.contains(bomId));
+                        _bomIds.removeWhere(
+                          (bomId) => !bomIdsInRows.contains(bomId),
+                        );
 
                         _lineItems = rows;
                         _recalculateTotalsFromLines();
@@ -3320,7 +4082,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(t.invoiceGlobalDiscountSection, style: Theme.of(context).textTheme.titleMedium),
+                        Text(
+                          t.invoiceGlobalDiscountSection,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                         const SizedBox(height: 12),
                         SegmentedButton<String>(
                           segments: [
@@ -3344,7 +4109,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         const SizedBox(height: 12),
                         TextField(
                           controller: _globalDiscountValueController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: InputDecoration(
                             labelText: t.invoiceGlobalDiscountValueLabel,
                             border: const OutlineInputBorder(),
@@ -3353,7 +4120,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         const SizedBox(height: 8),
                         Text(
                           t.invoiceGlobalDiscountLineDiscountHint(
-                            formatWithThousands(lineDiscOnly, decimalPlaces: _invoiceCurrencyDecimalPlaces),
+                            formatWithThousands(
+                              lineDiscOnly,
+                              decimalPlaces: _invoiceCurrencyDecimalPlaces,
+                            ),
                           ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -3362,7 +4132,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               t.invoiceGlobalDiscountAmountComputedHint(
-                                formatWithThousands(_sumDiscount - lineDiscOnly, decimalPlaces: _invoiceCurrencyDecimalPlaces),
+                                formatWithThousands(
+                                  _sumDiscount - lineDiscOnly,
+                                  decimalPlaces: _invoiceCurrencyDecimalPlaces,
+                                ),
                               ),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
@@ -3387,15 +4160,40 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       ),
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
-                    Text('${t.invoiceSummarySubtotal}: ${formatWithThousands(_sumSubtotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('${t.invoiceSummaryDiscount}: ${formatWithThousands(_sumDiscount, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('${t.invoiceSummaryTax}: ${formatWithThousands(_sumTax, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
-                    Text('جمع پس از ردیف‌ها: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[700])),
+                    Text(
+                      '${t.invoiceSummarySubtotal}: ${formatWithThousands(_sumSubtotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    Text(
+                      '${t.invoiceSummaryDiscount}: ${formatWithThousands(_sumDiscount, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    Text(
+                      '${t.invoiceSummaryTax}: ${formatWithThousands(_sumTax, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    Text(
+                      'جمع پس از ردیف‌ها: ${formatWithThousands(_sumTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                    ),
                     if (_adjustmentsNetSum != 0 || _adjustmentsTaxSum != 0) ...[
-                      Text('جمع خالص اضافات/کسورات: ${formatWithThousands(_adjustmentsNetSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
-                      Text('مالیات اضافات/کسورات: ${formatWithThousands(_adjustmentsTaxSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        'جمع خالص اضافات/کسورات: ${formatWithThousands(_adjustmentsNetSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      Text(
+                        'مالیات اضافات/کسورات: ${formatWithThousands(_adjustmentsTaxSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ],
-                    Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_invoiceGrandTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(
+                      '${t.invoiceSummaryTotal}: ${formatWithThousands(_invoiceGrandTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     if (widget.authStore.isMultiCurrency &&
                         _showInvoiceFxField &&
                         _previewFxRate != null &&
@@ -3404,7 +4202,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         isMultiCurrency: true,
                         showDual: true,
                         foreignPayable: _invoiceGrandTotal.toDouble(),
-                        basePayable: _invoiceGrandTotal.toDouble() * _previewFxRate!,
+                        basePayable:
+                            _invoiceGrandTotal.toDouble() * _previewFxRate!,
                         rate: _previewFxRate!,
                         foreignCurrencyLabel: _invoiceCurrencyUnitLabel,
                         baseCurrencyLabel: _baseCurrencyUnitLabel,
@@ -3478,12 +4277,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Widget _buildSettingsTab() {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
-    
+
     // بررسی اینکه آیا فاکتور فروش یا برگشت از فروش است و پیش‌نویس نیست
-    final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || 
-                           _selectedInvoiceType == InvoiceType.salesReturn;
+    final isSalesOrReturn =
+        _selectedInvoiceType == InvoiceType.sales ||
+        _selectedInvoiceType == InvoiceType.salesReturn;
     final showTaxFolderOption = isSalesOrReturn && !_isDraft;
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -3510,52 +4310,73 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SwitchListTile(
-                          title: Text(AppLocalizations.of(context).installmentsTitle),
-                          subtitle: Text(AppLocalizations.of(context).installmentsSubtitle),
+                          title: Text(
+                            AppLocalizations.of(context).installmentsTitle,
+                          ),
+                          subtitle: Text(
+                            AppLocalizations.of(context).installmentsSubtitle,
+                          ),
                           value: _useInstallments,
                           // غیرفعال در حالت پیش‌فاکتور (onChanged: null باعث غیرفعال شدن می‌شود)
-                          onChanged: _isDraft ? null : (value) {
-                            final oldLen = _tabController.length;
-                            final oldIdx = _tabController.index;
-                            final slot = _installmentsSlotForType(_selectedInvoiceType);
-                            setState(() {
-                              _useInstallments = value;
-                              _firstInstallmentDueDate ??= _invoiceDate ?? DateTime.now();
-                              _hasUserCustomizedSettings = true;
-                              final newTabCount = _getTabCountForType(_selectedInvoiceType);
-                              if (newTabCount != oldLen) {
-                                final newIdx = _mapTabIndexAfterInstallmentsToggle(
-                                  oldIndex: oldIdx,
-                                  oldLength: oldLen,
-                                  newLength: newTabCount,
-                                  addedInstallments: value,
-                                  installmentsSlot: slot,
-                                );
-                                _tabController.dispose();
-                                _tabController = TabController(
-                                  length: newTabCount,
-                                  vsync: this,
-                                  initialIndex: newIdx.clamp(0, newTabCount - 1),
-                                );
-                                _attachTabListener();
-                              }
-                              if (value == true) {
-                                _loadInstallmentPlans();
-                                final installmentsTabIndex =
-                                    _installmentsTabIndexForType(_selectedInvoiceType);
-                                if (installmentsTabIndex != null) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    if (!mounted) return;
-                                    if (installmentsTabIndex >= 0 &&
-                                        installmentsTabIndex < _tabController.length) {
-                                      _tabController.animateTo(installmentsTabIndex);
+                          onChanged: _isDraft
+                              ? null
+                              : (value) {
+                                  final oldLen = _tabController.length;
+                                  final oldIdx = _tabController.index;
+                                  final slot = _installmentsSlotForType(
+                                    _selectedInvoiceType,
+                                  );
+                                  setState(() {
+                                    _useInstallments = value;
+                                    _firstInstallmentDueDate ??=
+                                        _invoiceDate ?? DateTime.now();
+                                    _hasUserCustomizedSettings = true;
+                                    final newTabCount = _getTabCountForType(
+                                      _selectedInvoiceType,
+                                    );
+                                    if (newTabCount != oldLen) {
+                                      final newIdx =
+                                          _mapTabIndexAfterInstallmentsToggle(
+                                            oldIndex: oldIdx,
+                                            oldLength: oldLen,
+                                            newLength: newTabCount,
+                                            addedInstallments: value,
+                                            installmentsSlot: slot,
+                                          );
+                                      _tabController.dispose();
+                                      _tabController = TabController(
+                                        length: newTabCount,
+                                        vsync: this,
+                                        initialIndex: newIdx.clamp(
+                                          0,
+                                          newTabCount - 1,
+                                        ),
+                                      );
+                                      _attachTabListener();
+                                    }
+                                    if (value == true) {
+                                      _loadInstallmentPlans();
+                                      final installmentsTabIndex =
+                                          _installmentsTabIndexForType(
+                                            _selectedInvoiceType,
+                                          );
+                                      if (installmentsTabIndex != null) {
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (!mounted) return;
+                                              if (installmentsTabIndex >= 0 &&
+                                                  installmentsTabIndex <
+                                                      _tabController.length) {
+                                                _tabController.animateTo(
+                                                  installmentsTabIndex,
+                                                );
+                                              }
+                                            });
+                                      }
                                     }
                                   });
-                                }
-                              }
-                            });
-                            _saveLocalSettings();
-                          },
+                                  _saveLocalSettings();
+                                },
                         ),
                         // سایر تنظیمات اقساط به تب «اقساط» منتقل شد
                       ],
@@ -3579,14 +4400,25 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       const SizedBox(height: 8),
                       Text(
                         t.invoiceWarehouseReleaseSectionSubtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       SegmentedButton<String>(
                         segments: <ButtonSegment<String>>[
-                          ButtonSegment<String>(value: 'none', label: Text(t.invoiceWarehouseReleaseNone)),
-                          ButtonSegment<String>(value: 'draft', label: Text(t.invoiceWarehouseReleaseDraft)),
-                          ButtonSegment<String>(value: 'posted', label: Text(t.invoiceWarehouseReleasePosted)),
+                          ButtonSegment<String>(
+                            value: 'none',
+                            label: Text(t.invoiceWarehouseReleaseNone),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'draft',
+                            label: Text(t.invoiceWarehouseReleaseDraft),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'posted',
+                            label: Text(t.invoiceWarehouseReleasePosted),
+                          ),
                         ],
                         selected: <String>{_invoiceWarehouseReleaseMode},
                         onSelectionChanged: (Set<String> next) {
@@ -3621,9 +4453,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                           child: Text(
                             'این انبار در سطح سند حواله انبار استفاده می‌شود. اگر ردیف‌ها انبار نداشته باشند، از این انبار استفاده می‌شود.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600]),
                           ),
                         ),
                       ],
@@ -3632,15 +4463,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       if (_selectedInvoiceType == InvoiceType.sales)
                         SwitchListTile(
                           title: const Text('نادیده گرفتن اعتبار مشتری'),
-                          subtitle: const Text('در صورت فعال بودن، محدودیت اعتبار برای این فاکتور اعمال نمی‌شود'),
+                          subtitle: const Text(
+                            'در صورت فعال بودن، محدودیت اعتبار برای این فاکتور اعمال نمی‌شود',
+                          ),
                           value: _ignoreCreditCheck,
-                            onChanged: (value) {
+                          onChanged: (value) {
                             setState(() {
                               _ignoreCreditCheck = value;
                               _hasUserCustomizedSettings = true;
                             });
-                              _saveLocalSettings();
-                            },
+                            _saveLocalSettings();
+                          },
                         ),
                     ],
                   ),
@@ -3669,12 +4502,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             hintText: 'مثال: 50000',
                             prefixIcon: const Icon(Icons.attach_money),
                             border: const OutlineInputBorder(),
-                            helperText: 'هزینه عملیات و سربار تولید که به هزینه تمام‌شده محصول اضافه می‌شود',
+                            helperText:
+                                'هزینه عملیات و سربار تولید که به هزینه تمام‌شده محصول اضافه می‌شود',
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           onChanged: (value) {
                             setState(() {
-                              _productionOperationsTotal = double.tryParse(value);
+                              _productionOperationsTotal = double.tryParse(
+                                value,
+                              );
                             });
                           },
                         ),
@@ -3686,7 +4524,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               ],
 
               const SizedBox(height: 24),
-              
+
               // چاپ فاکتور بعد از صدور
               Card(
                 child: Padding(
@@ -3696,7 +4534,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     children: [
                       SwitchListTile(
                         title: const Text('چاپ فاکتور بعد از صدور'),
-                        subtitle: const Text('فاکتور بلافاصله پس از ذخیره چاپ شود'),
+                        subtitle: const Text(
+                          'فاکتور بلافاصله پس از ذخیره چاپ شود',
+                        ),
                         value: _printAfterSave,
                         onChanged: (value) {
                           setState(() {
@@ -3706,16 +4546,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           _saveLocalSettings();
                         },
                       ),
-                      
+
                       // تنظیمات چاپ (فقط اگر چاپ فعال باشد)
                       if (_printAfterSave) ...[
                         const Divider(),
                         const SizedBox(height: 16),
-                        
+
                         // انتخاب سایز کاغذ
                         DropdownButtonFormField<String>(
-                          value: (_selectedPaperSize != null &&
-                                  kInvoicePrintPaperOptions.any((o) => o.value == _selectedPaperSize))
+                          value:
+                              (_selectedPaperSize != null &&
+                                  kInvoicePrintPaperOptions.any(
+                                    (o) => o.value == _selectedPaperSize,
+                                  ))
                               ? _selectedPaperSize
                               : 'A4',
                           decoration: const InputDecoration(
@@ -3724,7 +4567,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           ),
                           items: [
                             ...kInvoicePrintPaperOptions.map(
-                              (o) => DropdownMenuItem(value: o.value, child: Text(o.labelFa)),
+                              (o) => DropdownMenuItem(
+                                value: o.value,
+                                child: Text(o.labelFa),
+                              ),
                             ),
                           ],
                           onChanged: (value) {
@@ -3746,13 +4592,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           decoration: InputDecoration(
                             labelText: 'جهت چاپ',
                             border: const OutlineInputBorder(),
-                            helperText: isInvoiceReceiptPaper(_selectedPaperSize)
+                            helperText:
+                                isInvoiceReceiptPaper(_selectedPaperSize)
                                 ? 'فیش پرینتر همیشه عمودی چاپ می‌شود'
                                 : null,
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'portrait', child: Text('عمودی (Portrait)')),
-                            DropdownMenuItem(value: 'landscape', child: Text('افقی (Landscape)')),
+                            DropdownMenuItem(
+                              value: 'portrait',
+                              child: Text('عمودی (Portrait)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'landscape',
+                              child: Text('افقی (Landscape)'),
+                            ),
                           ],
                           onChanged: isInvoiceReceiptPaper(_selectedPaperSize)
                               ? null
@@ -3765,11 +4618,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // فاکتور رسمی
                         SwitchListTile(
                           title: const Text('نمایش مهر و امضا'),
-                          subtitle: const Text('در صورت غیرفعال بودن، مهر و امضا در PDF نمایش داده نمی‌شود'),
+                          subtitle: const Text(
+                            'در صورت غیرفعال بودن، مهر و امضا در PDF نمایش داده نمی‌شود',
+                          ),
                           value: _showStampOnPrint,
                           onChanged: (value) {
                             setState(() {
@@ -3783,7 +4638,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           const SizedBox(height: 4),
                           SwitchListTile(
                             title: const Text('QR نمایش آنلاین / اعتبارسنجی'),
-                            subtitle: const Text('درج کد QR بالای فاکتور چاپی برای مشاهدهٔ نسخهٔ آنلاین'),
+                            subtitle: const Text(
+                              'درج کد QR بالای فاکتور چاپی برای مشاهدهٔ نسخهٔ آنلاین',
+                            ),
                             value: _showShareQrOnPrint,
                             onChanged: (value) {
                               setState(() {
@@ -3795,7 +4652,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           ),
                         ],
                         const SizedBox(height: 16),
-                        
+
                         // انتخاب قالب چاپ
                         if (_isLoadingPrintTemplates) ...[
                           const Center(child: CircularProgressIndicator()),
@@ -3814,7 +4671,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               ..._printTemplatesForCurrentPaper.map(
                                 (tpl) => DropdownMenuItem<String?>(
                                   value: tpl['id']?.toString(),
-                                  child: Text(tpl['name']?.toString() ?? 'Template ${tpl['id']}'),
+                                  child: Text(
+                                    tpl['name']?.toString() ??
+                                        'Template ${tpl['id']}',
+                                  ),
                                 ),
                               ),
                             ],
@@ -3832,9 +4692,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // ارسال به کارپوشه مودیان
               if (showTaxFolderOption) ...[
                 Card(
@@ -3845,7 +4705,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       children: [
                         SwitchListTile(
                           title: const Text('ارسال به کارپوشه مودیان'),
-                          subtitle: const Text('فاکتور پس از ثبت به کارپوشه مودیان مالیاتی ارسال شود'),
+                          subtitle: const Text(
+                            'فاکتور پس از ثبت به کارپوشه مودیان مالیاتی ارسال شود',
+                          ),
                           value: _sendToTaxFolder,
                           onChanged: (value) {
                             setState(() {
@@ -3860,9 +4722,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: 24),
-              
+
               // اطلاعات اضافی
               Card(
                 color: theme.colorScheme.surfaceContainerHighest,

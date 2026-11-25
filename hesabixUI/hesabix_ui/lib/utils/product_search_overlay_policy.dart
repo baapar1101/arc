@@ -1,4 +1,4 @@
-/// سیاست نمایش و ثبت پیشنهادهای جست‌وجوی کالا در فیلدهای دسکتاپ.
+/// سیاست نمایش و ثبت پیشنهادهای جست‌وجوی کالا در فیلدهای واکنش‌گرا.
 ///
 /// منوی پیشنهاد فقط پس از ورود متن باز می‌شود. در فروش سریع، Enter پیشنهاد
 /// انتخاب‌شده با صفحه‌کلید یا تنها نتیجهٔ موجود را ثبت می‌کند. اگر نتایج جاری
@@ -18,10 +18,15 @@ QuickSalesProductSearchSubmitAction resolveQuickSalesProductSearchSubmitAction({
   required int suggestionCount,
   required bool hasMoreSuggestions,
   required bool navigatedByKeyboard,
+  bool preferDirectSearch = false,
 }) {
   final normalizedInput = input.trim();
   if (normalizedInput.isEmpty) {
     return QuickSalesProductSearchSubmitAction.waitForSuggestionSelection;
+  }
+
+  if (preferDirectSearch) {
+    return QuickSalesProductSearchSubmitAction.searchField;
   }
 
   final suggestionsBelongToInput =

@@ -25,7 +25,7 @@ router = APIRouter(prefix="/admin/support-billing", tags=["admin-support-billing
 
 
 def _require_admin(ctx: AuthContext) -> None:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 
 

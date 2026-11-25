@@ -76,6 +76,11 @@ class _OperatorDashboardPageState extends State<OperatorDashboardPage> {
             icon: const Icon(Icons.inbox_outlined),
             label: const Text('صندوق ورودی'),
           ),
+          TextButton.icon(
+            onPressed: () => context.push('/user/profile/operator/mcp-connections'),
+            icon: const Icon(Icons.smart_toy_outlined),
+            label: const Text('MCP پشتیبانی'),
+          ),
           const SizedBox(width: 8),
         ],
       ),

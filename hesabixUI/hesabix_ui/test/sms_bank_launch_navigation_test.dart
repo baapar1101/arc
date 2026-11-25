@@ -51,6 +51,8 @@ void main() {
       expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/login'), isTrue);
       expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/user/profile/dashboard'), isTrue);
       expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/business/5/tab0/invoices'), isTrue);
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/u/shop-name'), isTrue);
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/public/pay/shop-name'), isTrue);
     });
 
     test('rejects filesystem-like paths', () {
@@ -71,6 +73,18 @@ void main() {
       );
       expect(
         SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/user/profile/dashboard'),
+        isFalse,
+      );
+      expect(
+        SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/u/shop-name'),
+        isFalse,
+      );
+      expect(
+        SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/i/abc'),
+        isFalse,
+      );
+      expect(
+        SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/p/xyz'),
         isFalse,
       );
     });

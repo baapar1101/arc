@@ -31,6 +31,8 @@ from adapters.db.models.product import Product
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
 from fastapi import HTTPException
 from app.core.basalam_plugin_dependency import check_basalam_plugin_active
+from app.core.plugin_license import ensure_plugin_config_row, get_business_plugin_row
+from app.core.business_calendar import business_today
 from app.core.cache import get_cache
 from app.core.responses import ApiError
 from app.services import crm_chat_service
@@ -94,19 +96,15 @@ def _find_plugin_row(db: Session) -> MarketplacePlugin:
     return plugin
 
 
-def _find_business_plugin(db: Session, business_id: int) -> BusinessPlugin:
+def _find_business_plugin(db: Session, business_id: int, *, create_if_global: bool = False) -> BusinessPlugin:
     plugin = _find_plugin_row(db)
-    row = (
-        db.query(BusinessPlugin)
-        .filter(
-            BusinessPlugin.business_id == int(business_id),
-            BusinessPlugin.plugin_id == plugin.id,
-        )
-        .first()
-    )
+    row = get_business_plugin_row(db, business_id, int(plugin.id))
     if row:
         return row
-
+    if create_if_global:
+        row = ensure_plugin_config_row(db, business_id, plugin)
+        if row:
+            return row
     raise ApiError(
         "BASALAM_LICENSE_NOT_FOUND",
         "Basalam license row for this business was not found.",
@@ -236,7 +234,6 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
 
 
 def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
-    row = _find_business_plugin(db, business_id)
     if not check_basalam_plugin_active(db, int(business_id)):
         raise ApiError(
             "BASALAM_PLUGIN_NOT_ACTIVE",
@@ -244,7 +241,9 @@ def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
             http_status=403,
             details={"plugin_code": PLUGIN_CODE},
         )
-    extra = _json_loads_safe(row.extra_info)
+    plugin = _find_plugin_row(db)
+    row = get_business_plugin_row(db, business_id, int(plugin.id))
+    extra = _json_loads_safe(row.extra_info) if row is not None else {}
     saved = extra.get(EXTRA_INFO_KEY)
     if not isinstance(saved, dict):
         saved = _default_settings()
@@ -252,7 +251,6 @@ def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
 
 
 def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
-    row = _find_business_plugin(db, business_id)
     if not check_basalam_plugin_active(db, int(business_id)):
         raise ApiError(
             "BASALAM_PLUGIN_NOT_ACTIVE",
@@ -260,6 +258,7 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
             http_status=403,
             details={"plugin_code": PLUGIN_CODE},
         )
+    row = _find_business_plugin(db, business_id, create_if_global=True)
     extra = _json_loads_safe(row.extra_info)
     prev = extra.get(EXTRA_INFO_KEY) if isinstance(extra.get(EXTRA_INFO_KEY), dict) else _default_settings()
     settings = _normalize_settings(payload or {}, prev)
@@ -755,7 +754,7 @@ def _sync_order_to_invoice(
         "invoice_type": invoice_type,
         "person_id": int(person_id),
         "currency_id": int(currency_id),
-        "document_date": (date.today()).isoformat(),
+        "document_date": business_today(business_id).isoformat(),
         "lines": lines,
         "description": f"Basalam order {order_id}",
         "extra_info": {
@@ -2087,10 +2086,33 @@ def _get_local_product(
     return None
 
 
+def _basalam_local_stock(db: Session, business_id: int, local_product: Product, item: Dict[str, Any], settings: Dict[str, Any]) -> int:
+    stock = item.get("stock")
+    if stock is None:
+        from app.services.inventory_lot_service import business_as_of, is_expiry_tracked_product, sellable_quantity
+
+        if is_expiry_tracked_product(local_product):
+            stock = sellable_quantity(
+                db,
+                int(business_id),
+                local_product,
+                None,
+                business_as_of(int(business_id)),
+            )
+        else:
+            stock = settings.get("default_basalam_stock", 1)
+    try:
+        return max(0, int(stock))
+    except Exception:
+        return 1
+
+
 def _build_basalam_product_request_from_local(
     local_product: Product,
     item: Dict[str, Any],
     settings: Dict[str, Any],
+    db: Optional[Session] = None,
+    business_id: Optional[int] = None,
 ) -> Any:
     try:
         from basalam_sdk.core.models import ProductRequestSchema
@@ -2101,13 +2123,17 @@ def _build_basalam_product_request_from_local(
             http_status=500,
             details={"reason": str(exc)},
         )
-    stock = item.get("stock")
-    if stock is None:
-        stock = settings.get("default_basalam_stock", 1)
-    try:
-        stock_int = max(0, int(stock))
-    except Exception:
-        stock_int = 1
+    bid = int(business_id or getattr(local_product, "business_id", 0) or 0)
+    if db is not None:
+        stock_int = _basalam_local_stock(db, bid, local_product, item, settings)
+    else:
+        stock = item.get("stock")
+        if stock is None:
+            stock = settings.get("default_basalam_stock", 1)
+        try:
+            stock_int = max(0, int(stock))
+        except Exception:
+            stock_int = 1
     price_src = item.get("primary_price")
     if price_src is None:
         price_src = local_product.base_sales_price
@@ -2184,6 +2210,31 @@ def publish_products_to_basalam(
         if not local_product:
             results.append({"status": "local_product_not_found", "input": item})
             continue
+        from app.services.product_variant_service import is_variant_inventory_product
+
+        if is_variant_inventory_product(local_product):
+            processed += 1
+            conflict_queue.append(
+                {
+                    "conflict_id": _new_conflict_id("variant"),
+                    "type": "variant_conflict",
+                    "direction": "push",
+                    "reason": "local_has_inventory_variants",
+                    "local_product_id": int(local_product.id),
+                    "local_product_name": local_product.name,
+                    "local_product_code": local_product.code,
+                    "payload": item,
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            )
+            results.append(
+                {
+                    "status": "manual_review_required",
+                    "local_product_id": int(local_product.id),
+                    "reason": "inventory_variant_not_supported",
+                }
+            )
+            continue
         if (item.get("variants") or (local_product.inventory_mode or "bulk") == "unique") and variant_strategy == "manual_review":
             processed += 1
             conflict_queue.append(
@@ -2201,7 +2252,7 @@ def publish_products_to_basalam(
             )
             results.append({"status": "manual_review_required", "local_product_id": int(local_product.id), "reason": "variant_conflict"})
             continue
-        req = _build_basalam_product_request_from_local(local_product, item, settings)
+        req = _build_basalam_product_request_from_local(local_product, item, settings, db=db, business_id=int(business_id))
         remote_id = str(item.get("basalam_product_id") or local_to_remote.get(str(local_product.id)) or "").strip()
         try:
             req_payload = req.model_dump(exclude_none=True)
@@ -2502,7 +2553,7 @@ def push_products_incremental(
                 "description": p.description,
                 "sku": p.code,
                 "primary_price": int(_parse_decimal(p.base_sales_price, 0)),
-                "stock": int(payload.get("stock") or settings.get("default_basalam_stock", 1)),
+                "stock": _basalam_local_stock(db, int(business_id), p, payload, settings),
             }
         )
     out = publish_products_to_basalam(

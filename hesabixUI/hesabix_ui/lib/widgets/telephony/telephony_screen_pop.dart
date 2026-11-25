@@ -3,8 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/business_nav.dart';
+import '../../models/person_model.dart';
 import '../../services/telephony/telephony_api.dart';
 import '../../services/telephony/telephony_session_controller.dart';
+import '../../l10n/app_localizations.dart';
+import '../../services/telephony/telephony_l10n.dart';
+import '../../utils/error_extractor.dart';
+import '../person/person_form_dialog.dart';
 
 class TelephonyScreenPopOverlay extends StatefulWidget {
   final int businessId;
@@ -43,19 +48,72 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
   Map<String, dynamic>? get _balance =>
       _ctx['balance'] is Map ? Map<String, dynamic>.from(_ctx['balance'] as Map) : null;
 
+  void _openCrm(String relativePath) {
+    context.go(context.businessPanelUrl(widget.businessId, relativePath));
+  }
+
+  void _openPersonFile(dynamic personId) {
+    if (personId == null) return;
+    _openCrm('crm/customer-360?personId=$personId');
+  }
+
+  void _openLeadFile(dynamic leadId) {
+    if (leadId == null) return;
+    _openCrm('crm/leads/$leadId');
+  }
+
+  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
+
+  /// شماره طرف مقابل تماس، نه داخلی کسب‌وکار.
+  String _callerNumber() {
+    final call = _call ?? const <String, dynamic>{};
+    final extension = '${call['extension'] ?? ''}'.trim();
+    final extensionDigits = _digitsOnly(extension);
+    final direction = '${call['direction'] ?? ''}';
+    final ordered = <String>[
+      '${call['peer_number'] ?? ''}',
+      if (direction == 'outbound') ...[
+        '${call['to_number_normalized'] ?? ''}',
+        '${call['to_number_raw'] ?? ''}',
+      ] else ...[
+        '${call['from_number_normalized'] ?? ''}',
+        '${call['from_number_raw'] ?? ''}',
+      ],
+      '${call['from_number_normalized'] ?? ''}',
+      '${call['from_number_raw'] ?? ''}',
+      '${call['to_number_normalized'] ?? ''}',
+      '${call['to_number_raw'] ?? ''}',
+    ];
+    String? fallback;
+    for (final raw in ordered) {
+      final value = raw.trim();
+      if (value.isEmpty) continue;
+      final digits = _digitsOnly(value);
+      if (digits.isEmpty) continue;
+      if (extensionDigits.isNotEmpty && digits == extensionDigits) continue;
+      if (digits.length >= 8) return value;
+      fallback ??= value;
+    }
+    return fallback ?? '';
+  }
+
   Future<void> _createLead() async {
     final callId = _call?['id'];
     if (callId == null) return;
     setState(() => _busy = true);
     try {
-      await _api.createLeadFromCall(widget.businessId, int.parse('$callId'));
+      final created = await _api.createLeadFromCall(widget.businessId, int.parse('$callId'));
       await widget.session.unawaitedOpenPop(int.parse('$callId'));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سرنخ ایجاد شد')));
-      }
+      final lead = created['lead'] is Map ? Map<String, dynamic>.from(created['lead'] as Map) : null;
+      final leadId = lead?['id'] ?? created['id'];
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyLeadCreated)));
+      _openLeadFile(leadId);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -63,18 +121,30 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
   }
 
   Future<void> _createPerson() async {
-    final callId = _call?['id'];
+    final callId = int.tryParse('${_call?['id'] ?? ''}');
     if (callId == null) return;
+    final created = await showDialog<Person?>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => PersonFormDialog(
+        businessId: widget.businessId,
+        initialMobile: _callerNumber(),
+        initialPersonTypes: const [PersonType.customer],
+      ),
+    );
+    if (created?.id == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await _api.createPersonFromCall(widget.businessId, int.parse('$callId'));
-      await widget.session.unawaitedOpenPop(int.parse('$callId'));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مخاطب ایجاد شد')));
-      }
+      await _api.patchCall(widget.businessId, callId, {
+        'person_id': created!.id,
+        'match_method': 'created_person',
+      });
+      await widget.session.unawaitedOpenPop(callId);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -88,11 +158,13 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
     try {
       await widget.session.saveCallNote(callId: int.parse('$callId'), note: _noteCtrl.text.trim());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('یادداشت ذخیره شد')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyNoteSaved)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -104,11 +176,13 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
     try {
       await widget.session.hangupActiveCall();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('دستور قطع تماس ارسال شد')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyHangupSent)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -116,29 +190,18 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
   }
 
   String _headerTitle(String status) {
-    switch (status) {
-      case 'ringing':
-        return 'تماس ورودی';
-      case 'answered':
-        return 'در مکالمه';
-      case 'completed':
-        return 'تماس پایان یافت';
-      case 'missed':
-        return 'تماس از دست‌رفته';
-      default:
-        return 'تماس فعال';
-    }
+    return telephonyScreenPopStatusLabel(AppLocalizations.of(context), status);
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= 900;
     final status = '${_call?['status'] ?? ''}';
-    final number =
-        '${_call?['from_number_normalized'] ?? _call?['from_number_raw'] ?? _call?['to_number_normalized'] ?? ''}';
-    final title = _person?['name']?.toString() ?? _lead?['name']?.toString() ?? 'شماره ناشناس';
+    final number = _callerNumber();
+    final title = _person?['name']?.toString() ?? _lead?['name']?.toString() ?? t.telephonyUnknownNumber;
     final anonymous = _person == null && _lead == null;
     final inProgress = status == 'ringing' || status == 'answered';
     final headerColor = status == 'ringing'
@@ -227,7 +290,7 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'مانده: ${_balance!['amount']} · ${_balance!['status']}',
+                              t.telephonyBalanceRemain('${_balance!['amount']}', '${_balance!['status']}'),
                               style: TextStyle(color: scheme.onSecondaryContainer, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -237,21 +300,21 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                   ],
                   if ((_ctx['overdue_checks'] as List?)?.isNotEmpty == true) ...[
                     const SizedBox(height: 12),
-                    Text('چک‌های سررسید/معوق', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(t.telephonyOverdueChecks, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                     ...((_ctx['overdue_checks'] as List).take(3)).map((c) {
                       final m = Map<String, dynamic>.from(c as Map);
                       return ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(Icons.money_outlined, color: scheme.error, size: 20),
-                        title: Text('چک ${m['check_number']}'),
+                        title: Text(t.telephonyCheckNumber('${m['check_number']}')),
                         subtitle: Text('${m['amount']} · ${m['status'] ?? ''}'),
                       );
                     }),
                   ],
                   if ((_ctx['open_deals'] as List?)?.isNotEmpty == true) ...[
                     const SizedBox(height: 8),
-                    Text('معاملات باز', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(t.telephonyOpenDeals, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                     ...((_ctx['open_deals'] as List).take(3)).map((d) {
                       final m = Map<String, dynamic>.from(d as Map);
                       return ListTile(
@@ -265,7 +328,7 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                   ],
                   const SizedBox(height: 14),
                   if ((_ctx['recent_documents'] as List?)?.isNotEmpty == true) ...[
-                    Text('آخرین اسناد', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(t.telephonyRecentDocuments, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     ...((_ctx['recent_documents'] as List).take(3)).map((d) {
                       final m = Map<String, dynamic>.from(d as Map);
@@ -284,7 +347,7 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                     minLines: 2,
                     maxLines: 4,
                     decoration: InputDecoration(
-                      labelText: 'یادداشت سریع',
+                      labelText: t.telephonyQuickNote,
                       filled: true,
                       fillColor: scheme.surfaceContainerLowest,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -302,24 +365,27 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                   if (anonymous) ...[
                     FilledButton.tonal(
                       onPressed: _busy ? null : _createLead,
-                      child: const Text('ایجاد سرنخ'),
+                      child: Text(t.telephonyCreateLead),
                     ),
                     OutlinedButton(
                       onPressed: _busy ? null : _createPerson,
-                      child: const Text('ایجاد مخاطب'),
+                      child: Text(t.telephonyCreateContact),
                     ),
-                  ] else if (_person != null)
-                    FilledButton.tonal(
-                      onPressed: () {
-                        context.go(
-                          context.businessPanelUrl(widget.businessId, 'crm/customer-360/${_person!['id']}'),
-                        );
-                      },
-                      child: const Text('پرونده مشتری'),
-                    ),
+                  ] else ...[
+                    if (_person != null)
+                      FilledButton.tonal(
+                        onPressed: () => _openPersonFile(_person!['id']),
+                        child: Text(t.telephonyCustomerFile),
+                      ),
+                    if (_lead != null)
+                      FilledButton.tonal(
+                        onPressed: () => _openLeadFile(_lead!['id']),
+                        child: Text(t.telephonyLeadFile),
+                      ),
+                  ],
                   FilledButton(
                     onPressed: _busy ? null : _saveNote,
-                    child: const Text('ذخیره یادداشت'),
+                    child: Text(t.telephonySaveNote),
                   ),
                   if (inProgress)
                     FilledButton(
@@ -328,7 +394,7 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                         foregroundColor: scheme.onError,
                       ),
                       onPressed: _busy ? null : _hangup,
-                      child: const Text('قطع تماس'),
+                      child: Text(t.telephonyHangupCall),
                     ),
                 ],
               ),

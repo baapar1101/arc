@@ -151,6 +151,15 @@ class TelephonyMediaHub:
 		if t:
 			t.last_heartbeat_at = time.time()
 
+	def extension_user_ids(self, pbx_id: int, extension: str) -> list[int]:
+		"""کاربران سافت‌فون آنلاین روی این داخلی. برای فیلتر نام سرنخ قبل از زنگ."""
+		ext = str(extension or "").strip()
+		return [
+			int(link.user_id)
+			for link in self._clients.values()
+			if link.pbx_id == pbx_id and str(link.extension or "").strip() == ext
+		]
+
 	async def notify_softphone_incoming(
 		self,
 		*,
@@ -159,15 +168,24 @@ class TelephonyMediaHub:
 		call_id: int,
 		from_number: Optional[str] = None,
 		channel: Optional[str] = None,
+		person: Optional[Dict[str, Any]] = None,
+		lead: Optional[Dict[str, Any]] = None,
+		lead_visible_user_ids: Optional[Set[int]] = None,
+		ambiguous: bool = False,
 	) -> int:
 		"""ارسال زنگ ورودی به Softphone clientهای آنلاین روی همان داخلی."""
 		ext = str(extension or "").strip()
 		sent = 0
+		person_name = (person or {}).get("name") if isinstance(person, dict) else None
 		for session_id, link in list(self._clients.items()):
 			if link.pbx_id != pbx_id:
 				continue
 			if str(link.extension or "").strip() != ext:
 				continue
+			visible_lead = lead
+			if lead_visible_user_ids is not None and int(link.user_id) not in lead_visible_user_ids:
+				visible_lead = None
+			lead_name = (visible_lead or {}).get("name") if isinstance(visible_lead, dict) else None
 			ok = await self.send_to_client(
 				session_id,
 				{
@@ -176,6 +194,12 @@ class TelephonyMediaHub:
 					"from": from_number,
 					"extension": ext,
 					"channel": channel,
+					"person": person,
+					"lead": visible_lead,
+					"person_name": person_name,
+					"lead_name": lead_name,
+					"party_name": person_name or lead_name,
+					"ambiguous": bool(ambiguous),
 				},
 			)
 			if ok:
@@ -464,7 +488,14 @@ class TelephonyMediaHub:
 		)
 		return bridge
 
-	async def stop_bridge(self, session_id: str, *, reason: str = "hangup") -> None:
+	async def stop_bridge(
+		self,
+		session_id: str,
+		*,
+		reason: str = "hangup",
+		channel: Optional[str] = None,
+		channels: Optional[list] = None,
+	) -> None:
 		async with self._lock:
 			bridge_id = self._bridges_by_session.pop(session_id, None)
 			bridge = self._bridges.pop(bridge_id, None) if bridge_id else None
@@ -474,18 +505,20 @@ class TelephonyMediaHub:
 			if link:
 				link.bridge_id = None
 				link.active_call_id = None
-		# حتی بدون bridge محلی، به Connector بگو AudioSocket را ببند (قطع واقعی تماس)
+		# حتی بدون bridge محلی، به Connector بگو AudioSocket و کانال AMI را ببند
 		if pbx_id:
-			await self.send_to_tunnel(
-				pbx_id,
-				{
-					"type": "bridge.stop",
-					"bridge_id": bridge_id,
-					"session_id": session_id,
-					"audiosocket_uuid": as_uuid,
-					"reason": reason,
-				},
-			)
+			payload: Dict[str, Any] = {
+				"type": "bridge.stop",
+				"bridge_id": bridge_id,
+				"session_id": session_id,
+				"audiosocket_uuid": as_uuid,
+				"reason": reason,
+			}
+			if channel:
+				payload["channel"] = channel
+			if channels:
+				payload["channels"] = list(channels)
+			await self.send_to_tunnel(pbx_id, payload)
 		await self.send_to_client(
 			session_id,
 			{"type": "bridge.ended", "bridge_id": bridge_id, "reason": reason},

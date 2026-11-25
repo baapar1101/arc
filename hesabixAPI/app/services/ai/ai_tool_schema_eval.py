@@ -6,9 +6,9 @@ Wire vs construction token costs are simulated without an LLM provider.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     MAX_TOOLS_PER_REQUEST,
     QUERY_COMPLEXITY_ITERATIONS,
@@ -26,7 +26,7 @@ from app.services.ai.ai_tool_discovery_gold import (
 )
 from app.services.ai.ai_tool_intent import iterations_for_query
 
-EVAL_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/tool-schema-loading")
+EVAL_DIR = docs_root() / "ai-agent" / "evals" / "tool-schema-loading"
 
 # Phase 6 floors — schema loading must not change retrieval.
 PHASE6_RECALL_AT_10 = 0.90

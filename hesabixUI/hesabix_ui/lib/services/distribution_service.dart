@@ -297,6 +297,52 @@ class DistributionService {
     return _dataMap(res.data);
   }
 
+  Future<List<dynamic>> listTeamMembers({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/team-members',
+    );
+    final m = _dataMap(res.data);
+    final items = m['items'];
+    if (items is List) return items;
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> updateMyPreferences({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/me/preferences',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> publishDailyPlan({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/daily-plan/publish',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<void> unpublishDailyPlan({
+    required int businessId,
+    String? planDate,
+    int? targetUserId,
+  }) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/daily-plan/publish',
+      query: <String, dynamic>{
+        if (planDate != null) 'plan_date': planDate,
+        if (targetUserId != null) 'target_user_id': '$targetUserId',
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> getReportsDashboard({
     required int businessId,
     required String fromDate,

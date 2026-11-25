@@ -840,6 +840,11 @@ class WorkflowEngine:
         r"\$([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_]+)?)",
         re.ASCII,
     )
+    # {{ trigger_data.field }} و {{ node_id.field }} — همان قراردادی که پرامپت طراحی ورک‌فلو به AI می‌دهد
+    _WORKFLOW_BRACE_TOKEN_RE = re.compile(
+        r"\{\{\s*([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\s*\}\}",
+        re.ASCII,
+    )
 
     @staticmethod
     def _lookup_node_result(node_results: Dict[str, Any], node_id: str) -> Any:
@@ -876,7 +881,57 @@ class WorkflowEngine:
                 td = context.get("trigger_data")
                 if isinstance(td, dict) and field in td:
                     return td[field]
+            # $trigger_data.field وقتی خود trigger_data نود نیست
+            if result is None:
+                container = context.get(node_id)
+                if isinstance(container, dict) and field in container:
+                    return container[field]
         return None
+
+    @staticmethod
+    def _walk_mapping(value: Any, parts: List[str]) -> Any:
+        cur = value
+        for part in parts:
+            if not isinstance(cur, dict) or part not in cur:
+                return None
+            cur = cur[part]
+        return cur
+
+    @staticmethod
+    def _resolve_brace_path(
+        path: str,
+        context: Dict[str, Any],
+        node_results: Dict[str, Any],
+    ) -> Any:
+        """حل مسیر داخل {{ }} از trigger_data، context یا خروجی نود."""
+        parts = [p for p in (path or "").split(".") if p]
+        if not parts:
+            return None
+        head, rest = parts[0], parts[1:]
+        if head == "trigger_data":
+            td = context.get("trigger_data")
+            if not rest:
+                return td
+            return WorkflowEngine._walk_mapping(td, rest)
+        if head in context:
+            base = context[head]
+            if not rest:
+                return base
+            walked = WorkflowEngine._walk_mapping(base, rest)
+            if walked is not None:
+                return walked
+        node = WorkflowEngine._lookup_node_result(node_results, head)
+        if node is None:
+            return None
+        if not rest:
+            return node
+        return WorkflowEngine._walk_mapping(node, rest)
+
+    @staticmethod
+    def _stringify_resolved(resolved: Any) -> str:
+        if isinstance(resolved, (dict, list)):
+            return json.dumps(resolved, ensure_ascii=False)
+        return str(resolved)
 
     @staticmethod
     def _resolve_value_static(
@@ -889,10 +944,18 @@ class WorkflowEngine:
 
         - اگر کل رشته دقیقاً یک token به شکل $node یا $node.field باشد، همان رفتار قبلی
           (نوع برگشتی می‌تواند غیر رشته باشد).
-        - اگر رشته شامل متن ثابت و یک یا چند $node.field باشد، هر token با str(resolved)
-          جایگزین می‌شود؛ token حل‌نشده بدون تغییر می‌ماند.
+        - اگر کل رشته دقیقاً یک {{ path }} باشد، مقدار حل‌شده با نوع اصلی برمی‌گردد.
+        - اگر رشته شامل متن ثابت و یک یا چند $node.field یا {{ path }} باشد، هر token
+          با متن مقدار جایگزین می‌شود؛ token حل‌نشده بدون تغییر می‌ماند.
         """
-        if not isinstance(value, str) or "$" not in value:
+        if not isinstance(value, str) or ("$" not in value and "{{" not in value):
+            return value
+
+        brace_only = WorkflowEngine._WORKFLOW_BRACE_TOKEN_RE.fullmatch(value)
+        if brace_only is not None and "$" not in value:
+            resolved = WorkflowEngine._resolve_brace_path(brace_only.group(1), context, node_results)
+            if resolved is not None:
+                return resolved
             return value
 
         m = WorkflowEngine._WORKFLOW_REF_TOKEN_RE.fullmatch(value)
@@ -908,9 +971,20 @@ class WorkflowEngine:
             resolved = WorkflowEngine._resolve_ref_token(ref, context, node_results)
             if resolved is None:
                 return match.group(0)
-            return str(resolved)
+            return WorkflowEngine._stringify_resolved(resolved)
 
-        return WorkflowEngine._WORKFLOW_REF_TOKEN_RE.sub(_replace_token, value)
+        def _replace_brace(match: re.Match) -> str:
+            resolved = WorkflowEngine._resolve_brace_path(match.group(1), context, node_results)
+            if resolved is None:
+                return match.group(0)
+            return WorkflowEngine._stringify_resolved(resolved)
+
+        replaced = value
+        if "$" in replaced:
+            replaced = WorkflowEngine._WORKFLOW_REF_TOKEN_RE.sub(_replace_token, replaced)
+        if "{{" in replaced:
+            replaced = WorkflowEngine._WORKFLOW_BRACE_TOKEN_RE.sub(_replace_brace, replaced)
+        return replaced
     
     def _resolve_value(
         self,

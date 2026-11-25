@@ -32,6 +32,7 @@ router = APIRouter(prefix="/loan-facilities", tags=["تسهیلات دریافت
 @router.post(
 	"/businesses/{business_id}/query",
 	summary="فهرست تسهیلات دریافتی",
+	description="ابزار MCP: `list_loan_facilities`.",
 )
 @require_business_access("business_id")
 def list_facilities_endpoint(
@@ -55,6 +56,7 @@ def list_facilities_endpoint(
 @router.post(
 	"/businesses/{business_id}/create",
 	summary="ایجاد قرارداد تسهیلات (پیش‌نویس)",
+	description="ابزار MCP: `create_loan_facility` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def create_facility_endpoint(
@@ -76,6 +78,7 @@ def create_facility_endpoint(
 @router.get(
 	"/{facility_id}",
 	summary="جزئیات تسهیلات با اقساط",
+	description="ابزار MCP: `get_loan_facility`.",
 )
 def get_facility_endpoint(
 	request: Request,
@@ -93,6 +96,7 @@ def get_facility_endpoint(
 @router.patch(
 	"/{facility_id}",
 	summary="به‌روزرسانی قرارداد",
+	description="ابزار MCP: `update_loan_facility` (نیازمند تأیید).",
 )
 def update_facility_endpoint(
 	request: Request,
@@ -111,6 +115,7 @@ def update_facility_endpoint(
 @router.delete(
 	"/{facility_id}",
 	summary="حذف قرارداد تسهیلات در صورت مجاز بودن حسابداری",
+	description="ابزار MCP: `delete_loan_facility` (نیازمند تأیید).",
 )
 def delete_facility_endpoint(
 	request: Request,
@@ -132,6 +137,7 @@ def delete_facility_endpoint(
 @router.post(
 	"/{facility_id}/schedule",
 	summary="تولید یا بازسازی جدول اقساط",
+	description="ابزار MCP: `regenerate_loan_schedule` (نیازمند تأیید).",
 )
 def schedule_facility_endpoint(
 	request: Request,
@@ -152,6 +158,7 @@ def schedule_facility_endpoint(
 @router.post(
 	"/businesses/{business_id}/facilities/{facility_id}/installments/{installment_id}/payments",
 	summary="ثبت پرداخت قسط",
+	description="ابزار MCP: `record_loan_payment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def pay_installment_endpoint(
@@ -177,6 +184,7 @@ def pay_installment_endpoint(
 @router.delete(
 	"/businesses/{business_id}/facilities/{facility_id}/installments/{installment_id}/payments/{payment_id}",
 	summary="حذف پرداخت قسط و سند حسابداری مرتبط",
+	description="ابزار MCP: `delete_loan_payment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def delete_installment_payment_endpoint(

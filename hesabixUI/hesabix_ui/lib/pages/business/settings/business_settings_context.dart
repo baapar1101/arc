@@ -1,6 +1,7 @@
 import '../../../core/auth_store.dart';
 import '../../../core/business_panel_ui_store.dart';
 import '../../../core/business_route_paths.dart';
+import '../../../widgets/marketplace/plugin_marketplace_utils.dart';
 
 /// Context for building the business settings hub (permissions, plugins, routes).
 class BusinessSettingsContext {
@@ -52,9 +53,10 @@ class BusinessSettingsContext {
   }
 
   bool pluginActive(String code) {
-    return plugins.any(
-      (p) => p['plugin_code'] == code && p['is_active'] == true,
-    );
+    return plugins.any((p) {
+      final pluginCode = (p['plugin_code'] ?? p['code'] ?? '').toString();
+      return pluginCode == code && marketplacePluginLicenseActive(p);
+    });
   }
 
   bool get canJoinSettings => authStore.hasBusinessPermission('settings', 'join');
@@ -120,6 +122,20 @@ class BusinessSettingsContext {
         authStore.hasBusinessPermission('payroll', 'manage');
   }
 
+  bool get canAccessOfficeAutomation {
+    if (!pluginActive('office_automation')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('office_automation', 'view') ||
+        authStore.hasBusinessPermission('office_automation', 'admin');
+  }
+
+  bool get canAccessFixedAssets {
+    if (!pluginActive('fixed_assets')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('fixed_assets', 'view') ||
+        authStore.hasBusinessPermission('fixed_assets', 'manage');
+  }
+
   bool get canAccessMoadian {
     if (!pluginActive('moadian_tax_integration')) return false;
     if (isOwner) return true;
@@ -139,4 +155,14 @@ class BusinessSettingsContext {
     return authStore.hasBusinessPermission('woocommerce', 'view') ||
         authStore.hasBusinessPermission('woocommerce', 'manage');
   }
+
+  bool get canAccessDigipay {
+    if (!canJoinSettings || !pluginActive('digipay_credit')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('digipay', 'view') ||
+        authStore.hasBusinessPermission('digipay', 'manage');
+  }
+
+  bool get canAccessAdvancedAccounting =>
+      pluginActive(kAdvancedAccountingPluginCode);
 }

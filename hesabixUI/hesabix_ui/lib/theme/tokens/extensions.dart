@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'reports_catalog.dart';
 import 'semantic_colors.dart';
+import 'settings_hub.dart';
+import 'shell_nav.dart';
 import 'theme_catalog.dart';
 
+export 'reports_catalog.dart';
 export 'semantic_colors.dart';
+export 'settings_hub.dart';
+export 'shell_nav.dart';
 export 'theme_catalog.dart';
 
 @immutable
@@ -80,21 +86,72 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
   final Color topBarBackground;
   final Color topBarForeground;
   final Color dashboardBackground;
+  /// رنگ آیتم «بازار افزونه‌ها» در منوی کناری.
+  final Color sidebarMarketplace;
+  final Color sidebarMarketplaceFill;
+  /// رنگ آیتم «تنظیمات» در منوی کناری.
+  final Color sidebarSettings;
+  final Color sidebarSettingsFill;
 
   const AppShellColors({
     required this.topBarBackground,
     required this.topBarForeground,
     required this.dashboardBackground,
+    required this.sidebarMarketplace,
+    required this.sidebarMarketplaceFill,
+    required this.sidebarSettings,
+    required this.sidebarSettingsFill,
   });
 
   static AppShellColors fromScheme(ColorScheme scheme, {required bool isDark}) {
+    final topBarBg = isDark
+        ? Color.lerp(scheme.primary, scheme.surface, 0.25)!
+        : scheme.primary;
+    final topBarFg = ThemeData.estimateBrightnessForColor(topBarBg) == Brightness.dark
+        ? Colors.white
+        : scheme.onPrimary;
+    final marketplace = scheme.tertiary;
+    final settings = scheme.secondary;
+    Color fillOf(Color accent) => Color.alphaBlend(
+          accent.withValues(alpha: isDark ? 0.30 : 0.16),
+          scheme.surfaceContainerLow,
+        );
     return AppShellColors(
-      topBarBackground: isDark
-          ? const Color(0x73111827)
-          : const Color(0x80FFFFFF),
-      topBarForeground: scheme.onSurface,
-      dashboardBackground: Colors.transparent,
+      topBarBackground: topBarBg,
+      topBarForeground: topBarFg,
+      dashboardBackground: isDark
+          ? scheme.surface
+          : Color.alphaBlend(
+              scheme.primary.withValues(alpha: 0.035),
+              scheme.surfaceContainerLowest,
+            ),
+      sidebarMarketplace: marketplace,
+      sidebarMarketplaceFill: fillOf(marketplace),
+      sidebarSettings: settings,
+      sidebarSettingsFill: fillOf(settings),
     );
+  }
+
+  Color? sidebarFooterForeground(String? key) {
+    switch (key) {
+      case 'plugin-marketplace':
+        return sidebarMarketplace;
+      case 'settings':
+        return sidebarSettings;
+      default:
+        return null;
+    }
+  }
+
+  Color? sidebarFooterFill(String? key) {
+    switch (key) {
+      case 'plugin-marketplace':
+        return sidebarMarketplaceFill;
+      case 'settings':
+        return sidebarSettingsFill;
+      default:
+        return null;
+    }
   }
 
   @override
@@ -102,11 +159,19 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
     Color? topBarBackground,
     Color? topBarForeground,
     Color? dashboardBackground,
+    Color? sidebarMarketplace,
+    Color? sidebarMarketplaceFill,
+    Color? sidebarSettings,
+    Color? sidebarSettingsFill,
   }) =>
       AppShellColors(
         topBarBackground: topBarBackground ?? this.topBarBackground,
         topBarForeground: topBarForeground ?? this.topBarForeground,
         dashboardBackground: dashboardBackground ?? this.dashboardBackground,
+        sidebarMarketplace: sidebarMarketplace ?? this.sidebarMarketplace,
+        sidebarMarketplaceFill: sidebarMarketplaceFill ?? this.sidebarMarketplaceFill,
+        sidebarSettings: sidebarSettings ?? this.sidebarSettings,
+        sidebarSettingsFill: sidebarSettingsFill ?? this.sidebarSettingsFill,
       );
 
   @override
@@ -116,6 +181,10 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
       topBarBackground: Color.lerp(topBarBackground, other.topBarBackground, t)!,
       topBarForeground: Color.lerp(topBarForeground, other.topBarForeground, t)!,
       dashboardBackground: Color.lerp(dashboardBackground, other.dashboardBackground, t)!,
+      sidebarMarketplace: Color.lerp(sidebarMarketplace, other.sidebarMarketplace, t)!,
+      sidebarMarketplaceFill: Color.lerp(sidebarMarketplaceFill, other.sidebarMarketplaceFill, t)!,
+      sidebarSettings: Color.lerp(sidebarSettings, other.sidebarSettings, t)!,
+      sidebarSettingsFill: Color.lerp(sidebarSettingsFill, other.sidebarSettingsFill, t)!,
     );
   }
 }
@@ -123,6 +192,12 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
 extension AppThemeExtensions on BuildContext {
   AppSpacing get appSpacing => Theme.of(this).extension<AppSpacing>() ?? const AppSpacing();
   AppRadii get appRadii => Theme.of(this).extension<AppRadii>() ?? const AppRadii();
+  AppShellNavMetrics get shellNav =>
+      Theme.of(this).extension<AppShellNavMetrics>() ?? const AppShellNavMetrics();
+  AppReportsCatalogMetrics get reportsCatalog =>
+      Theme.of(this).extension<AppReportsCatalogMetrics>() ?? const AppReportsCatalogMetrics();
+  AppSettingsHubMetrics get settingsHub =>
+      Theme.of(this).extension<AppSettingsHubMetrics>() ?? const AppSettingsHubMetrics();
   AppShellColors get shellColors =>
       Theme.of(this).extension<AppShellColors>() ??
       AppShellColors.fromScheme(Theme.of(this).colorScheme, isDark: Theme.of(this).brightness == Brightness.dark);

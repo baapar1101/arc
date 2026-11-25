@@ -100,7 +100,7 @@ def _actor_display(db: Session, user_id: Optional[int]) -> Optional[str]:
 @router.get(
 	"/business/{business_id}/scope-catalog",
 	summary="کاتالوگ scopeهای معتبر قالب",
-	description="لیست scopeهای مجاز برای اتصال قالب به نوع سند.",
+	description="ابزار MCP: `get_report_template_scope_catalog`.",
 )
 @require_business_access("business_id")
 async def report_template_scope_catalog(
@@ -116,7 +116,7 @@ async def report_template_scope_catalog(
 @router.get(
 	"/business/{business_id}",
 	summary="لیست قالب‌های گزارش",
-	description="لیست قالب‌ها با امکان فیلتر بر اساس ماژول و زیرنوع. کاربران عادی فقط Published را می‌بینند.",
+	description="ابزار MCP: `list_report_templates`.",
 )
 @require_business_access("business_id")
 async def list_report_templates(
@@ -176,7 +176,7 @@ async def list_report_templates(
 @router.get(
 	"/{template_id}/business/{business_id}",
 	summary="جزئیات یک قالب گزارش (فقط سازندگان)",
-	description="اطلاعات کامل قالب شامل محتوا برای ویرایشگر",
+	description="ابزار MCP: `get_report_template`.",
 )
 @require_business_access("business_id")
 async def get_report_template(
@@ -219,6 +219,7 @@ async def get_report_template(
 @router.post(
 	"/business/{business_id}",
 	summary="ایجاد قالب جدید (فقط سازندگان)",
+	description="ابزار MCP: `create_report_template` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_report_template(
@@ -239,6 +240,7 @@ async def create_report_template(
 @router.put(
 	"/{template_id}/business/{business_id}",
 	summary="ویرایش قالب (فقط سازندگان)",
+	description="ابزار MCP: `update_report_template` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_report_template(
@@ -258,6 +260,7 @@ async def update_report_template(
 @router.delete(
 	"/{template_id}/business/{business_id}",
 	summary="حذف قالب (فقط سازندگان)",
+	description="ابزار MCP: `delete_report_template` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_report_template(
@@ -276,6 +279,7 @@ async def delete_report_template(
 @router.post(
 	"/{template_id}/business/{business_id}/publish",
 	summary="انتشار/بازگشت به پیش‌نویس (سازگاری با نسخه قبل)",
+	description="ابزار MCP: `publish_report_template` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def publish_report_template(
@@ -306,7 +310,7 @@ async def publish_report_template(
 @router.post(
 	"/{template_id}/business/{business_id}/transition",
 	summary="تغییر وضعیت lifecycle قالب",
-	description="تغییر وضعیت کنترل‌شده: draft/in_review/approved/published/deprecated",
+	description="تغییر وضعیت کنترل‌شده: draft/in_review/approved/published/deprecated. ابزار MCP: `transition_report_template_status` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def transition_report_template_status(
@@ -361,7 +365,7 @@ async def transition_report_template_status(
 @router.get(
 	"/{template_id}/business/{business_id}/status-events",
 	summary="تاریخچه تغییر وضعیت قالب",
-	description="نمایش timeline تغییر وضعیت‌ها با دلیل و کاربر انجام‌دهنده.",
+	description="نمایش timeline تغییر وضعیت‌ها با دلیل و کاربر انجام‌دهنده. ابزار MCP: `list_report_template_status_events`.",
 )
 @require_business_access("business_id")
 async def report_template_status_events(
@@ -403,7 +407,7 @@ async def report_template_status_events(
 @router.get(
 	"/business/{business_id}/status-events",
 	summary="گزارش مدیریتی تغییر وضعیت قالب‌ها",
-	description="گزارش تجمیعی/فیلترپذیر برای audit تغییر وضعیت قالب‌ها.",
+	description="گزارش تجمیعی/فیلترپذیر برای audit تغییر وضعیت قالب‌ها. ابزار MCP: `list_report_template_status_audit`.",
 )
 @require_business_access("business_id")
 async def report_templates_status_events_report(
@@ -533,6 +537,7 @@ async def report_templates_status_events_report(
 @router.post(
 	"/business/{business_id}/set-default",
 	summary="تنظیم قالب پیش‌فرض یک ماژول/زیرنوع (فقط سازندگان)",
+	description="ابزار MCP: `set_default_report_template` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def set_default_template(
@@ -570,7 +575,7 @@ async def set_default_template(
 @router.post(
 	"/business/{business_id}/preview",
 	summary="پیش‌نمایش قالب (فقط سازندگان)",
-	description="بدون ذخیره‌سازی؛ HTML/CSS ارسالی با داده نمونه رندر و به PDF تبدیل می‌شود.",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. HTML: `preview_report_template_html`.",
 )
 @require_business_access("business_id")
 async def preview_report_template(
@@ -623,7 +628,7 @@ async def preview_report_template(
 @router.post(
 	"/business/{business_id}/preview-html",
 	summary="پیش‌نمایش سریع HTML قالب",
-	description="بدون ذخیره‌سازی و بدون تولید PDF؛ برای پیش‌نمایش زنده Studio.",
+	description="بدون ذخیره‌سازی و بدون تولید PDF؛ برای پیش‌نمایش زنده Studio. ابزار MCP: `preview_report_template_html`.",
 )
 @require_business_access("business_id")
 async def preview_report_template_html(
@@ -666,7 +671,7 @@ async def preview_report_template_html(
 @router.post(
 	"/business/{business_id}/preview-pdf",
 	summary="پیش‌نمایش PDF قالب (فقط سازندگان)",
-	description="بدون ذخیره‌سازی؛ HTML/CSS ارسالی با داده نمونه رندر و به PDF تبدیل می‌شود. فایل PDF به صورت bytes برگردانده می‌شود.",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. HTML: `preview_report_template_html`.",
 )
 @require_business_access("business_id")
 async def preview_report_template_pdf(
@@ -723,7 +728,7 @@ async def preview_report_template_pdf(
 @router.get(
 	"/business/{business_id}/schema",
 	summary="Schema متغیرهای قابل‌استفاده در قالب برای ماژول/زیرنوع",
-	description="لیست کلیدها/توضیحات و نمونه context برای کمک به سازندگان قالب",
+	description="ابزار MCP: `get_report_template_studio_contract`.",
 )
 @require_business_access("business_id")
 async def report_template_schema(
@@ -1071,7 +1076,7 @@ async def report_template_schema(
 @router.post(
 	"/business/{business_id}/validate-builder-design",
 	summary="اعتبارسنجی طراحی Builder برای scope",
-	description="بررسی سازگاری بلوک‌ها با نوع سند و ارائه errors/warnings.",
+	description="بررسی سازگاری بلوک‌ها با نوع سند و ارائه errors/warnings. ابزار MCP: `validate_report_template_builder_design`.",
 )
 @require_business_access("business_id")
 async def validate_builder_design(
@@ -1096,7 +1101,7 @@ async def validate_builder_design(
 @router.get(
 	"/business/{business_id}/template-gallery",
 	summary="گالری قالب‌های آماده (Studio v2)",
-	description="لیست خانواده‌های قالب با طراحی پیش‌فرض برای شروع سریع.",
+	description="لیست خانواده‌های قالب با طراحی پیش‌فرض برای شروع سریع. ابزار MCP: `list_report_template_gallery`.",
 )
 @require_business_access("business_id")
 async def report_template_gallery(
@@ -1122,6 +1127,7 @@ async def report_template_gallery(
 @router.get(
 	"/business/{business_id}/studio-blocks",
 	summary="کاتالوگ بلوک‌های Studio v3",
+	description="بلوک‌های مجاز استودیو برای یک scope. ابزار MCP: `list_report_template_studio_blocks`.",
 )
 @require_business_access("business_id")
 async def report_template_studio_blocks(
@@ -1138,6 +1144,7 @@ async def report_template_studio_blocks(
 @router.get(
 	"/business/{business_id}/studio-contract",
 	summary="قرارداد schema، compiler، component و binding استودیو v4",
+	description="قرارداد استودیو v4. ابزار MCP: `get_report_template_studio_contract`.",
 )
 @require_business_access("business_id")
 async def report_template_studio_contract(
@@ -1154,7 +1161,7 @@ async def report_template_studio_contract(
 @router.post(
 	"/business/{business_id}/validate-v2-design",
 	summary="اعتبارسنجی طراحی Studio v2",
-	description="بررسی سازگاری طراحی v2 با scope و کامپایلر.",
+	description="بررسی سازگاری طراحی v2 با scope و کامپایلر. ابزار MCP: `validate_report_template_studio_design`.",
 )
 @require_business_access("business_id")
 async def validate_v2_design_endpoint(
@@ -1178,7 +1185,7 @@ async def validate_v2_design_endpoint(
 @router.post(
 	"/business/{business_id}/compile-v2-design",
 	summary="کامپایل طراحی Studio v2 به HTML/CSS",
-	description="تبدیل template_design به fragmentهای Jinja2 برای حالت پیشرفته.",
+	description="تبدیل template_design به fragmentهای Jinja2 برای حالت پیشرفته. ابزار MCP: `compile_report_template_studio_design`.",
 )
 @require_business_access("business_id")
 async def compile_v2_design_endpoint(
@@ -1208,6 +1215,7 @@ async def compile_v2_design_endpoint(
 @router.post(
 	"/business/{business_id}/validate-studio-design",
 	summary="اعتبارسنجی طراحی Studio",
+	description="اعتبارسنجی طراحی استودیو. ابزار MCP: `validate_report_template_studio_design`.",
 )
 @require_business_access("business_id")
 async def validate_studio_design_endpoint(
@@ -1231,6 +1239,7 @@ async def validate_studio_design_endpoint(
 @router.post(
 	"/business/{business_id}/compile-studio-design",
 	summary="کامپایل طراحی Studio به HTML/CSS",
+	description="خروجی HTML/CSS بدون PDF. ابزار MCP: `compile_report_template_studio_design`.",
 )
 @require_business_access("business_id")
 async def compile_studio_design_endpoint(
@@ -1260,6 +1269,7 @@ async def compile_studio_design_endpoint(
 @router.post(
 	"/business/{business_id}/migrate-v2-to-v3",
 	summary="تبدیل طراحی Studio v2 به v3",
+	description="تبدیل غیرمخرب design. ابزار MCP: `migrate_report_template_v2_to_v3`.",
 )
 @require_business_access("business_id")
 async def migrate_v2_to_v3_endpoint(
@@ -1284,7 +1294,7 @@ async def migrate_v2_to_v3_endpoint(
 @router.post(
 	"/business/{business_id}/migrate-v3-to-v4",
 	summary="تبدیل غیرمخرب طراحی Studio v3 به v4",
-	description="فقط یک design جدید برمی‌گرداند و قالب اصلی را تغییر نمی‌دهد.",
+	description="فقط یک design جدید برمی‌گرداند و قالب اصلی را تغییر نمی‌دهد. ابزار MCP: `migrate_report_template_v3_to_v4`.",
 )
 @require_business_access("business_id")
 async def migrate_v3_to_v4_endpoint(
@@ -1309,7 +1319,7 @@ async def migrate_v3_to_v4_endpoint(
 @router.post(
 	"/business/{business_id}/migrate-builder-to-v2",
 	summary="تبدیل طراحی Builder قدیمی به Studio v2",
-	description="تبدیل best-effort از builder_design به template_design v2.",
+	description="تبدیل غیرمخرب design. ابزار MCP: `migrate_report_template_builder_to_v2`. اعتبارسنجی: `validate_report_template_builder_design`.",
 )
 @require_business_access("business_id")
 async def migrate_builder_to_v2(

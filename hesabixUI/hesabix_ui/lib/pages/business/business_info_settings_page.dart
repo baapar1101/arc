@@ -8,6 +8,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/business_models.dart';
+import 'package:hesabix_ui/models/product_measurement.dart';
 import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
@@ -65,6 +66,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   // تنظیمات محاسبه سود فاکتور
   String? _invoiceProfitCalculationMethod;
   String? _invoiceProfitCalculationBasis;
+  String _invoiceProfitMissingPurchasePricePolicy = 'zero_cost';
   bool _invoiceProfitIncludeOverhead = false;
   String? _invoiceProfitOverheadType;
   final _invoiceProfitOverheadPercentController = TextEditingController();
@@ -80,6 +82,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _invoiceSyncUpdatePurchasePriceEnabled = false;
   String? _invoiceSyncSalesPriceBasis;
   String? _invoiceSyncPurchasePriceBasis;
+  String _invoiceSyncPurchasePriceMultiLinePolicy = 'weighted_average';
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
   /// direct_inventory | grni_two_step | grni_legacy
@@ -93,6 +96,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _allowNegativeInventoryForBulk = false;
   bool _allowNegativeInventoryForUnique = false;
   bool _warehouseTransferRequirePositiveStock = true;
+  ProductMeasurementUnit _productDimensionUnit = ProductMeasurementUnit.mm;
+  ProductMeasurementUnit _productWeightUnit = ProductMeasurementUnit.g;
 
   // کالای هزینه‌شده / کالای درآمدشده
   String _geiWorkflowMode = 'simple';
@@ -204,6 +209,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       // تنظیمات محاسبه سود
       _invoiceProfitCalculationMethod = resp.invoiceProfitCalculationMethod ?? 'automatic';
       _invoiceProfitCalculationBasis = resp.invoiceProfitCalculationBasis ?? 'purchase_price';
+      _invoiceProfitMissingPurchasePricePolicy = resp.invoiceProfitMissingPurchasePricePolicy;
       _invoiceProfitIncludeOverhead = resp.invoiceProfitIncludeOverhead;
       _invoiceProfitOverheadType = resp.invoiceProfitOverheadType ?? 'none';
       _invoiceProfitOverheadPercentController.text = (resp.invoiceProfitOverheadPercent ?? 0).toStringAsFixed(2);
@@ -215,6 +221,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceSyncUpdatePurchasePriceEnabled = resp.invoiceSyncUpdatePurchasePriceEnabled;
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
       _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
+      _invoiceSyncPurchasePriceMultiLinePolicy = resp.invoiceSyncPurchasePriceMultiLinePolicy;
       _invoiceWarehouseReleaseMode = resp.invoiceWarehouseReleaseMode;
       _invoicePurchaseAccountingMode = resp.invoicePurchaseAccountingMode;
       _invoiceGlobalDiscountPercentBasis = resp.invoiceGlobalDiscountPercentBasis;
@@ -228,6 +235,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               ? resp.invoiceGlobalDiscountMaxAmount!.toStringAsFixed(0)
               : '';
       _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
+      _productDimensionUnit = ProductMeasurementUnit.dimensionFromCode(
+        resp.productDimensionUnit,
+      );
+      _productWeightUnit = ProductMeasurementUnit.weightFromCode(
+        resp.productWeightUnit,
+      );
       _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
       _geiWorkflowMode = resp.goodsExpenseIncomeWorkflowMode;
@@ -362,6 +375,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if (_invoiceProfitCalculationBasis != null && _invoiceProfitCalculationBasis != orig.invoiceProfitCalculationBasis) {
       payload['invoice_profit_calculation_basis'] = _invoiceProfitCalculationBasis;
     }
+    if (_invoiceProfitMissingPurchasePricePolicy != orig.invoiceProfitMissingPurchasePricePolicy) {
+      payload['invoice_profit_missing_purchase_price_policy'] = _invoiceProfitMissingPurchasePricePolicy;
+    }
     if (_invoiceProfitIncludeOverhead != orig.invoiceProfitIncludeOverhead) {
       payload['invoice_profit_include_overhead'] = _invoiceProfitIncludeOverhead;
     }
@@ -397,6 +413,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if (_invoiceSyncPurchasePriceBasis != null && _invoiceSyncPurchasePriceBasis != orig.invoiceSyncPurchasePriceBasis) {
       payload['invoice_sync_purchase_price_basis'] = _invoiceSyncPurchasePriceBasis;
     }
+    if (_invoiceSyncPurchasePriceMultiLinePolicy != orig.invoiceSyncPurchasePriceMultiLinePolicy) {
+      payload['invoice_sync_purchase_price_multi_line_policy'] = _invoiceSyncPurchasePriceMultiLinePolicy;
+    }
     if (_invoiceWarehouseReleaseMode != orig.invoiceWarehouseReleaseMode) {
       payload['invoice_warehouse_release_mode'] = _invoiceWarehouseReleaseMode;
     }
@@ -423,6 +442,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_allowNegativeInventoryForBulk != orig.allowNegativeInventoryForBulk) {
       payload['allow_negative_inventory_for_bulk'] = _allowNegativeInventoryForBulk;
+    }
+    if (_productDimensionUnit.code != orig.productDimensionUnit) {
+      payload['product_dimension_unit'] = _productDimensionUnit.code;
+    }
+    if (_productWeightUnit.code != orig.productWeightUnit) {
+      payload['product_weight_unit'] = _productWeightUnit.code;
     }
     if (_allowNegativeInventoryForUnique != orig.allowNegativeInventoryForUnique) {
       payload['allow_negative_inventory_for_unique'] = _allowNegativeInventoryForUnique;
@@ -1288,6 +1313,23 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildInventoryNegativePolicySettings(cs),
 
               const SizedBox(height: 24),
+              _buildSectionTitle('واحدهای مشخصات فیزیکی کالا', cs),
+              const SizedBox(height: 8),
+              _measurementUnitDropdown(
+                'واحد ابعاد کالا',
+                _productDimensionUnit,
+                ProductMeasurementUnit.dimensionUnits,
+                (unit) => setState(() => _productDimensionUnit = unit),
+              ),
+              const SizedBox(height: 12),
+              _measurementUnitDropdown(
+                'واحد وزن کالا',
+                _productWeightUnit,
+                ProductMeasurementUnit.weightUnits,
+                (unit) => setState(() => _productWeightUnit = unit),
+              ),
+
+              const SizedBox(height: 24),
               _buildSectionTitle('کالای هزینه‌شده / کالای درآمدشده', cs),
               const SizedBox(height: 8),
               _buildGoodsExpenseIncomeSettings(cs),
@@ -1411,6 +1453,35 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                     setState(() {
                       _invoiceProfitFifoShortageMode = value;
                     });
+                  },
+                ),
+              ],
+              if (_invoiceProfitCalculationBasis == 'purchase_price') ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _invoiceProfitMissingPurchasePricePolicy,
+                  decoration: const InputDecoration(
+                    labelText: 'رفتار قیمت خرید نامشخص',
+                    helperText: 'اگر هنگام ثبت فروش، قیمت خرید محصول تعریف نشده باشد چه رفتاری انجام شود؟',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'block_calculation',
+                      child: Text('جلوگیری از ثبت/محاسبه تا تعیین قیمت خرید'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'use_line_cost_price',
+                      child: Text('استفاده از بهای پایه ثبت‌شده روی ردیف؛ در نبود آن توقف'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'zero_cost',
+                      child: Text('محاسبه با هزینه صفر (رفتار سازگار قبلی)'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _invoiceProfitMissingPurchasePricePolicy = value);
                   },
                 ),
               ],
@@ -1658,6 +1729,25 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       child: Text('قیمت تمام‌شده ردیف (خرید) / در فروش همان قیمت واحد'),
     ),
   ];
+
+  Widget _measurementUnitDropdown(
+    String label,
+    ProductMeasurementUnit selected,
+    List<ProductMeasurementUnit> units,
+    ValueChanged<ProductMeasurementUnit> onChanged,
+  ) {
+    return DropdownButtonFormField<ProductMeasurementUnit>(
+      initialValue: selected,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        for (final unit in units)
+          DropdownMenuItem(value: unit, child: Text(unit.label)),
+      ],
+      onChanged: _saving ? null : (unit) {
+        if (unit != null) onChanged(unit);
+      },
+    );
+  }
 
   Widget _buildInventoryNegativePolicySettings(ColorScheme cs) {
     final t = AppLocalizations.of(context);
@@ -2063,6 +2153,37 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                 ),
                 items: _invoiceSyncBasisItems,
                 onChanged: (value) => setState(() => _invoiceSyncPurchasePriceBasis = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _invoiceSyncPurchasePriceMultiLinePolicy,
+                decoration: const InputDecoration(
+                  labelText: 'سیاست چند ردیف یک محصول در فاکتور خرید',
+                  helperText: 'اگر یک محصول با چند قیمت در یک فاکتور باشد، قیمت پایه چگونه تعیین شود؟',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'weighted_average',
+                    child: Text('میانگین وزنی بر اساس مقدار'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'last_line',
+                    child: Text('آخرین ردیف واردشده'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'highest_price',
+                    child: Text('بیشترین قیمت'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'lowest_price',
+                    child: Text('کمترین قیمت'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _invoiceSyncPurchasePriceMultiLinePolicy = value);
+                },
               ),
             ],
           ],

@@ -194,7 +194,7 @@ Public Class MainForm
                 _lblFooterHint.Text = If(_preflightPanel.CanProceed, "بازبینی تأیید شد", "ابتدا بررسی تطبیقی را کامل کنید")
             Case WizardStep.Transfer
                 _btnBack.Visible = True : _btnNext.Visible = False
-                _lblFooterHint.Text = "انتقال قابل ازسرگیری است"
+                _lblFooterHint.Text = "انتقال و همگام‌سازی خودکار اسناد"
             Case Else
                 _btnBack.Visible = True : _btnNext.Enabled = False
                 _lblFooterHint.Text = ""

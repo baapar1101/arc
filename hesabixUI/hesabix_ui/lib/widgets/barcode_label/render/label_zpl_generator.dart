@@ -4,6 +4,7 @@ import '../../../models/barcode_label/label_design_v1.dart';
 import 'label_image_raster.dart';
 import 'label_image_resolver.dart';
 import 'label_pdf_renderer.dart';
+import 'roll_label_page_metrics.dart';
 
 /// تولید ZPL از طرح — symbology، چرخش، QR/DataMatrix، تصویر.
 class LabelZplGenerator {
@@ -20,35 +21,27 @@ class LabelZplGenerator {
   }) async {
     final buf = StringBuffer();
     final dotsPerMm = dpi / 25.4;
-    final columns = sheet.rollColumns.clamp(1, 20).toInt();
     final labelWidthMm = design.canvas.widthMm;
-    final labelHeightMm = design.canvas.heightMm;
-    final gapX = sheet.rollGapMm['x'] ?? 2;
-    final gapY = sheet.rollGapMm['y'] ?? 2;
-    final left = sheet.rollMarginMm['left'] ?? 0;
-    final right = sheet.rollMarginMm['right'] ?? 0;
-    final top = sheet.rollMarginMm['top'] ?? 0;
-    final bottom = sheet.rollMarginMm['bottom'] ?? 0;
-    final requiredWidth = left + right + columns * labelWidthMm + (columns - 1) * gapX;
-    final rollWidth = sheet.rollPaperWidthMm > 0 ? sheet.rollPaperWidthMm : requiredWidth;
-    if (rollWidth + 0.01 < requiredWidth) {
+    final metrics = rollLabelPageMetrics(
+      sheet: sheet,
+      labelWidthMm: labelWidthMm,
+      labelHeightMm: design.canvas.heightMm,
+    );
+    if (!metrics.fits) {
       throw ArgumentError('Roll width is too small for the selected label grid.');
     }
+    final columns = metrics.columns;
     final els = List<LabelElement>.from(design.elements)..sort((a, b) => a.zIndex.compareTo(b.zIndex));
     for (var start = 0; start < contexts.length; start += columns) {
       final rowEnd = (start + columns).clamp(0, contexts.length);
-      final isFirstRow = start == 0;
-      final isLastRow = rowEnd == contexts.length;
-      final rowTop = isFirstRow ? top : 0.0;
-      final rowTail = isLastRow ? bottom : gapY;
       buf.writeln('^XA');
       buf.writeln('^CI28');
-      buf.writeln('^PW${(rollWidth * dotsPerMm).round()}');
-      buf.writeln('^LL${((rowTop + labelHeightMm + rowTail) * dotsPerMm).round()}');
+      buf.writeln('^PW${(metrics.widthMm * dotsPerMm).round()}');
+      buf.writeln('^LL${(metrics.heightMm * dotsPerMm).round()}');
       for (var ci = start; ci < rowEnd; ci++) {
         final ctx = contexts[ci];
-        final offsetX = ((left + (ci - start) * (labelWidthMm + gapX)) * dotsPerMm).round();
-        final offsetY = (rowTop * dotsPerMm).round();
+        final offsetX = ((metrics.leftMm + (ci - start) * (labelWidthMm + metrics.gapXMm)) * dotsPerMm).round();
+        final offsetY = (metrics.topMm * dotsPerMm).round();
         for (final el in els) {
           if (!el.visible) continue;
           Uint8List? imageBytes;

@@ -40,6 +40,8 @@ from adapters.api.v1.schema_models.distribution import (
 	AssortmentPayload,
 	SetupWizardPayload,
 	NewOutletPayload,
+	UserPreferencePayload,
+	DailyPlanPublishPayload,
 )
 from app.core.business_calendar import business_today
 from app.services import distribution_service as dist_svc
@@ -102,7 +104,11 @@ def require_distribution_approve_returns_dep(
 	raise ApiError("FORBIDDEN", "distribution.approve_returns or distribution.manage required", http_status=403)
 
 
-@router.get("/business/{business_id}/summary")
+@router.get(
+	"/business/{business_id}/summary",
+	summary="خلاصه افزونه توزیع",
+	description="ابزار MCP: `get_distribution_summary`.",
+)
 def get_summary(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -117,7 +123,11 @@ def get_summary(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/territories")
+@router.get(
+	"/business/{business_id}/territories",
+	summary="فهرست قلمروهای توزیع",
+	description="ابزار MCP: `list_distribution_territories`.",
+)
 def list_territories(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -131,7 +141,11 @@ def list_territories(
 	return success_response({"items": dist_svc.list_territories(db, business_id, ctx)}, request)
 
 
-@router.post("/business/{business_id}/territories")
+@router.post(
+	"/business/{business_id}/territories",
+	summary="ایجاد قلمرو توزیع",
+	description="ابزار MCP: `create_distribution_territory` (نیازمند تأیید).",
+)
 def create_territory(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -147,7 +161,11 @@ def create_territory(
 	return success_response(data, request)
 
 
-@router.put("/business/{business_id}/territories/{territory_id}")
+@router.put(
+	"/business/{business_id}/territories/{territory_id}",
+	summary="ویرایش قلمرو توزیع",
+	description="ابزار MCP: `update_distribution_territory` (نیازمند تأیید).",
+)
 def update_territory(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -160,11 +178,15 @@ def update_territory(
 	___: None = Depends(require_business_permission_dep("distribution", "manage")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	data = dist_svc.update_territory(db, business_id, territory_id, body.model_dump(exclude_none=True))
+	data = dist_svc.update_territory(db, business_id, territory_id, body.model_dump(exclude_unset=True))
 	return success_response(data, request)
 
 
-@router.delete("/business/{business_id}/territories/{territory_id}")
+@router.delete(
+	"/business/{business_id}/territories/{territory_id}",
+	summary="حذف قلمرو توزیع",
+	description="ابزار MCP: `delete_distribution_territory` (نیازمند تأیید).",
+)
 def delete_territory(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -180,7 +202,11 @@ def delete_territory(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/routes")
+@router.get(
+	"/business/{business_id}/routes",
+	summary="فهرست مسیرهای توزیع",
+	description="ابزار MCP: `list_distribution_routes`.",
+)
 def list_routes(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -194,7 +220,11 @@ def list_routes(
 	return success_response({"items": dist_svc.list_routes(db, business_id, ctx)}, request)
 
 
-@router.post("/business/{business_id}/routes")
+@router.post(
+	"/business/{business_id}/routes",
+	summary="ایجاد مسیر توزیع",
+	description="ابزار MCP: `create_distribution_route` (نیازمند تأیید).",
+)
 def create_route(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -210,7 +240,11 @@ def create_route(
 	return success_response(data, request)
 
 
-@router.put("/business/{business_id}/routes/{route_id}")
+@router.put(
+	"/business/{business_id}/routes/{route_id}",
+	summary="ویرایش مسیر توزیع",
+	description="ابزار MCP: `update_distribution_route` (نیازمند تأیید).",
+)
 def update_route(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -227,7 +261,11 @@ def update_route(
 	return success_response(data, request)
 
 
-@router.delete("/business/{business_id}/routes/{route_id}")
+@router.delete(
+	"/business/{business_id}/routes/{route_id}",
+	summary="حذف مسیر توزیع",
+	description="ابزار MCP: `delete_distribution_route` (نیازمند تأیید).",
+)
 def delete_route(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -243,7 +281,11 @@ def delete_route(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/routes/{route_id}/stops")
+@router.get(
+	"/business/{business_id}/routes/{route_id}/stops",
+	summary="توقف‌های مسیر توزیع",
+	description="ابزار MCP: `list_distribution_route_stops`.",
+)
 def list_stops(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -259,7 +301,11 @@ def list_stops(
 	return success_response({"items": data}, request)
 
 
-@router.post("/business/{business_id}/routes/{route_id}/stops")
+@router.post(
+	"/business/{business_id}/routes/{route_id}/stops",
+	summary="افزودن یا ویرایش توقف مسیر",
+	description="ابزار MCP: `upsert_distribution_route_stop` (نیازمند تأیید).",
+)
 def upsert_stop(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -276,7 +322,11 @@ def upsert_stop(
 	return success_response(data, request)
 
 
-@router.delete("/business/{business_id}/routes/{route_id}/stops/{stop_id}")
+@router.delete(
+	"/business/{business_id}/routes/{route_id}/stops/{stop_id}",
+	summary="حذف توقف مسیر",
+	description="ابزار MCP: `delete_distribution_route_stop` (نیازمند تأیید).",
+)
 def delete_stop(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -293,7 +343,11 @@ def delete_stop(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/assignments")
+@router.get(
+	"/business/{business_id}/assignments",
+	summary="تخصیص مسیر به کاربران",
+	description="ابزار MCP: `list_distribution_assignments`.",
+)
 def list_assignments(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -309,7 +363,11 @@ def list_assignments(
 	return success_response({"items": data}, request)
 
 
-@router.post("/business/{business_id}/assignments")
+@router.post(
+	"/business/{business_id}/assignments",
+	summary="تخصیص مسیر به کاربر",
+	description="ابزار MCP: `create_distribution_assignment` (نیازمند تأیید).",
+)
 def create_assignment(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -325,7 +383,11 @@ def create_assignment(
 	return success_response(data, request)
 
 
-@router.delete("/business/{business_id}/assignments/{assignment_id}")
+@router.delete(
+	"/business/{business_id}/assignments/{assignment_id}",
+	summary="حذف تخصیص مسیر",
+	description="ابزار MCP: `delete_distribution_assignment` (نیازمند تأیید).",
+)
 def delete_assignment(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -341,7 +403,11 @@ def delete_assignment(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/daily-plan")
+@router.get(
+	"/business/{business_id}/daily-plan",
+	summary="برنامه ویزیت روزانه",
+	description="ابزار MCP: `get_distribution_daily_plan`.",
+)
 def daily_plan(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -357,15 +423,14 @@ def daily_plan(
 	uid = ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
-	can_team = ctx.has_business_permission("distribution", "manage") or ctx.has_business_permission(
-		"distribution", "reports_team"
-	)
+	can_team = dist_svc._can_see_team_distribution(ctx, business_id)
 	can_field = ctx.has_business_permission("distribution", "operate") or ctx.has_business_permission(
 		"distribution", "manage"
 	)
 	if target_user_id is not None:
 		if not can_team:
 			raise ApiError("FORBIDDEN", "Only managers can load another user's plan", http_status=403)
+		dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(target_user_id))
 		uid = int(target_user_id)
 	elif not can_field and not ctx.has_business_permission("distribution", "reports_team"):
 		raise ApiError(
@@ -378,7 +443,134 @@ def daily_plan(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/visits/start")
+@router.get(
+	"/business/{business_id}/team-members",
+	summary="اعضای تیم توزیع قابل مشاهده",
+	description="ویزیتورها و ناظران در محدوده دسترسی کاربر. ابزار MCP: `list_distribution_team_members`.",
+)
+def list_team_members(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	return success_response({"items": dist_svc.list_team_members(db, business_id, ctx)}, request)
+
+
+@router.get(
+	"/business/{business_id}/me/preferences",
+	summary="ترجیح موقعیت کاربر توزیع",
+	description="رضایت اشتراک موقعیت زنده کاربر جاری. ابزار MCP: `get_distribution_my_preferences`. برای ثبت از PUT همین مسیر یا ابزار `set_distribution_location_consent`.",
+)
+def get_my_preferences(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	uid = ctx.get_user_id()
+	if uid is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	row = dist_svc.get_user_preference(db, business_id, int(uid))
+	if not row:
+		return success_response({"user_id": int(uid), "location_consent": False, "location_consent_at": None}, request)
+	return success_response(dist_svc.preference_to_dict(row), request)
+
+
+@router.put(
+	"/business/{business_id}/me/preferences",
+	summary="رضایت اشتراک موقعیت زنده",
+	description="ابزار MCP: `set_distribution_location_consent` (نیازمند تأیید).",
+)
+def update_my_preferences(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: UserPreferencePayload = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	uid = ctx.get_user_id()
+	if uid is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	data = dist_svc.upsert_user_preference(db, business_id, int(uid), body.model_dump(exclude_none=True))
+	return success_response(data, request)
+
+
+@router.post(
+	"/business/{business_id}/daily-plan/publish",
+	summary="نشر برنامه روزانه توزیع",
+	description="ابزار MCP: `publish_distribution_daily_plan` (نیازمند تأیید).",
+)
+def publish_daily_plan(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: DailyPlanPublishPayload = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	actor = ctx.get_user_id()
+	if actor is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	d = _parse_iso_date(body.plan_date, "plan_date") if body.plan_date else business_today(business_id)
+	if body.all_assigned:
+		data = dist_svc.publish_daily_plans_for_date(
+			db, business_id, int(actor), d, locked=body.locked, notes=body.notes, ctx=ctx,
+		)
+		return success_response(data, request)
+	target = int(body.target_user_id) if body.target_user_id else int(actor)
+	data = dist_svc.publish_daily_plan(
+		db, business_id, int(actor), target, d, locked=body.locked, notes=body.notes, ctx=ctx,
+	)
+	return success_response(data, request)
+
+
+@router.delete(
+	"/business/{business_id}/daily-plan/publish",
+	summary="لغو نشر برنامه روزانه توزیع",
+	description="حذف قفل/نشر برنامه روزانه یک ویزیتور. ابزار MCP: `unpublish_distribution_daily_plan` (نیازمند تأیید).",
+)
+def unpublish_daily_plan(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	plan_date: Optional[str] = Query(None),
+	target_user_id: Optional[int] = Query(None),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	actor = ctx.get_user_id()
+	if actor is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	target = int(target_user_id) if target_user_id else int(actor)
+	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
+	dist_svc.unpublish_daily_plan(db, business_id, target, d, ctx=ctx)
+	return success_response({"ok": True}, request)
+
+
+@router.post(
+	"/business/{business_id}/visits/start",
+	summary="شروع بازدید میدانی",
+	description="ابزار MCP: `start_distribution_visit` (نیازمند تأیید).",
+)
 def start_visit(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -397,7 +589,11 @@ def start_visit(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/visits/{visit_id}/complete")
+@router.post(
+	"/business/{business_id}/visits/{visit_id}/complete",
+	summary="تکمیل بازدید میدانی",
+	description="ابزار MCP: `complete_distribution_visit` (نیازمند تأیید).",
+)
 def complete_visit(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -420,7 +616,11 @@ def complete_visit(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/visits/{visit_id}/cancel")
+@router.post(
+	"/business/{business_id}/visits/{visit_id}/cancel",
+	summary="لغو بازدید",
+	description="ابزار MCP: `cancel_distribution_visit` (نیازمند تأیید).",
+)
 def cancel_visit(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -448,7 +648,11 @@ def cancel_visit(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/visits/{visit_id}/heartbeat")
+@router.post(
+	"/business/{business_id}/visits/{visit_id}/heartbeat",
+	summary="موقعیت لحظه‌ای بازدید",
+	description="ابزار MCP: `update_distribution_visit_location` (نیازمند تأیید).",
+)
 def visit_heartbeat(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -468,7 +672,11 @@ def visit_heartbeat(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/live-location")
+@router.post(
+	"/business/{business_id}/live-location",
+	summary="ارسال موقعیت زنده تیم",
+	description="ابزار MCP: `report_distribution_live_location` (نیازمند تأیید).",
+)
 def report_live_location(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -491,7 +699,11 @@ def report_live_location(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/visits")
+@router.get(
+	"/business/{business_id}/visits",
+	summary="فهرست بازدیدهای توزیع",
+	description="ابزار MCP: `list_distribution_visits`.",
+)
 def list_visits(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -512,7 +724,11 @@ def list_visits(
 	return success_response({"items": items, "total": total, "skip": skip, "limit": limit}, request)
 
 
-@router.post("/business/{business_id}/return-requests")
+@router.post(
+	"/business/{business_id}/return-requests",
+	summary="ثبت درخواست مرجوعی",
+	description="ابزار MCP: `create_distribution_return_request` (نیازمند تأیید).",
+)
 def create_return(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -529,11 +745,15 @@ def create_return(
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	payload = body.model_dump()
 	payload["lines"] = [ln.model_dump(exclude_none=True) for ln in body.lines]
-	data = dist_svc.create_return_request(db, business_id, uid, payload)
+	data = dist_svc.create_return_request(db, business_id, uid, payload, ctx=ctx)
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/return-requests")
+@router.get(
+	"/business/{business_id}/return-requests",
+	summary="فهرست درخواست‌های مرجوعی",
+	description="ابزار MCP: `list_distribution_return_requests`.",
+)
 def list_returns(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -549,7 +769,11 @@ def list_returns(
 	return success_response({"items": data}, request)
 
 
-@router.post("/business/{business_id}/return-requests/{request_id}/resolve")
+@router.post(
+	"/business/{business_id}/return-requests/{request_id}/resolve",
+	summary="تأیید یا رد مرجوعی",
+	description="ابزار MCP: `resolve_distribution_return_request` (نیازمند تأیید).",
+)
 def resolve_return(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -569,22 +793,30 @@ def resolve_return(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات عملیات توزیع",
+	description="ابزار MCP: `get_distribution_settings`.",
+)
 def get_distribution_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	data = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
+	data = dist_svc.settings_for_client(db, business_id, ctx)
 	return success_response(data, request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ویرایش تنظیمات توزیع",
+	description="ابزار MCP: `update_distribution_settings` (نیازمند تأیید).",
+)
 def put_distribution_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -600,7 +832,11 @@ def put_distribution_settings(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/dashboard")
+@router.get(
+	"/business/{business_id}/reports/dashboard",
+	summary="داشبورد گزارش توزیع",
+	description="ابزار MCP: `get_distribution_dashboard`.",
+)
 def distribution_reports_dashboard(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -622,7 +858,11 @@ def distribution_reports_dashboard(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/vans")
+@router.get(
+	"/business/{business_id}/vans",
+	summary="فهرست خودروهای توزیع",
+	description="ابزار MCP: `list_distribution_vans`.",
+)
 def list_vans(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -636,7 +876,11 @@ def list_vans(
 	return success_response({"items": dist_p3.list_vans(db, business_id, ctx)}, request)
 
 
-@router.post("/business/{business_id}/vans")
+@router.post(
+	"/business/{business_id}/vans",
+	summary="ثبت خودروی توزیع",
+	description="ابزار MCP: `create_distribution_van` (نیازمند تأیید).",
+)
 def create_van(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -652,7 +896,11 @@ def create_van(
 	return success_response(data, request)
 
 
-@router.put("/business/{business_id}/vans/{van_id}")
+@router.put(
+	"/business/{business_id}/vans/{van_id}",
+	summary="ویرایش خودروی توزیع",
+	description="ابزار MCP: `update_distribution_van` (نیازمند تأیید).",
+)
 def update_van(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -669,22 +917,30 @@ def update_van(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/vans/{van_id}/stock")
+@router.get(
+	"/business/{business_id}/vans/{van_id}/stock",
+	summary="موجودی خودرو",
+	description="ابزار MCP: `get_distribution_van_stock`.",
+)
 def van_stock(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	van_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response(dist_p3.get_van_stock(db, business_id, van_id), request)
+	return success_response(dist_p3.get_van_stock(db, business_id, van_id, ctx=ctx), request)
 
 
-@router.post("/business/{business_id}/vans/{van_id}/load")
+@router.post(
+	"/business/{business_id}/vans/{van_id}/load",
+	summary="بارگیری خودرو",
+	description="ابزار MCP: `load_distribution_van` (نیازمند تأیید).",
+)
 def load_van(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -701,11 +957,15 @@ def load_van(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	lines = [ln.model_dump(exclude_none=True) for ln in body.lines]
-	data = dist_p3.load_van(db, business_id, uid, van_id, lines, body.source_warehouse_id)
+	data = dist_p3.load_van(db, business_id, uid, van_id, lines, body.source_warehouse_id, ctx=ctx)
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/vans/{van_id}/unload")
+@router.post(
+	"/business/{business_id}/vans/{van_id}/unload",
+	summary="تخلیه خودرو",
+	description="ابزار MCP: `unload_distribution_van` (نیازمند تأیید).",
+)
 def unload_van(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -722,11 +982,15 @@ def unload_van(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	lines = [ln.model_dump(exclude_none=True) for ln in body.lines]
-	data = dist_p3.unload_van(db, business_id, uid, van_id, lines, body.dest_warehouse_id)
+	data = dist_p3.unload_van(db, business_id, uid, van_id, lines, body.dest_warehouse_id, ctx=ctx)
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/vans/my-stock")
+@router.get(
+	"/business/{business_id}/vans/my-stock",
+	summary="موجودی خودروی کاربر جاری",
+	description="ابزار MCP: `get_my_distribution_van_stock`.",
+)
 def my_van_stock(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -743,10 +1007,14 @@ def my_van_stock(
 	van = dist_p3.get_van_for_user(db, business_id, uid)
 	if not van:
 		return success_response({"van_id": None, "items": []}, request)
-	return success_response(dist_p3.get_van_stock(db, business_id, van.id), request)
+	return success_response(dist_p3.get_van_stock(db, business_id, van.id, ctx=ctx), request)
 
 
-@router.put("/business/{business_id}/persons/{person_id}/location")
+@router.put(
+	"/business/{business_id}/persons/{person_id}/location",
+	summary="مختصات فروشگاه مشتری",
+	description="ابزار MCP: `set_distribution_customer_location` (نیازمند تأیید).",
+)
 def set_person_location(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -763,7 +1031,11 @@ def set_person_location(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/routes/{route_id}/optimize")
+@router.get(
+	"/business/{business_id}/routes/{route_id}/optimize",
+	summary="پیش‌نمایش بهینه‌سازی مسیر",
+	description="ابزار MCP: `preview_distribution_route_optimization`. ذخیره با `apply_distribution_route_optimization`.",
+)
 def optimize_route(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -773,7 +1045,7 @@ def optimize_route(
 	start_longitude: Optional[float] = Query(None),
 	persist: bool = Query(False),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
@@ -781,13 +1053,19 @@ def optimize_route(
 	_ensure_plugin(db, business_id)
 	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
 	if persist:
+		if not dist_svc._can_manage_distribution(ctx, business_id):
+			raise ApiError("FORBIDDEN", "ذخیرهٔ بهینه‌سازی مسیر نیاز به distribution.manage دارد.", http_status=403)
 		data = dist_p3.apply_route_optimize(db, business_id, route_id, d, start_latitude, start_longitude)
 	else:
 		data = dist_p3.optimize_route_plan(db, business_id, route_id, d, start_latitude, start_longitude)
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/team-map")
+@router.get(
+	"/business/{business_id}/reports/team-map",
+	summary="نقشه زنده تیم توزیع",
+	description="ابزار MCP: `get_distribution_team_map`.",
+)
 def team_map(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -804,7 +1082,11 @@ def team_map(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync-offline")
+@router.post(
+	"/business/{business_id}/sync-offline",
+	summary="همگام‌سازی دسته آفلاین توزیع",
+	description="اعمال حداکثر حدود ۵۰ اقدام آفلاین ویزیتور با `client_batch_id`. ابزار MCP: `sync_distribution_offline` (نیازمند تأیید).",
+)
 def sync_offline(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -833,7 +1115,11 @@ def sync_offline(
 # ─── فاز ۴: هدف فروش، تسویه، چاپ ─────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/targets")
+@router.get(
+	"/business/{business_id}/targets",
+	summary="اهداف فروش توزیع",
+	description="ابزار MCP: `list_distribution_targets`.",
+)
 def list_targets(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -850,7 +1136,11 @@ def list_targets(
 	return success_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}/targets")
+@router.post(
+	"/business/{business_id}/targets",
+	summary="ثبت هدف فروش توزیع",
+	description="ابزار MCP: `upsert_distribution_target` (نیازمند تأیید).",
+)
 def upsert_target(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -869,7 +1159,11 @@ def upsert_target(
 	return success_response(data, request)
 
 
-@router.delete("/business/{business_id}/targets/{target_id}")
+@router.delete(
+	"/business/{business_id}/targets/{target_id}",
+	summary="حذف هدف فروش توزیع",
+	description="ابزار MCP: `delete_distribution_target` (نیازمند تأیید).",
+)
 def delete_target(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -885,7 +1179,11 @@ def delete_target(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/settlements/preview")
+@router.get(
+	"/business/{business_id}/settlements/preview",
+	summary="پیش‌نمایش تسویه توزیع",
+	description="ابزار MCP: `preview_distribution_settlement`.",
+)
 def settlement_preview(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -906,7 +1204,11 @@ def settlement_preview(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/settlements")
+@router.get(
+	"/business/{business_id}/settlements",
+	summary="فهرست تسویه‌های توزیع",
+	description="ابزار MCP: `list_distribution_settlements`.",
+)
 def list_settlements(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -926,7 +1228,11 @@ def list_settlements(
 	return success_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}/settlements")
+@router.post(
+	"/business/{business_id}/settlements",
+	summary="ثبت تسویه توزیع",
+	description="ابزار MCP: `upsert_distribution_settlement` (نیازمند تأیید).",
+)
 def upsert_settlement(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -945,7 +1251,11 @@ def upsert_settlement(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/settlements/{settlement_id}/confirm")
+@router.post(
+	"/business/{business_id}/settlements/{settlement_id}/confirm",
+	summary="تأیید تسویه توزیع",
+	description="ابزار MCP: `confirm_distribution_settlement` (نیازمند تأیید).",
+)
 def confirm_settlement(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -966,42 +1276,56 @@ def confirm_settlement(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/persons/{person_id}/invoices")
+@router.get(
+	"/business/{business_id}/persons/{person_id}/invoices",
+	summary="فاکتورهای باز مشتری در توزیع",
+	description="ابزار MCP: `list_distribution_person_open_invoices`.",
+)
 def list_person_distribution_invoices(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	person_id: int = Path(..., gt=0),
 	limit: int = Query(20, ge=1, le=50),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	from app.services.distribution_documents import list_person_open_invoices
 
 	items = list_person_open_invoices(db, business_id, person_id, limit=limit)
 	return success_response({"items": items}, request)
 
 
-@router.get("/business/{business_id}/persons/{person_id}/credit-summary")
+@router.get(
+	"/business/{business_id}/persons/{person_id}/credit-summary",
+	summary="خلاصه اعتبار مشتری توزیع",
+	description="ابزار MCP: `get_distribution_person_credit_summary`.",
+)
 def person_credit_summary(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	person_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	data = dist_svc.get_person_credit_summary(db, business_id, person_id)
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/daily-plan/pdf")
+@router.get(
+	"/business/{business_id}/daily-plan/pdf",
+	summary="PDF برنامه روزانه توزیع",
+	description="باینری است؛ در MCP نیست. JSON: `get_distribution_daily_plan`.",
+)
 def daily_plan_pdf(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1017,41 +1341,47 @@ def daily_plan_pdf(
 	uid = target_user_id or ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None and int(uid) != int(scope):
-		raise ApiError("FORBIDDEN", "Cannot print another visitor plan", http_status=403)
+	dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(uid))
 	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
 	return dist_p4.export_daily_plan_pdf(db, request, business_id, int(uid), d)
 
 
-@router.get("/business/{business_id}/vans/{van_id}/loading-list/pdf")
+@router.get(
+	"/business/{business_id}/vans/{van_id}/loading-list/pdf",
+	summary="PDF لیست بارگیری خودرو",
+	description="باینری است و در MCP ثبت نشده. JSON: `get_distribution_van_stock`.",
+)
 def van_loading_list_pdf(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	van_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ):
 	_ensure_plugin(db, business_id)
-	return dist_p4.export_van_loading_list_pdf(db, request, business_id, van_id)
+	return dist_p4.export_van_loading_list_pdf(db, request, business_id, van_id, ctx=ctx)
 
 
-@router.get("/business/{business_id}/settlements/{settlement_id}/pdf")
+@router.get(
+	"/business/{business_id}/settlements/{settlement_id}/pdf",
+	summary="PDF تسویه توزیع",
+	description="باینری است و در MCP ثبت نشده. JSON: `list_distribution_settlements`.",
+)
 def settlement_pdf(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	settlement_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ):
 	_ensure_plugin(db, business_id)
-	return dist_p4.export_settlement_pdf(db, request, business_id, settlement_id)
+	return dist_p4.export_settlement_pdf(db, request, business_id, settlement_id, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -1074,7 +1404,11 @@ from adapters.api.v1.schema_models.distribution import (  # noqa: E402
 from app.services import distribution_commercial_service as dist_c  # noqa: E402
 
 
-@router.get("/business/{business_id}/orders")
+@router.get(
+	"/business/{business_id}/orders",
+	summary="سفارش‌های میدانی توزیع",
+	description="ابزار MCP: `list_distribution_orders`.",
+)
 def list_orders(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1095,7 +1429,11 @@ def list_orders(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/orders")
+@router.post(
+	"/business/{business_id}/orders",
+	summary="ایجاد سفارش توزیع",
+	description="ابزار MCP: `create_distribution_order` (نیازمند تأیید).",
+)
 def create_order(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1110,11 +1448,15 @@ def create_order(
 	uid = ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
-	data = dist_c.create_visit_order(db, business_id, int(uid), body.model_dump(exclude_none=True))
+	data = dist_c.create_visit_order(db, business_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx)
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/orders/{order_id}/confirm")
+@router.post(
+	"/business/{business_id}/orders/{order_id}/confirm",
+	summary="تأیید سفارش توزیع",
+	description="ابزار MCP: `confirm_distribution_order` (نیازمند تأیید).",
+)
 def confirm_order(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1129,10 +1471,14 @@ def confirm_order(
 	uid = ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
-	return success_response(dist_c.confirm_visit_order(db, business_id, int(uid), order_id), request)
+	return success_response(dist_c.confirm_visit_order(db, business_id, int(uid), order_id, ctx=ctx), request)
 
 
-@router.post("/business/{business_id}/orders/{order_id}/status")
+@router.post(
+	"/business/{business_id}/orders/{order_id}/status",
+	summary="تغییر وضعیت سفارش توزیع",
+	description="ابزار MCP: `update_distribution_order_status` (نیازمند تأیید).",
+)
 def set_order_status(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1152,22 +1498,31 @@ def set_order_status(
 	)
 
 
-@router.get("/business/{business_id}/persons/{person_id}/suggested-order")
+@router.get(
+	"/business/{business_id}/persons/{person_id}/suggested-order",
+	summary="پیشنهاد سفارش مشتری",
+	description="ابزار MCP: `get_suggested_distribution_order`.",
+)
 def suggested_order(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	person_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	return success_response(dist_c.suggested_order_for_person(db, business_id, person_id), request)
 
 
-@router.get("/business/{business_id}/promotions")
+@router.get(
+	"/business/{business_id}/promotions",
+	summary="پروموشن‌های توزیع",
+	description="ابزار MCP: `list_distribution_promotions`.",
+)
 def list_promos(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1182,7 +1537,11 @@ def list_promos(
 	return success_response(dist_c.list_promotions(db, business_id, active_only=not all), request)
 
 
-@router.post("/business/{business_id}/promotions")
+@router.post(
+	"/business/{business_id}/promotions",
+	summary="ایجاد پروموشن توزیع",
+	description="ابزار MCP: `create_distribution_promotion` (نیازمند تأیید).",
+)
 def create_promo(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1197,7 +1556,11 @@ def create_promo(
 	return success_response(dist_c.upsert_promotion(db, business_id, body.model_dump(exclude_none=True)), request)
 
 
-@router.put("/business/{business_id}/promotions/{promo_id}")
+@router.put(
+	"/business/{business_id}/promotions/{promo_id}",
+	summary="ویرایش پروموشن توزیع",
+	description="ابزار MCP: `update_distribution_promotion` (نیازمند تأیید).",
+)
 def update_promo(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1216,7 +1579,11 @@ def update_promo(
 	)
 
 
-@router.delete("/business/{business_id}/promotions/{promo_id}")
+@router.delete(
+	"/business/{business_id}/promotions/{promo_id}",
+	summary="حذف پروموشن توزیع",
+	description="ابزار MCP: `delete_distribution_promotion` (نیازمند تأیید).",
+)
 def delete_promo(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1232,7 +1599,11 @@ def delete_promo(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/delivery-trips")
+@router.get(
+	"/business/{business_id}/delivery-trips",
+	summary="سفرهای تحویل",
+	description="ابزار MCP: `list_distribution_delivery_trips`.",
+)
 def list_trips(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1248,7 +1619,11 @@ def list_trips(
 	return success_response(dist_c.list_delivery_trips(db, business_id, ctx, trip_date=d), request)
 
 
-@router.post("/business/{business_id}/delivery-trips")
+@router.post(
+	"/business/{business_id}/delivery-trips",
+	summary="ایجاد سفر تحویل",
+	description="ابزار MCP: `create_distribution_delivery_trip` (نیازمند تأیید).",
+)
 def create_trip(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1264,12 +1639,16 @@ def create_trip(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	return success_response(
-		dist_c.create_delivery_trip(db, business_id, int(uid), body.model_dump(exclude_none=True)),
+		dist_c.create_delivery_trip(db, business_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx),
 		request,
 	)
 
 
-@router.post("/business/{business_id}/delivery-trips/{trip_id}/start")
+@router.post(
+	"/business/{business_id}/delivery-trips/{trip_id}/start",
+	summary="شروع سفر تحویل",
+	description="ابزار MCP: `start_distribution_delivery_trip` (نیازمند تأیید).",
+)
 def start_trip(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1289,7 +1668,11 @@ def start_trip(
 	)
 
 
-@router.post("/business/{business_id}/delivery-stops/{stop_id}/complete")
+@router.post(
+	"/business/{business_id}/delivery-stops/{stop_id}/complete",
+	summary="تکمیل توقف تحویل",
+	description="ابزار MCP: `complete_distribution_delivery_stop` (نیازمند تأیید).",
+)
 def complete_stop(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1304,12 +1687,18 @@ def complete_stop(
 	_ensure_plugin(db, business_id)
 	uid = ctx.get_user_id() or 0
 	return success_response(
-		dist_c.complete_delivery_stop(db, business_id, stop_id, int(uid), body.model_dump(exclude_none=True)),
+		dist_c.complete_delivery_stop(
+			db, business_id, stop_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx
+		),
 		request,
 	)
 
 
-@router.get("/business/{business_id}/load-plans")
+@router.get(
+	"/business/{business_id}/load-plans",
+	summary="برنامه‌های بارگیری",
+	description="ابزار MCP: `list_distribution_load_plans`.",
+)
 def list_load_plans(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1325,7 +1714,11 @@ def list_load_plans(
 	return success_response(dist_c.list_load_plans(db, business_id, plan_date=d), request)
 
 
-@router.post("/business/{business_id}/load-plans")
+@router.post(
+	"/business/{business_id}/load-plans",
+	summary="ایجاد برنامه بارگیری",
+	description="ابزار MCP: `create_distribution_load_plan` (نیازمند تأیید).",
+)
 def create_load_plan(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1344,7 +1737,11 @@ def create_load_plan(
 	)
 
 
-@router.post("/business/{business_id}/load-plans/{plan_id}/confirm")
+@router.post(
+	"/business/{business_id}/load-plans/{plan_id}/confirm",
+	summary="تأیید برنامه بارگیری",
+	description="ابزار MCP: `confirm_distribution_load_plan` (نیازمند تأیید).",
+)
 def confirm_load_plan(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1362,22 +1759,30 @@ def confirm_load_plan(
 	return success_response(dist_c.confirm_load_plan(db, business_id, plan_id, int(uid), payload), request)
 
 
-@router.get("/business/{business_id}/visits/{visit_id}/trail")
+@router.get(
+	"/business/{business_id}/visits/{visit_id}/trail",
+	summary="مسیر ثبت‌شده بازدید",
+	description="ابزار MCP: `get_distribution_visit_trail`.",
+)
 def visit_trail(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	visit_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response(dist_c.get_visit_trail(db, business_id, visit_id), request)
+	return success_response(dist_c.get_visit_trail(db, business_id, visit_id, ctx=ctx), request)
 
 
-@router.get("/business/{business_id}/users/{user_id}/day-trail")
+@router.get(
+	"/business/{business_id}/users/{user_id}/day-trail",
+	summary="مسیر روزانه ویزیتور",
+	description="ابزار MCP: `get_distribution_user_day_trail`.",
+)
 def user_day_trail(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1390,13 +1795,18 @@ def user_day_trail(
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
+	if not dist_svc._can_see_team_distribution(ctx, business_id):
 		raise ApiError("FORBIDDEN", "Day trail requires manage or reports_team", http_status=403)
+	dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(user_id))
 	d = _parse_iso_date(day, "day") if day else business_today(business_id)
 	return success_response(dist_c.get_user_day_trail(db, business_id, user_id, d), request)
 
 
-@router.get("/business/{business_id}/commission-rules")
+@router.get(
+	"/business/{business_id}/commission-rules",
+	summary="قواعد کمیسیون توزیع",
+	description="ابزار MCP: `list_distribution_commission_rules`.",
+)
 def list_comm_rules(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1410,7 +1820,11 @@ def list_comm_rules(
 	return success_response(dist_c.list_commission_rules(db, business_id), request)
 
 
-@router.post("/business/{business_id}/commission-rules")
+@router.post(
+	"/business/{business_id}/commission-rules",
+	summary="تعریف قاعده کمیسیون",
+	description="ابزار MCP: `create_distribution_commission_rule` (نیازمند تأیید).",
+)
 def create_comm_rule(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1425,7 +1839,11 @@ def create_comm_rule(
 	return success_response(dist_c.upsert_commission_rule(db, business_id, body.model_dump(exclude_none=True)), request)
 
 
-@router.post("/business/{business_id}/commission-runs")
+@router.post(
+	"/business/{business_id}/commission-runs",
+	summary="محاسبه کمیسیون",
+	description="ابزار MCP: `create_distribution_commission_run` (نیازمند تأیید).",
+)
 def create_comm_run(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1444,7 +1862,11 @@ def create_comm_run(
 	)
 
 
-@router.get("/business/{business_id}/commission-runs")
+@router.get(
+	"/business/{business_id}/commission-runs",
+	summary="اجراهای کمیسیون",
+	description="ابزار MCP: `list_distribution_commission_runs`.",
+)
 def list_comm_runs(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1458,7 +1880,11 @@ def list_comm_runs(
 	return success_response(dist_c.list_commission_runs(db, business_id), request)
 
 
-@router.post("/business/{business_id}/shelf-audits")
+@router.post(
+	"/business/{business_id}/shelf-audits",
+	summary="ثبت بازرسی قفسه",
+	description="ابزار MCP: `create_distribution_shelf_audit` (نیازمند تأیید).",
+)
 def create_shelf_audit(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1472,46 +1898,58 @@ def create_shelf_audit(
 	_ensure_plugin(db, business_id)
 	uid = ctx.get_user_id() or 0
 	return success_response(
-		dist_c.create_shelf_audit(db, business_id, int(uid), body.model_dump(exclude_none=True)),
+		dist_c.create_shelf_audit(db, business_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx),
 		request,
 	)
 
 
-@router.get("/business/{business_id}/shelf-audits")
+@router.get(
+	"/business/{business_id}/shelf-audits",
+	summary="فهرست بازرسی قفسه",
+	description="ابزار MCP: `list_distribution_shelf_audits`.",
+)
 def list_shelf_audits(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	person_id: Optional[int] = Query(None, gt=0),
 	visit_id: Optional[int] = Query(None, gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	return success_response(
-		dist_c.list_shelf_audits(db, business_id, person_id=person_id, visit_id=visit_id),
+		dist_c.list_shelf_audits(db, business_id, person_id=person_id, visit_id=visit_id, ctx=ctx),
 		request,
 	)
 
 
-@router.get("/business/{business_id}/customer-assets")
+@router.get(
+	"/business/{business_id}/customer-assets",
+	summary="تجهیزات نزد مشتری",
+	description="ابزار MCP: `list_distribution_customer_assets`.",
+)
 def list_assets(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	person_id: Optional[int] = Query(None, gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response(dist_c.list_customer_assets(db, business_id, person_id), request)
+	return success_response(dist_c.list_customer_assets(db, business_id, person_id, ctx=ctx), request)
 
 
-@router.post("/business/{business_id}/customer-assets")
+@router.post(
+	"/business/{business_id}/customer-assets",
+	summary="ثبت تجهیز مشتری",
+	description="ابزار MCP: `create_distribution_customer_asset` (نیازمند تأیید).",
+)
 def create_asset(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1526,7 +1964,11 @@ def create_asset(
 	return success_response(dist_c.upsert_customer_asset(db, business_id, body.model_dump(exclude_none=True)), request)
 
 
-@router.put("/business/{business_id}/customer-assets/{asset_id}")
+@router.put(
+	"/business/{business_id}/customer-assets/{asset_id}",
+	summary="ویرایش تجهیز مشتری",
+	description="ابزار MCP: `update_distribution_customer_asset` (نیازمند تأیید).",
+)
 def update_asset(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1536,7 +1978,7 @@ def update_asset(
 	_ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
-	___: None = Depends(require_distribution_operate_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	return success_response(
@@ -1545,7 +1987,11 @@ def update_asset(
 	)
 
 
-@router.get("/business/{business_id}/reports/commercial-kpi")
+@router.get(
+	"/business/{business_id}/reports/commercial-kpi",
+	summary="KPI تجاری توزیع",
+	description="در MCP جدا نیست؛ از `get_distribution_scorecard` استفاده شود.",
+)
 def commercial_kpi(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1567,7 +2013,11 @@ def commercial_kpi(
 	return success_response(visitor_scorecard(db, business_id, ctx, fd, td, target_user_id), request)
 
 
-@router.get("/business/{business_id}/catalog/reasons")
+@router.get(
+	"/business/{business_id}/catalog/reasons",
+	summary="کدهای علت ویزیت/مرجوعی",
+	description="ابزار MCP: `list_distribution_reason_codes`.",
+)
 def list_reason_codes(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1583,7 +2033,11 @@ def list_reason_codes(
 	return success_response(reason_catalog(), request)
 
 
-@router.get("/business/{business_id}/persons/{person_id}/360")
+@router.get(
+	"/business/{business_id}/persons/{person_id}/360",
+	summary="نمای ۳۶۰ مشتری توزیع",
+	description="ابزار MCP: `get_distribution_customer_360`.",
+)
 def get_customer_360(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1597,10 +2051,14 @@ def get_customer_360(
 	_ensure_plugin(db, business_id)
 	from app.services.distribution_field_ops_service import customer_360
 
-	return success_response(customer_360(db, business_id, person_id, user_id=ctx.get_user_id()), request)
+	return success_response(customer_360(db, business_id, person_id, user_id=ctx.get_user_id(), ctx=ctx), request)
 
 
-@router.get("/business/{business_id}/products/by-barcode")
+@router.get(
+	"/business/{business_id}/products/by-barcode",
+	summary="جستجوی کالا با بارکد در توزیع",
+	description="ابزار MCP: `get_distribution_product_by_barcode`.",
+)
 def product_by_barcode(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1618,7 +2076,11 @@ def product_by_barcode(
 	return success_response(lookup_product_by_barcode(db, business_id, barcode, person_id=person_id), request)
 
 
-@router.get("/business/{business_id}/offline-pack")
+@router.get(
+	"/business/{business_id}/offline-pack",
+	summary="بسته داده آفلاین توزیع",
+	description="ابزار MCP: `get_distribution_offline_pack`.",
+)
 def get_offline_pack(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1634,7 +2096,11 @@ def get_offline_pack(
 	return success_response(build_offline_pack(db, business_id, ctx), request)
 
 
-@router.post("/business/{business_id}/setup-wizard")
+@router.post(
+	"/business/{business_id}/setup-wizard",
+	summary="راه‌اندازی افزونه توزیع",
+	description="ابزار MCP: `run_distribution_setup_wizard` (نیازمند تأیید).",
+)
 def run_setup_wizard_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1652,7 +2118,11 @@ def run_setup_wizard_api(
 	return success_response(run_setup_wizard(db, business_id, int(uid), body.model_dump(exclude_none=True)), request)
 
 
-@router.post("/business/{business_id}/outlets")
+@router.post(
+	"/business/{business_id}/outlets",
+	summary="ثبت مشتری جدید در مسیر توزیع",
+	description="ابزار MCP: `onboard_distribution_outlet` (نیازمند تأیید).",
+)
 def onboard_outlet_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1670,13 +2140,17 @@ def onboard_outlet_api(
 	return success_response(onboard_new_outlet(db, business_id, int(uid), body.model_dump(exclude_none=True)), request)
 
 
-@router.get("/business/{business_id}/customer-profiles")
+@router.get(
+	"/business/{business_id}/customer-profiles",
+	summary="پروفایل‌های مشتری توزیع",
+	description="ابزار MCP: `list_distribution_customer_profiles`.",
+)
 def list_profiles_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	person_id: Optional[int] = Query(None, gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
@@ -1684,10 +2158,14 @@ def list_profiles_api(
 	_ensure_plugin(db, business_id)
 	from app.services.distribution_field_ops_service import list_customer_profiles
 
-	return success_response({"items": list_customer_profiles(db, business_id, person_id=person_id)}, request)
+	return success_response({"items": list_customer_profiles(db, business_id, person_id=person_id, ctx=ctx)}, request)
 
 
-@router.put("/business/{business_id}/persons/{person_id}/profile")
+@router.put(
+	"/business/{business_id}/persons/{person_id}/profile",
+	summary="ویرایش پروفایل مشتری توزیع",
+	description="ابزار MCP: `upsert_distribution_customer_profile` (نیازمند تأیید).",
+)
 def upsert_profile_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1705,7 +2183,11 @@ def upsert_profile_api(
 	return success_response(upsert_customer_profile(db, business_id, person_id, body.model_dump(exclude_none=True)), request)
 
 
-@router.get("/business/{business_id}/assortments")
+@router.get(
+	"/business/{business_id}/assortments",
+	summary="ترکیب کالای فروشگاه",
+	description="ابزار MCP: `list_distribution_assortments`.",
+)
 def list_assortments_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1721,7 +2203,11 @@ def list_assortments_api(
 	return success_response({"items": list_assortments(db, business_id)}, request)
 
 
-@router.post("/business/{business_id}/assortments")
+@router.post(
+	"/business/{business_id}/assortments",
+	summary="ایجاد ترکیب کالا",
+	description="ابزار MCP: `create_distribution_assortment` (نیازمند تأیید).",
+)
 def create_assortment_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1738,7 +2224,11 @@ def create_assortment_api(
 	return success_response(upsert_assortment(db, business_id, body.model_dump(exclude_none=True)), request)
 
 
-@router.put("/business/{business_id}/assortments/{assortment_id}")
+@router.put(
+	"/business/{business_id}/assortments/{assortment_id}",
+	summary="ویرایش ترکیب کالا",
+	description="ابزار MCP: `update_distribution_assortment` (نیازمند تأیید).",
+)
 def update_assortment_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1756,7 +2246,11 @@ def update_assortment_api(
 	return success_response(upsert_assortment(db, business_id, body.model_dump(exclude_none=True), assortment_id), request)
 
 
-@router.delete("/business/{business_id}/assortments/{assortment_id}")
+@router.delete(
+	"/business/{business_id}/assortments/{assortment_id}",
+	summary="حذف ترکیب کالا",
+	description="ابزار MCP: `delete_distribution_assortment` (نیازمند تأیید).",
+)
 def delete_assortment_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -1774,7 +2268,11 @@ def delete_assortment_api(
 	return success_response({"ok": True}, request)
 
 
-@router.get("/business/{business_id}/reports/scorecard")
+@router.get(
+	"/business/{business_id}/reports/scorecard",
+	summary="امتیاز عملکرد ویزیتور",
+	description="ابزار MCP: `get_distribution_scorecard`.",
+)
 def scorecard_api(
 	request: Request,
 	business_id: int = Path(..., gt=0),

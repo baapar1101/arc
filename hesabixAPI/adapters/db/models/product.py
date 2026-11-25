@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
+from app.core.product_measurements import MEASUREMENT_PRECISION, MEASUREMENT_SCALE
 
 
 class ProductItemType(str, Enum):
@@ -55,6 +56,11 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    length_mm: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+    width_mm: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+    height_mm: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+    weight_g: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+
     # بارکدهای عمومی (چند مقدار با ویرگول؛ برای اسکن و چاپ برچسب)
     general_barcodes: Mapped[str | None] = mapped_column(
         Text,
@@ -75,6 +81,11 @@ class Product(Base):
     base_sales_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     base_purchase_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    base_purchase_price_sync_meta: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="منبع و سیاست آخرین همگام‌سازی قیمت خرید از فاکتور",
+    )
 
     # قیمت ارزی (P6 — فقط کسب‌وکار چندارزی استفاده می‌کند)
     sales_price_fx: Mapped[Decimal | None] = mapped_column(
@@ -105,8 +116,32 @@ class Product(Base):
     
     # حالت موجودی (فله‌ای/یونیک)
     inventory_mode: Mapped[str | None] = mapped_column(String(16), nullable=True, default="bulk", comment="حالت موجودی: bulk (فله‌ای) یا unique (یونیک)")
+    # تفکیک موجودی با ویژگی select؛ مستقل از inventory_mode. پیش‌فرض none رفتار فعلی را حفظ می‌کند.
+    variant_mode: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="none",
+        server_default="none",
+        comment="none یا inventory؛ MVP فقط bulk+inventory",
+    )
     track_serial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی سریال نامبر برای کالاهای یونیک")
     track_barcode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی بارکد برای کالاهای یونیک")
+    track_expiry: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0", comment="ردیابی لات و تاریخ تولید/انقضا"
+    )
+    lot_policy: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="optional", server_default="optional", comment="optional یا required"
+    )
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="عمر مفید از تاریخ تولید (روز)")
+    best_before_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    removal_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    alert_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expired_sale_policy: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="block", server_default="block", comment="block یا manager_confirm"
+    )
+    min_remaining_shelf_life_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
     # مالیات
     is_sales_taxable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

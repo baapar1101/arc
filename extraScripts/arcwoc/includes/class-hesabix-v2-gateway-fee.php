@@ -399,6 +399,7 @@ class Hesabix_V2_Gateway_Fee_Service
 				'discount_value' => 0,
 				'tax_rate' => 0,
 				'movement' => 'out',
+				'wc_line_kind' => 'fee',
 				'wc_fee_label' => $fee_label,
 				'wc_fee_negative' => true,
 			);
@@ -414,6 +415,7 @@ class Hesabix_V2_Gateway_Fee_Service
 				'discount_value' => 0,
 				'tax_rate' => 0,
 				'movement' => 'out',
+				'wc_line_kind' => 'fee',
 				'wc_fee_label' => $fee_label,
 			);
 		}

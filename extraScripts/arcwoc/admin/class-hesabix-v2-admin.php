@@ -28,6 +28,13 @@ class Hesabix_V2_Admin
 	private $version;
 
 	/**
+	 * سفارش‌هایی که باید بعد از ذخیرهٔ کامل اقلام (shutdown) ارزیابی شوند.
+	 *
+	 * @var array<int, array{sync:bool,reverse:bool}>
+	 */
+	private $deferred_admin_order_ids = array();
+
+	/**
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    2.0.0
@@ -322,9 +329,9 @@ class Hesabix_V2_Admin
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
 							'confirmSync' => __('ارسال یا به‌روزرسانی این سفارش در حسابیکس انجام شود؟', 'hesabix-v2'),
-							'confirmUnsync' => __('فاکتور این سفارش در حسابیکس حذف و پیوند افزونه پاک شود؟ این کار برگشت‌پذیر نیست.', 'hesabix-v2'),
+							'confirmUnsync' => __('برای این سفارش برگشت از فروش در حسابیکس ثبت شود؟ فاکتور فروش قطعی حذف نمی‌شود. پیش‌فاکتور هنوز قطعی‌نشده حذف می‌گردد.', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای همهٔ سفارش‌های انتخاب‌شده ارسال یا به‌روزرسانی انجام شود؟', 'hesabix-v2'),
-							'confirmBulkUnsync' => __('برای همهٔ موارد انتخاب‌شده لغو ارسال (حذف فاکتور) انجام شود؟', 'hesabix-v2'),
+							'confirmBulkUnsync' => __('برای موارد انتخاب‌شده برگشت از فروش ثبت شود؟ فروش قطعی حذف نمی‌شود.', 'hesabix-v2'),
 							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در حسابیکس با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
 							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور حسابیکس را به‌روز کند.', 'hesabix-v2'),
 							'confirmBulkProfit' => __('سود فاکتور برای سفارش‌های انتخاب‌شده از حسابیکس دریافت شود؟', 'hesabix-v2'),
@@ -502,7 +509,7 @@ class Hesabix_V2_Admin
 			'manage_woocommerce',
 			'hesabix-v2',
 			array($this, 'display_dashboard'),
-			HESABIX_V2_PLUGIN_URL . 'assets/img/menu-icon.png',
+			Hesabix_V2_Brand::menu_icon_url(),
 			56
 		);
 
@@ -819,6 +826,26 @@ class Hesabix_V2_Admin
 			}
 		}
 
+		$sales_return_on_statuses = isset($prev_sync['sales_return_on_statuses']) && is_array($prev_sync['sales_return_on_statuses'])
+			? $prev_sync['sales_return_on_statuses']
+			: array('cancelled', 'refunded');
+		$sales_return_on_wc_refund = array_key_exists('sales_return_on_wc_refund', $prev_sync)
+			? !empty($prev_sync['sales_return_on_wc_refund'])
+			: true;
+		if (isset($_POST['hesabix_v2_sales_return_fields'])) {
+			$sales_return_on_statuses = array();
+			if (isset($_POST['sales_return_on_statuses']) && is_array($_POST['sales_return_on_statuses'])) {
+				foreach ($_POST['sales_return_on_statuses'] as $st) {
+					$st = sanitize_text_field(wp_unslash($st));
+					$st = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($st);
+					if ($st !== '' && isset($status_choices[$st]) && !in_array($st, array('trash', 'auto-draft', 'checkout-draft', 'draft'), true)) {
+						$sales_return_on_statuses[] = $st;
+					}
+				}
+			}
+			$sales_return_on_wc_refund = isset($_POST['sales_return_on_wc_refund']);
+		}
+
 		$invoice_tab_in_post = isset($_POST['hesabix_v2_invoice_tab_fields']);
 		$finalize_proforma_on_paid = !empty($prev_sync['finalize_proforma_on_paid']);
 		$finalize_proforma_order_statuses = isset($prev_sync['finalize_proforma_order_statuses']) && is_array($prev_sync['finalize_proforma_order_statuses'])
@@ -859,6 +886,8 @@ class Hesabix_V2_Admin
 			'sync_order_on_checkout' => isset($_POST['sync_order_on_checkout']),
 			'sync_order_on_payment_complete' => isset($_POST['sync_order_on_payment_complete']),
 			'sync_order_on_statuses' => $sync_order_on_statuses,
+			'sales_return_on_statuses' => $sales_return_on_statuses,
+			'sales_return_on_wc_refund' => $sales_return_on_wc_refund,
 			'invoice_is_proforma' => isset($_POST['invoice_doc_mode']) && sanitize_text_field(wp_unslash($_POST['invoice_doc_mode'])) === 'proforma',
 			'finalize_proforma_on_paid' => $finalize_proforma_on_paid,
 			'finalize_proforma_order_statuses' => $finalize_proforma_order_statuses,
@@ -907,6 +936,9 @@ class Hesabix_V2_Admin
 			'queue_items_per_cron_run' => isset($_POST['queue_items_per_cron_run'])
 				? max(1, min(500, absint(wp_unslash($_POST['queue_items_per_cron_run']))))
 				: 15,
+			'product_variation_mode' => isset($_POST['product_variation_mode'])
+				? sanitize_key(wp_unslash($_POST['product_variation_mode']))
+				: (isset($prev_sync['product_variation_mode']) ? (string) $prev_sync['product_variation_mode'] : 'legacy'),
 		);
 
 		$fiscal_policy_allowed = array('keep', 'clamp', 'skip');
@@ -920,6 +952,9 @@ class Hesabix_V2_Admin
 		}
 		if (!in_array($sync_settings['shipping_line_mode'], array('service', 'account_adjustment'), true)) {
 			$sync_settings['shipping_line_mode'] = 'service';
+		}
+		if (!in_array($sync_settings['product_variation_mode'], array('legacy', 'native'), true)) {
+			$sync_settings['product_variation_mode'] = 'legacy';
 		}
 
 		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
@@ -937,29 +972,55 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_debug_mode', isset($_POST['debug_mode']));
 		update_option('hesabix_v2_add_checkout_fields', isset($_POST['add_checkout_fields']));
 
-		$ob_cost = isset($_POST['ob_inv_cost_basis']) ? sanitize_key(wp_unslash($_POST['ob_inv_cost_basis'])) : 'regular';
-		if (!in_array($ob_cost, array('regular', 'sale', 'zero'), true)) {
-			$ob_cost = 'regular';
+		if (isset($_POST['ob_inv_prefs_present'])) {
+			$ob_cost = isset($_POST['ob_inv_cost_basis']) ? sanitize_key(wp_unslash($_POST['ob_inv_cost_basis'])) : 'regular';
+			if (!in_array($ob_cost, array('regular', 'sale', 'zero'), true)) {
+				$ob_cost = 'regular';
+			}
+			$prev_ob = get_option('hesabix_v2_opening_inventory_prefs', array());
+			if (!is_array($prev_ob)) {
+				$prev_ob = array();
+			}
+			$inv_acc = isset($_POST['ob_inv_inventory_account_id']) ? absint(wp_unslash($_POST['ob_inv_inventory_account_id'])) : 0;
+			$eq_acc = isset($_POST['ob_inv_equity_account_id']) ? absint(wp_unslash($_POST['ob_inv_equity_account_id'])) : 0;
+			if ($inv_acc < 1 && !empty($prev_ob['inventory_account_id'])) {
+				$inv_acc = (int) $prev_ob['inventory_account_id'];
+			}
+			if ($eq_acc < 1 && !empty($prev_ob['equity_account_id'])) {
+				$eq_acc = (int) $prev_ob['equity_account_id'];
+			}
+			update_option(
+				'hesabix_v2_opening_inventory_prefs',
+				array(
+					'include_tax' => isset($_POST['ob_inv_include_tax']),
+					'cost_basis' => $ob_cost,
+					'auto_balance_to_equity' => isset($_POST['ob_inv_auto_balance']),
+					'do_post' => isset($_POST['ob_inv_do_post']),
+					'batch_size' => isset($_POST['ob_inv_batch_size']) ? max(3, min(40, absint(wp_unslash($_POST['ob_inv_batch_size'])))) : 12,
+					'inventory_account_id' => $inv_acc,
+					'equity_account_id' => $eq_acc,
+					'warehouse_override' => isset($_POST['ob_inv_warehouse_override']) ? absint(wp_unslash($_POST['ob_inv_warehouse_override'])) : 0,
+				)
+			);
 		}
-		$ob_inv_prefs = array(
-			'include_tax' => isset($_POST['ob_inv_include_tax']),
-			'cost_basis' => $ob_cost,
-			'auto_balance_to_equity' => isset($_POST['ob_inv_auto_balance']),
-			'do_post' => isset($_POST['ob_inv_do_post']),
-			'batch_size' => isset($_POST['ob_inv_batch_size']) ? max(3, min(40, absint(wp_unslash($_POST['ob_inv_batch_size'])))) : 12,
-			'inventory_account_id' => isset($_POST['ob_inv_inventory_account_id']) ? absint(wp_unslash($_POST['ob_inv_inventory_account_id'])) : 0,
-			'equity_account_id' => isset($_POST['ob_inv_equity_account_id']) ? absint(wp_unslash($_POST['ob_inv_equity_account_id'])) : 0,
-			'warehouse_override' => isset($_POST['ob_inv_warehouse_override']) ? absint(wp_unslash($_POST['ob_inv_warehouse_override'])) : 0,
-		);
-		update_option('hesabix_v2_opening_inventory_prefs', $ob_inv_prefs);
 
 		// API base URL - allow configuring server address
 		if (isset($_POST['api_base_url'])) {
 			$url = esc_url_raw(trim(wp_unslash($_POST['api_base_url'])));
 			if (!empty($url)) {
 				$url = rtrim($url, '/');
+				$previous_api = rtrim((string) get_option('hesabix_v2_api_base_url', ''), '/');
 				update_option('hesabix_v2_api_base_url', $url);
 				Hesabix_V2_Currency_Service::invalidate_list_cache();
+				if (
+					$url !== $previous_api
+					&& class_exists('Hesabix_V2_Brand', false)
+					&& get_option('hesabix_v2_enabled')
+					&& get_option('hesabix_v2_api_key')
+				) {
+					delete_transient(Hesabix_V2_Brand::REFRESH_TRANSIENT);
+					Hesabix_V2_Brand::sync_from_api(new Hesabix_V2_Api(), true);
+				}
 			}
 		}
 
@@ -1272,7 +1333,13 @@ class Hesabix_V2_Admin
 			return;
 		}
 
-		Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+		Hesabix_V2_Queue_Service::enqueue(
+			'order',
+			$order_id,
+			'sync_order',
+			null,
+			Hesabix_V2_Queue_Service::PRIORITY_ORDER
+		);
 
 		// بدون spawn_cron: آن درخواست loopback اغلب همان بدنهٔ ذخیرهٔ سفارش را منتظر یا PHP-FPM را اشغال می‌کند.
 		$scheduled = false;
@@ -1380,14 +1447,332 @@ class Hesabix_V2_Admin
 				}
 			}
 		}
-		$in_sync_list = !empty($allowed) && in_array($new_status, $allowed, true);
+		$in_sync_list = Hesabix_V2_Invoice_Helper::order_status_in_list($new_status, $allowed);
+		if ($new_slug === 'trash' || Hesabix_V2_Invoice_Helper::status_should_create_sales_return($new_slug, $sync)) {
+			return;
+		}
 		if (!$in_sync_list && !$proforma_promote) {
 			return;
 		}
 		if ($this->should_skip_auto_order_sync($order_id)) {
 			return;
 		}
+		if (is_admin()) {
+			$this->defer_admin_order_eval($order_id, false, true);
+			return;
+		}
 		$this->defer_auto_order_sync_to_queue($order_id);
+	}
+
+	/**
+	 * سفارش دستی پنل ادمین / REST: هوک چک‌اوت اجرا نمی‌شود.
+	 *
+	 * @param int            $order_id
+	 * @param WC_Order|null  $order
+	 * @return void
+	 */
+	public function maybe_sync_order_on_new_order($order_id, $order = null)
+	{
+		if (is_admin()) {
+			$this->defer_admin_order_eval($order_id, false, true);
+			return;
+		}
+		$this->maybe_queue_order_if_status_allows_auto_sync($order_id, null);
+	}
+
+	/**
+	 * ذخیرهٔ سفارش در ادمین (HPOS و کلاسیک) بعد از ثبت اقلام.
+	 *
+	 * @param int $order_id
+	 * @return void
+	 */
+	public function maybe_sync_order_on_admin_save($order_id)
+	{
+		if (!is_admin()) {
+			return;
+		}
+		$this->defer_admin_order_eval($order_id, false, true);
+	}
+
+	/**
+	 * پس از ذخیرهٔ اقلام سفارش (اغلب دیرتر از new_order در سفارش دستی).
+	 *
+	 * @param int $order_id
+	 * @return void
+	 */
+	public function maybe_sync_order_on_saved_items($order_id)
+	{
+		$this->defer_admin_order_eval($order_id, false, true);
+	}
+
+	/**
+	 * اگر وضعیت سفارش در فهرست همگام‌سازی باشد و سفارش خالی/پیش‌نویس نباشد، به صف برود.
+	 *
+	 * @param int                 $order_id
+	 * @param WC_Order|null|mixed $order
+	 * @return void
+	 */
+	private function maybe_queue_order_if_status_allows_auto_sync($order_id, $order = null)
+	{
+		if (!$this->is_auto_sync_orders_enabled()) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if (!$order instanceof WC_Order) {
+			return;
+		}
+
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($order->get_status());
+		if (in_array($slug, array('auto-draft', 'checkout-draft', 'draft', 'trash'), true)) {
+			return;
+		}
+		if (Hesabix_V2_Invoice_Helper::status_should_create_sales_return($slug, $sync)) {
+			return;
+		}
+
+		if (count($order->get_items()) < 1) {
+			return;
+		}
+
+		$allowed = isset($sync['sync_order_on_statuses']) && is_array($sync['sync_order_on_statuses'])
+			? $sync['sync_order_on_statuses']
+			: array();
+		if (!Hesabix_V2_Invoice_Helper::order_status_in_list($slug, $allowed)) {
+			return;
+		}
+		if ($this->should_skip_auto_order_sync($order_id)) {
+			return;
+		}
+
+		$this->defer_auto_order_sync_to_queue($order_id);
+	}
+
+	/**
+	 * ارزیابی فروش/برگشت را تا پایان درخواست عقب بینداز تا اقلام سفارش دستی ذخیره شده باشند.
+	 *
+	 * @param int  $order_id
+	 * @param bool $reverse
+	 * @param bool $sync
+	 * @return void
+	 */
+	private function defer_admin_order_eval($order_id, $reverse = false, $sync = true)
+	{
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+		if (!isset($this->deferred_admin_order_ids[ $order_id ])) {
+			$this->deferred_admin_order_ids[ $order_id ] = array(
+				'sync' => false,
+				'reverse' => false,
+			);
+		}
+		if ($sync) {
+			$this->deferred_admin_order_ids[ $order_id ]['sync'] = true;
+		}
+		if ($reverse) {
+			$this->deferred_admin_order_ids[ $order_id ]['reverse'] = true;
+		}
+		if (!has_action('shutdown', array($this, 'flush_deferred_admin_order_eval'))) {
+			add_action('shutdown', array($this, 'flush_deferred_admin_order_eval'), 20);
+		}
+	}
+
+	/**
+	 * پس از ذخیرهٔ کامل سفارش ادمین: فاکتور فروش یا برگشت از فروش.
+	 *
+	 * @return void
+	 */
+	public function flush_deferred_admin_order_eval()
+	{
+		$jobs = $this->deferred_admin_order_ids;
+		$this->deferred_admin_order_ids = array();
+		foreach ($jobs as $order_id => $flags) {
+			$order_id = (int) $order_id;
+			if ($order_id < 1 || !is_array($flags)) {
+				continue;
+			}
+			if (!empty($flags['reverse'])) {
+				$this->maybe_reverse_order_if_status_requires($order_id, null);
+			}
+			if (!empty($flags['sync'])) {
+				$this->maybe_queue_order_if_status_allows_auto_sync($order_id, null);
+			}
+		}
+	}
+
+	/**
+	 * اگر وضعیت فعلی در فهرست برگشت از فروش باشد و فاکتور فروش وجود داشته باشد، برگشت صف می‌شود.
+	 *
+	 * @param int                 $order_id
+	 * @param WC_Order|null|mixed $order
+	 * @return void
+	 */
+	private function maybe_reverse_order_if_status_requires($order_id, $order = null)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if (!$order instanceof WC_Order || $order instanceof WC_Order_Refund) {
+			return;
+		}
+
+		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($order->get_status());
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (!Hesabix_V2_Invoice_Helper::status_should_create_sales_return($slug, $sync)) {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		$reason = ($slug === 'refunded')
+			? Hesabix_V2_Sales_Return_Service::REASON_REFUNDED_STATUS
+			: Hesabix_V2_Sales_Return_Service::REASON_CANCEL;
+
+		Hesabix_V2_Sales_Return_Service::enqueue_remaining($order_id, $reason);
+	}
+
+	/**
+	 * تغییر وضعیت به موارد تنظیم‌شده (پیش‌فرض لغو شده / مسترد شده) → برگشت از فروش.
+	 *
+	 * @param int      $order_id
+	 * @param string   $old_status
+	 * @param string   $new_status
+	 * @param WC_Order $order
+	 * @return void
+	 */
+	public function maybe_reverse_order_on_status_change($order_id, $old_status, $new_status, $order)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (!Hesabix_V2_Invoice_Helper::status_should_create_sales_return($new_status, $sync)) {
+			return;
+		}
+
+		if (is_admin()) {
+			$this->defer_admin_order_eval($order_id, true, false);
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		$this->maybe_reverse_order_if_status_requires($order_id, $order);
+	}
+
+	/**
+	 * بازپرداخت ووکامرس → برگشت از فروش به‌اندازهٔ اقلام/مبلغ بازپرداخت.
+	 *
+	 * @param int $order_id
+	 * @param int $refund_id
+	 * @return void
+	 */
+	public function maybe_reverse_order_on_refund($order_id, $refund_id)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (empty($sync['sales_return_on_wc_refund'])) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		$refund_id = (int) $refund_id;
+		if ($order_id < 1 || $refund_id < 1) {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		Hesabix_V2_Sales_Return_Service::enqueue_refund($order_id, $refund_id);
+	}
+
+	/**
+	 * حذف دائمی سفارش (نه انتقال به زباله‌دان) → برگشت مانده، هم‌زمان چون سفارش در حال حذف است.
+	 *
+	 * @param int            $order_id
+	 * @param WC_Order|null  $order
+	 * @return void
+	 */
+	public function maybe_reverse_order_on_permanent_delete($order_id, $order = null)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if ($order instanceof WC_Order_Refund) {
+			return;
+		}
+		if ($order instanceof WC_Order && method_exists($order, 'get_type') && $order->get_type() === 'shop_order_refund') {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		Hesabix_V2_Sales_Return_Service::process_remaining(
+			$order_id,
+			Hesabix_V2_Sales_Return_Service::REASON_DELETE
+		);
+	}
+
+	/**
+	 * CPT کلاسیک: حذف دائمی shop_order.
+	 *
+	 * @param int $post_id
+	 * @return void
+	 */
+	public function maybe_reverse_shop_order_on_delete_post($post_id)
+	{
+		$post_id = (int) $post_id;
+		if ($post_id < 1) {
+			return;
+		}
+		if (get_post_type($post_id) !== 'shop_order') {
+			return;
+		}
+
+		$this->maybe_reverse_order_on_permanent_delete($post_id, null);
 	}
 
 	/**
@@ -1454,6 +1839,13 @@ class Hesabix_V2_Admin
 		}
 
 		echo '<p><strong>' . esc_html__('وضعیت حسابیکس:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
+		$return_ids = Hesabix_V2_Invoice_Service::get_sales_return_invoice_ids($oid);
+		if (!empty($return_ids)) {
+			echo '<p><strong>' . esc_html__('برگشت از فروش:', 'hesabix-v2') . '</strong> ';
+			echo esc_html(implode(', ', $return_ids));
+			echo '</p>';
+			echo '<p class="description">' . esc_html__('فاکتور فروش قطعی نگه داشته شده و همگام خودکار متوقف است.', 'hesabix-v2') . '</p>';
+		}
 
 		if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
 			echo Hesabix_V2_Invoice_Profit_Service::render_meta_box_block($order); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside service
@@ -1536,10 +1928,12 @@ class Hesabix_V2_Admin
 			if (isset($bulk['per_order'][ $oid ])) {
 				$po = $bulk['per_order'][ $oid ];
 				$paused = !empty($po['skipped_pause']);
+				$skipped_return = !empty($po['skipped_sales_return']);
 				$results[] = array(
 					'order_id' => (int) $oid,
-					'success' => $paused ? true : (!empty($po['success'])),
+					'success' => ($paused || $skipped_return) ? true : (!empty($po['success'])),
 					'skipped_pause' => $paused,
+					'skipped_sales_return' => $skipped_return,
 					'message' => isset($po['message']) ? (string) $po['message'] : '',
 				);
 
@@ -1773,7 +2167,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: لغو ارسال (حذف فاکتور) برای چند سفارش
+	 * AJAX: لغو ارسال (برگشت از فروش / حذف پیش‌فاکتور) برای چند سفارش
 	 *
 	 * @return void
 	 */
@@ -2268,6 +2662,9 @@ class Hesabix_V2_Admin
 		$api = new Hesabix_V2_Api();
 		$result = $api->test_connection();
 		if (!empty($result['success'])) {
+			if (class_exists('Hesabix_V2_Brand', false)) {
+				Hesabix_V2_Brand::sync_from_api($api, true);
+			}
 			$result = $this->sanitize_connection_ajax_payload($result);
 		}
 
@@ -2294,6 +2691,9 @@ class Hesabix_V2_Admin
 		$api = new Hesabix_V2_Api();
 		$result = $api->test_connection();
 		if (!empty($result['success'])) {
+			if (class_exists('Hesabix_V2_Brand', false)) {
+				Hesabix_V2_Brand::sync_from_api($api, false);
+			}
 			$result = $this->sanitize_connection_ajax_payload($result);
 		}
 
@@ -2394,11 +2794,19 @@ class Hesabix_V2_Admin
 	private function get_opening_inventory_script_payload()
 	{
 		$ui = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+		$obp = get_option('hesabix_v2_opening_inventory_prefs', array());
+		if (!is_array($obp)) {
+			$obp = array();
+		}
 		return array(
 			'post_confirm_phrase' => Hesabix_V2_Opening_Inventory_Service::post_confirm_phrase(),
 			'prereq' => $ui['prereq'],
 			'checklist' => $ui['checklist'],
 			'pending_job' => Hesabix_V2_Opening_Inventory_Service::get_pending_job_summary_for_user(get_current_user_id()),
+			'savedInventoryAccountId' => (int) ($obp['inventory_account_id'] ?? 0),
+			'savedEquityAccountId' => (int) ($obp['equity_account_id'] ?? 0),
+			'defaultInventoryCodes' => array('10102', '12101', '10101'),
+			'defaultEquityCodes' => array('30201', '30106', '30101'),
 			'strings' => array(
 				'loadAccounts' => __('در حال بارگذاری حساب‌ها…', 'hesabix-v2'),
 				'accountsError' => __('خطا در دریافت حساب‌ها از حسابیکس.', 'hesabix-v2'),
@@ -3033,6 +3441,9 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_setup_completed', true);
 		delete_transient('hesabix_v2_show_setup_wizard');
 		Hesabix_V2_Currency_Service::invalidate_list_cache();
+		if (class_exists('Hesabix_V2_Brand', false)) {
+			Hesabix_V2_Brand::sync_from_api($api, true);
+		}
 
 		wp_send_json(array('success' => true, 'message' => __('راه‌اندازی با موفقیت انجام شد.', 'hesabix-v2')));
 	}

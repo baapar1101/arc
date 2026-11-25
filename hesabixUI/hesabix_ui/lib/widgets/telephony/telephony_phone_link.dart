@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../services/telephony/telephony_session_controller.dart';
+import '../../l10n/app_localizations.dart';
+import '../../utils/error_extractor.dart';
 
 /// لینک شماره‌گیری کنار فیلد تلفن در CRM / اشخاص.
 class TelephonyPhoneLink extends StatelessWidget {
@@ -21,6 +23,7 @@ class TelephonyPhoneLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (!enabled || number.trim().isEmpty) {
       return SelectableText(number);
     }
@@ -31,7 +34,7 @@ class TelephonyPhoneLink extends StatelessWidget {
         Flexible(child: SelectableText(number)),
         const SizedBox(width: 4),
         IconButton(
-          tooltip: 'تماس',
+          tooltip: t.telephonyCallAction,
           visualDensity: VisualDensity.compact,
           icon: Icon(Icons.phone_forwarded_rounded, color: scheme.primary, size: 20),
           onPressed: () async {
@@ -45,12 +48,14 @@ class TelephonyPhoneLink extends StatelessWidget {
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('در حال برقراری تماس…')),
+                  SnackBar(content: Text(t.telephonyPlacingCall)),
                 );
               }
             } catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+                );
               }
             }
           },

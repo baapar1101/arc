@@ -25,8 +25,11 @@ from app.services.person_service import (
     invalidate_persons_cache,
 )
 from app.services.user_ui_preferences_service import (
+    MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS,
     get_quick_sales_payment_shortcuts,
+    get_quick_sales_pinned_product_ids,
     save_quick_sales_payment_shortcuts,
+    save_quick_sales_pinned_product_ids,
 )
 
 logger = logging.getLogger(__name__)
@@ -1484,4 +1487,111 @@ def get_configured_anonymous_customer(db: Session, business_id: int) -> Person:
         "ANONYMOUS_CUSTOMER_NOT_SET",
         "مشتری ناشناس تعریف نشده است",
         http_status=404,
+    )
+
+
+def _normalize_pinned_product_ids_payload(product_ids: Any) -> List[int]:
+    if product_ids is None:
+        return []
+    if not isinstance(product_ids, list):
+        raise ApiError(
+            "INVALID_PINNED_PRODUCTS",
+            "فهرست کالاهای ثابت باید آرایه باشد",
+            http_status=400,
+        )
+    seen: set[int] = set()
+    ids: List[int] = []
+    for raw_id in product_ids:
+        try:
+            product_id = int(raw_id)
+        except (TypeError, ValueError) as exc:
+            raise ApiError(
+                "INVALID_PINNED_PRODUCTS",
+                "شناسه کالا نامعتبر است",
+                http_status=400,
+            ) from exc
+        if product_id <= 0:
+            raise ApiError(
+                "INVALID_PINNED_PRODUCTS",
+                "شناسه کالا نامعتبر است",
+                http_status=400,
+            )
+        if product_id in seen:
+            continue
+        seen.add(product_id)
+        ids.append(product_id)
+    if len(ids) > MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS:
+        raise ApiError(
+            "PINNED_PRODUCTS_LIMIT",
+            f"حداکثر {MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS} کالا را می‌توان به‌صورت ثابت نگه داشت",
+            http_status=400,
+            details={"max_count": MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS},
+        )
+    return ids
+
+
+def list_quick_sales_pinned_products(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+) -> Dict[str, Any]:
+    from app.services.product_service import get_product
+
+    stored_ids = get_quick_sales_pinned_product_ids(db, user_id, business_id)
+    items: List[Dict[str, Any]] = []
+    for product_id in stored_ids:
+        row = get_product(db, product_id, business_id)
+        if row is None or row.get("is_active") is False:
+            continue
+        items.append(row)
+    return {
+        "product_ids": stored_ids,
+        "items": items,
+        "max_count": MAX_QUICK_SALES_PINNED_PRODUCTS_PER_BUSINESS,
+    }
+
+
+def set_quick_sales_pinned_products(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+    product_ids: Any,
+) -> Dict[str, Any]:
+    from adapters.db.models.product import Product
+
+    ids = _normalize_pinned_product_ids_payload(product_ids)
+    if ids:
+        rows = (
+            db.query(Product.id, Product.is_active)
+            .filter(
+                Product.business_id == int(business_id),
+                Product.id.in_(ids),
+            )
+            .all()
+        )
+        found = {int(row[0]): bool(row[1]) for row in rows}
+        missing = [product_id for product_id in ids if product_id not in found]
+        if missing:
+            raise ApiError(
+                "PRODUCT_NOT_FOUND",
+                "یکی از کالاهای انتخاب‌شده یافت نشد",
+                http_status=404,
+                details={"product_ids": missing},
+            )
+        inactive = [product_id for product_id in ids if found.get(product_id) is False]
+        if inactive:
+            raise ApiError(
+                "PRODUCT_INACTIVE",
+                "کالای غیرفعال را نمی‌توان در فهرست ثابت فروش سریع نگه داشت",
+                http_status=400,
+                details={"product_ids": inactive},
+            )
+    save_quick_sales_pinned_product_ids(db, user_id, business_id, ids)
+    db.commit()
+    return list_quick_sales_pinned_products(
+        db,
+        business_id=business_id,
+        user_id=user_id,
     )

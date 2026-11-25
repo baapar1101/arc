@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/core/api_client.dart';
+
+import '../core/api_client.dart';
+import '../theme/tokens/extensions.dart';
+import 'business/settings/business_settings_layout.dart';
 import 'system_settings/models/settings_category.dart';
 import 'system_settings/models/settings_item.dart';
 import 'system_settings/services/settings_categorization_service.dart';
-import 'system_settings/widgets/settings_search_bar.dart';
+import 'system_settings/widgets/settings_card.dart';
 import 'system_settings/widgets/settings_category_section.dart';
+import 'system_settings/widgets/settings_search_bar.dart';
+import 'system_settings/widgets/system_admin_quick_access.dart';
 
-/// صفحه اصلی پنل مدیریت تنظیمات سیستم
+/// هاب پنل مدیر سیستم؛ چیدمان فشردهٔ مشترک با تنظیمات کسب‌وکار.
 class SystemSettingsPage extends StatefulWidget {
   const SystemSettingsPage({super.key});
 
@@ -38,25 +43,12 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
   }
 
   void _initializeCategories() {
-    _categories = SettingsCategorizationService.getCategories();
-    
-    // فیلتر دسته‌ها و آیتم‌ها بر اساس دسترسی
-    if (!_isSuperAdmin) {
-      _categories = _categories
-          .where((category) => !category.requiresSuperAdmin)
-          .map((category) {
-            // فیلتر کردن آیتم‌های هر دسته
-            final filteredItems = category.items
-                .where((item) => !item.requiresSuperAdmin)
-                .toList();
-            return category.copyWith(items: filteredItems);
-          })
-          .toList();
-    }
-
-    // همه دسته‌ها به صورت پیش‌فرض باز هستند
-    for (var category in _categories) {
-      _categoryExpansionStates[category.id] = true;
+    _categories = SettingsCategorizationService.visibleCategories(
+      isSuperAdmin: _isSuperAdmin,
+    );
+    for (final category in _categories) {
+      _categoryExpansionStates[category.id] =
+          SettingsCategorizationService.isExpandedByDefault(category.id);
     }
   }
 
@@ -66,28 +58,23 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     setState(() {
       _searchQuery = query;
       _isSearching = query.trim().isNotEmpty;
-
-      if (_isSearching) {
-        _searchResults = SettingsCategorizationService.searchItems(
-          query,
-          t: t,
-          categories: _categories,
-        );
-      } else {
-        _searchResults = [];
-      }
+      _searchResults = _isSearching
+          ? SettingsCategorizationService.searchItems(
+              query,
+              t: t,
+              categories: _categories,
+            )
+          : [];
     });
   }
 
   void _onCategoryExpansionChanged(String categoryId, bool isExpanded) {
-    setState(() {
-      _categoryExpansionStates[categoryId] = isExpanded;
-    });
+    setState(() => _categoryExpansionStates[categoryId] = isExpanded);
   }
 
   void _expandAllCategories() {
     setState(() {
-      for (var category in _categories) {
+      for (final category in _categories) {
         _categoryExpansionStates[category.id] = true;
       }
     });
@@ -95,7 +82,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
 
   void _collapseAllCategories() {
     setState(() {
-      for (var category in _categories) {
+      for (final category in _categories) {
         _categoryExpansionStates[category.id] = false;
       }
     });
@@ -107,84 +94,112 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     final colorScheme = theme.colorScheme;
     final t = AppLocalizations.of(context);
     final width = MediaQuery.sizeOf(context).width;
-    const kDesktopLoose = 900.0;
-    final isDesktopLoose = width >= kDesktopLoose;
-    final pagePadding = isDesktopLoose
-        ? const EdgeInsets.fromLTRB(8, 8, 8, 12)
-        : const EdgeInsets.all(16);
-    final sectionGap =
-        isDesktopLoose ? 12.0 : 20.0;
-    final innerGap = isDesktopLoose ? 12.0 : 16.0;
+    final hub = context.settingsHub;
+    final isWide = hub.isWide(width);
+    final totalItems = _categories.fold<int>(0, (sum, category) => sum + category.items.length);
+    final quickAccess = SettingsCategorizationService.quickAccessItems(_categories);
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SingleChildScrollView(
-        padding: pagePadding,
+    return ColoredBox(
+      color: colorScheme.surface,
+      child: SingleChildScrollView(
+        padding: hub.pagePaddingFor(width),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildWelcomeSection(theme, colorScheme, t, width),
-
-            SizedBox(height: sectionGap),
-
+            _buildHeader(
+              theme: theme,
+              colorScheme: colorScheme,
+              t: t,
+              categoryCount: _categories.length,
+              itemCount: totalItems,
+              width: width,
+            ),
+            SizedBox(height: hub.sectionGapFor(width)),
             SettingsSearchBar(
+              key: const ValueKey('system_admin_search'),
               onSearchChanged: _onSearchChanged,
               initialQuery: _searchQuery,
-              dense: isDesktopLoose,
+              dense: true,
             ),
-
-            if (!_isSearching) _buildControlButtons(theme, colorScheme, t),
-
-            SizedBox(height: innerGap),
-
+            if (!_isSearching) _buildControlButtons(colorScheme, t),
+            if (!_isSearching) SystemAdminQuickAccess(items: quickAccess),
+            SizedBox(height: hub.innerGap),
             _isSearching
-                ? _buildSearchResults(theme, colorScheme, t, isDesktopLoose)
-                : _buildCategoriesList(theme, colorScheme, t, isDesktopLoose),
-
-            SizedBox(height: isDesktopLoose ? 12 : 20),
+                ? _buildSearchResults(theme, colorScheme, t)
+                : _buildCategoriesList(theme, colorScheme, t),
+            SizedBox(height: isWide ? hub.bottomGap : hub.sectionGapNarrow),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildWelcomeSection(
-    ThemeData theme,
-    ColorScheme colorScheme,
-    AppLocalizations t,
-    double width,
-  ) {
-    final totalItems = _categories.fold<int>(
-      0,
-      (sum, category) => sum + category.items.length,
-    );
-
+  Widget _buildHeader({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppLocalizations t,
+    required int categoryCount,
+    required int itemCount,
+    required double width,
+  }) {
     const kNarrowWelcome = 560.0;
-    final statsText =
-        '${_categories.length} ${t.settingsCategoriesCount} • $totalItems ${t.settingsCount}';
+    final hub = context.settingsHub;
+    final statsText = '$categoryCount ${t.settingsCategoriesCount} • $itemCount ${t.settingsCount}';
     final statsStyle = theme.textTheme.bodySmall?.copyWith(
       color: colorScheme.onSurface.withValues(alpha: 0.6),
+      fontSize: hub.cardSubtitleFontSize,
+      height: hub.labelHeight,
     );
+    final roleColor = _isSuperAdmin ? colorScheme.primary : colorScheme.secondary;
 
     final titleBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           t.systemAdministration,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-            fontSize: 24,
-          ),
+          style: hub.pageTitleStyle(theme.textTheme, color: colorScheme.onSurface),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: hub.headerTitleGap),
         Text(
           t.systemSettingsDescription,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: hub.pageSubtitleStyle(
+            theme.textTheme,
             color: colorScheme.onSurface.withValues(alpha: 0.7),
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+
+    final roleBadge = Container(
+      padding: hub.roleBadgePadding,
+      decoration: BoxDecoration(
+        color: roleColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _isSuperAdmin ? Icons.verified_user : Icons.admin_panel_settings_outlined,
+            size: hub.roleBadgeIconSize,
+            color: roleColor,
+          ),
+          SizedBox(width: hub.roleBadgeGap),
+          Text(
+            _isSuperAdmin ? t.systemAdminSuperAdminRole : t.systemAdminLimitedRole,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: roleColor,
+              fontSize: hub.roleBadgeFontSize,
+              height: hub.labelHeight,
+            ),
+          ),
+        ],
+      ),
     );
 
     if (width < kNarrowWelcome) {
@@ -192,7 +207,9 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           titleBlock,
-          const SizedBox(height: 10),
+          SizedBox(height: hub.listTitleGap),
+          roleBadge,
+          SizedBox(height: hub.headerTitleGap + 2),
           Text(statsText, style: statsStyle),
         ],
       );
@@ -202,52 +219,42 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: titleBlock),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            statsText,
-            style: statsStyle,
-            textAlign: TextAlign.end,
-          ),
+        SizedBox(width: hub.cardIconGap),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            roleBadge,
+            SizedBox(height: hub.headerTitleGap + 2),
+            Text(statsText, style: statsStyle, textAlign: TextAlign.end),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildControlButtons(
-    ThemeData theme,
-    ColorScheme colorScheme,
-    AppLocalizations t,
-  ) {
+  Widget _buildControlButtons(ColorScheme colorScheme, AppLocalizations t) {
+    final hub = context.settingsHub;
+    final buttonStyle = TextButton.styleFrom(
+      foregroundColor: colorScheme.primary,
+      padding: hub.controlButtonPadding,
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+    final labelStyle = TextStyle(fontSize: hub.controlButtonFontSize, height: hub.labelHeight);
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         TextButton(
           onPressed: _expandAllCategories,
-          style: TextButton.styleFrom(
-            foregroundColor: colorScheme.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            t.expandAllCategories,
-            style: TextStyle(fontSize: 13),
-          ),
+          style: buttonStyle,
+          child: Text(t.expandAllCategories, style: labelStyle),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: hub.roleBadgeGap),
         TextButton(
           onPressed: _collapseAllCategories,
-          style: TextButton.styleFrom(
-            foregroundColor: colorScheme.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            t.collapseAllCategories,
-            style: TextStyle(fontSize: 13),
-          ),
+          style: buttonStyle,
+          child: Text(t.collapseAllCategories, style: labelStyle),
         ),
       ],
     );
@@ -257,15 +264,15 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
     AppLocalizations t,
-    bool compactSpacing,
   ) {
+    final hub = context.settingsHub;
     if (_categories.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: hub.emptyStatePadding,
           child: Text(
             t.noSettingsFound,
-            style: theme.textTheme.bodyLarge?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
@@ -278,21 +285,16 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
       children: [
         Text(
           t.availableSettings,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
+          style: hub.listTitleStyle(theme.textTheme, color: colorScheme.onSurface),
         ),
-        SizedBox(height: compactSpacing ? 12 : 16),
+        SizedBox(height: hub.listTitleGap),
         ..._categories.map((category) {
           return SettingsCategorySection(
             key: ValueKey(category.id),
             category: category,
-            isExpanded: _categoryExpansionStates[category.id] ?? true,
+            isExpanded: _categoryExpansionStates[category.id] ?? false,
             onExpansionChanged: (isExpanded) =>
                 _onCategoryExpansionChanged(category.id, isExpanded),
-            searchQuery: null,
-            showSearchResults: false,
           );
         }),
       ],
@@ -303,25 +305,26 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
     AppLocalizations t,
-    bool compactSpacing,
   ) {
+    final hub = context.settingsHub;
     if (_searchResults.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: hub.emptyStatePadding,
           child: Column(
             children: [
               Icon(
                 Icons.search_off,
-                size: 64,
+                size: hub.emptyStateIconSize,
                 color: colorScheme.onSurface.withValues(alpha: 0.3),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: hub.listTitleGap),
               Text(
                 t.noSearchResults(_searchQuery),
-                style: theme.textTheme.bodyLarge?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -329,79 +332,24 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
       );
     }
 
-    // نمایش نتایج جستجو به صورت دسته‌بندی شده
-    final Map<String, List<SettingsItem>> groupedResults = {};
-    for (var item in _searchResults) {
-      if (!groupedResults.containsKey(item.categoryId)) {
-        groupedResults[item.categoryId] = [];
-      }
-      groupedResults[item.categoryId]!.add(item);
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              t.searchResults,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                t.searchResultCount(_searchResults.length),
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
+        Text(
+          t.searchResults,
+          style: hub.listTitleStyle(theme.textTheme, color: colorScheme.onSurface),
         ),
-        SizedBox(height: compactSpacing ? 12 : 16),
-        ...groupedResults.entries.map((entry) {
-          final categoryId = entry.key;
-          final items = entry.value;
-          final categoryMatch =
-              _categories.where((cat) => cat.id == categoryId).toList();
-          if (categoryMatch.isEmpty) {
-            return const SizedBox.shrink();
-          }
-          final category = categoryMatch.first;
-
-          // ایجاد یک دسته موقت فقط با آیتم‌های جستجو شده
-          final searchCategory = SettingsCategory(
-            id: category.id,
-            title: category.title,
-            description: category.description,
-            icon: category.icon,
-            color: category.color,
-            items: items,
-            order: category.order,
-            requiresSuperAdmin: category.requiresSuperAdmin,
-          );
-
-          return SettingsCategorySection(
-            key: ValueKey('search_${category.id}'),
-            category: searchCategory,
-            isExpanded: true,
-            searchQuery: _searchQuery,
-            showSearchResults: true,
-          );
-        }),
+        SizedBox(height: hub.listTitleGap),
+        BusinessSettingsLayout.buildResponsiveGrid(
+          context: context,
+          children: _searchResults.map((item) {
+            return SettingsCard(
+              item: item,
+              isHighlighted: true,
+              isDanger: item.tags.contains('danger'),
+            );
+          }).toList(),
+        ),
       ],
     );
   }

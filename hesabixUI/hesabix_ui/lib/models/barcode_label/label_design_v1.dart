@@ -64,7 +64,7 @@ class LabelCanvas {
 }
 
 class LabelSheet {
-  /// `sheet` = چیدمان روی کاغذ (A4/…)؛ `roll` = یک برچسب در هر صفحه (چاپگر حرارتی)
+  /// `sheet` = چیدمان روی کاغذ (A4/…)؛ `roll` = یک ردیف لیبل در هر صفحه (چاپگر حرارتی/رول)
   final String printMode;
   final String paper;
   final String orientation;

@@ -117,6 +117,21 @@ def build_invoice_lines(
 		}
 		if warehouse_id:
 			extra["warehouse_id"] = int(warehouse_id)
+		src_extra = ln.get("extra_info") if isinstance(ln.get("extra_info"), dict) else {}
+		if ln.get("lot_allocations"):
+			extra["lot_allocations"] = ln.get("lot_allocations")
+		elif src_extra.get("lot_allocations"):
+			extra["lot_allocations"] = src_extra.get("lot_allocations")
+		if ln.get("variant_id") is not None:
+			extra["variant_id"] = ln.get("variant_id")
+		elif src_extra.get("variant_id") is not None:
+			extra["variant_id"] = src_extra.get("variant_id")
+		if ln.get("allocations"):
+			extra["allocations"] = ln.get("allocations")
+		elif src_extra.get("allocations"):
+			extra["allocations"] = src_extra.get("allocations")
+		if src_extra.get("allow_expired_lot_sale") or ln.get("allow_expired_lot_sale"):
+			extra["allow_expired_lot_sale"] = True
 		out.append(
 			{
 				"product_id": pid,

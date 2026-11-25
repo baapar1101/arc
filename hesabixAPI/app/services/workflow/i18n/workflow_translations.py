@@ -31,6 +31,13 @@ from .basalam_triggers_i18n import (
     BASALAM_ORDER_PAID_TRANSLATIONS,
     BASALAM_CHAT_MESSAGE_RECEIVED_TRANSLATIONS,
 )
+from .office_automation_triggers_i18n import (
+    OA_LETTER_ARCHIVED_TRANSLATIONS,
+    OA_LETTER_DISPATCHED_TRANSLATIONS,
+    OA_LETTER_REFERRED_TRANSLATIONS,
+    OA_LETTER_REGISTERED_TRANSLATIONS,
+    OA_LETTER_SIGNED_TRANSLATIONS,
+)
 
 
 class SupportedLanguage(str, Enum):
@@ -1074,6 +1081,11 @@ TRIGGER_TRANSLATIONS_BY_KEY: Dict[str, Any] = {
     "basalam.order.updated": BASALAM_ORDER_UPDATED_TRANSLATIONS,
     "basalam.order.paid": BASALAM_ORDER_PAID_TRANSLATIONS,
     "basalam.chat.message.received": BASALAM_CHAT_MESSAGE_RECEIVED_TRANSLATIONS,
+    "office_automation.letter_registered": OA_LETTER_REGISTERED_TRANSLATIONS,
+    "office_automation.letter_referred": OA_LETTER_REFERRED_TRANSLATIONS,
+    "office_automation.letter_archived": OA_LETTER_ARCHIVED_TRANSLATIONS,
+    "office_automation.letter_dispatched": OA_LETTER_DISPATCHED_TRANSLATIONS,
+    "office_automation.letter_signed": OA_LETTER_SIGNED_TRANSLATIONS,
 }
 
 

@@ -6,11 +6,42 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from adapters.db.models.currency import Currency
 from adapters.db.models.marketplace import MarketplacePlugin, MarketplacePluginPlan
 
+
+ADVANCED_ACCOUNTING_PLUGIN_CODE = "advanced_accounting"
+AI_MCP_SERVER_PLUGIN_CODE = "ai_mcp_server"
+
+_ADVANCED_ACCOUNTING_DESCRIPTION = """
+بسته حسابداری پیشرفته برای حسابداران و کسب‌وکارهای حرفه‌ای:
+
+✅ صورت‌های مالی: تراز آزمایشی، ترازنامه، سود و زیان دوره و تجمیعی
+✅ دفاتر قانونی: دفتر کل، دفتر روزنامه و خروجی دفاتر الکترونیکی
+✅ مرور حساب‌ها، صورت جریان وجوه نقد و بسته گزارش‌های مالی
+✅ بستن سال مالی و برگردان سال مالی
+✅ تسعیر ارز، نرخ‌گذاری، تسعیر پایان دوره و گزارش تسعیر
+✅ راس‌گیری چک، تسهیلات دریافتی، سن بدهی و سن بستانکاری
+✅ پشتیبان‌گیری کسب‌وکار، مقصد FTP و بازیابی داخل تنظیمات
+✅ استودیو ساخت قالب فاکتور و اسناد
+
+جدول حساب‌ها، اسناد، فاکتور و تراز افتتاحیه در نسخه پایه باقی می‌مانند.
+""".strip()
+
+_AI_MCP_SERVER_DESCRIPTION = """
+اتصال امن دستیارهای خارجی هوش مصنوعی به داده همین کسب‌وکار از طریق MCP:
+
+✅ اتصال ChatGPT، Claude، Cursor و کلاینت‌های سازگار با MCP
+✅ خواندن و کار با فاکتور، کالا، اشخاص، خزانه، گزارش و سایر ابزارهای مجاز همان کاربر
+✅ رضایت OAuth با انتخاب کسب‌وکار و ابزار؛ توکن محدود به همان کسب‌وکار
+✅ اگر افزونه فعال نباشد یا اشتراک تمام شود، دستیار به داده دسترسی ندارد و این موضوع را به کاربر می‌گوید
+
+چت داخل حسابیکس و API معمولی نرم‌افزار بدون این افزونه در دسترس می‌مانند.
+ابزارهای افزونه‌های دیگر (حقوق، تعمیرگاه، بارکد و غیره) همچنان لایسنس خودشان را لازم دارند.
+""".strip()
 
 _REPAIR_SHOP_DESCRIPTION = """
 سیستم جامع مدیریت تعمیرگاه با قابلیت‌های زیر:
@@ -166,6 +197,20 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 180_000), ("yearly", 1_800_000)),
 	),
 	_PluginSeed(
+		code="fixed_assets",
+		name="کنترل اموال و دارایی ثابت",
+		description=(
+			"دفتر معین اموال مستقل از انبار: تحصیل اثاثیه و دارایی برای استفاده داخلی، "
+			"نگاشت به حساب‌های ۱۰۷/۱۰۸/۷۰۴، استهلاک خط مستقیم و مانده نزولی مطابق استاندارد ۱۱، "
+			"و صدور سند دفتر کل جدا از فاکتور خرید کالا."
+		),
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 220_000), ("yearly", 2_200_000)),
+	),
+	_PluginSeed(
 		code="hscript_custom_reports",
 		name="گزارش‌ساز اسکریپتی (HScript)",
 		description=(
@@ -193,6 +238,33 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 350_000), ("yearly", 3_500_000)),
 	),
 	_PluginSeed(
+		code="digipay_credit",
+		name="پرداخت اعتباری دیجی‌پی",
+		description=(
+			"پذیرش خرید اعتباری و اقساطی دیجی‌پی در فروش حضوری و آنلاین: تیکت UPG، "
+			"ثبت طلب روی حساب دریافتنی شخص دیجی‌پی (۱۰۴۰۱) بدون بدهکار کردن بانک در لحظه فروش، "
+			"و سند تسویهٔ دوره‌ای با کارمزد (۷۰۹۰۲) و مالیات ورودی کارمزد (۱۰۱۰۴)."
+		),
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 250_000), ("yearly", 2_500_000)),
+	),
+	_PluginSeed(
+		code="office_automation",
+		name="اتوماسیون اداری",
+		description=(
+			"کارتابل سمت‌محور: نامه داخلی، وارده و صادره، پیش‌نویس، ارجاع، پاراف، "
+			"پیوست، دبیرخانه، جانشین و چند سمت برای هر کاربر."
+		),
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 280_000), ("yearly", 2_800_000)),
+	),
+	_PluginSeed(
 		code="barcode_label_studio",
 		name="طراحی و چاپ برچسب بارکد",
 		description=(
@@ -207,15 +279,68 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_allowed=True,
 		plans=(("monthly", 180_000), ("yearly", 1_800_000), ("lifetime", 7_200_000)),
 	),
+	_PluginSeed(
+		code=ADVANCED_ACCOUNTING_PLUGIN_CODE,
+		name="بسته حسابداری پیشرفته",
+		description=_ADVANCED_ACCOUNTING_DESCRIPTION,
+		category="accounting",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 250_000), ("yearly", 2_500_000), ("lifetime", 9_000_000)),
+	),
+	_PluginSeed(
+		code="advanced_production",
+		name="افزونه تولید پیشرفته",
+		description=(
+			"گزارش‌های صنعتی تولید روی سفارش، فرمول ساخت و فاکتور تولید موجود: "
+			"پیشرفت، عقب‌افتادگی، بهای گزارشی استاندارد/واقعی/میانگین، کسری مواد و انحراف مصرف. "
+			"ثبت دفتر کل فاکتور تولید هسته بدون این افزونه تغییر نمی‌کند."
+		),
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 220_000), ("yearly", 2_200_000)),
+	),
+	_PluginSeed(
+		code=AI_MCP_SERVER_PLUGIN_CODE,
+		name="سرور MCP هوش مصنوعی",
+		description=_AI_MCP_SERVER_DESCRIPTION,
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 300_000), ("yearly", 3_000_000), ("lifetime", 10_000_000)),
+	),
+	_PluginSeed(
+		code="procurement",
+		name="مدیریت خرید و تدارکات",
+		description="درخواست خرید، استعلام و مناقصه، سفارش، رسید و کنترل کیفیت، تطبیق سه‌جانبه، بودجه تعهدی، قرارداد و امتیاز تأمین‌کننده.",
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 320_000), ("yearly", 3_200_000)),
+	),
 )
 
 
 # No public tariff is invented for newly introduced specialist add-ons.
 # Administrators configure plans explicitly; existing prices remain untouched.
 from app.services.advanced_plugin_catalog import MODULES as _SPECIALIST_MODULES
+_DEFAULT_PLUGINS = tuple(p for p in _DEFAULT_PLUGINS if p.code not in _SPECIALIST_MODULES)
 _DEFAULT_PLUGINS += tuple(_PluginSeed(code=code,name=spec['name'],description=spec['description'],
     category=spec['category'],icon_url=None,trial_days=None,trial_allowed=False,plans=())
     for code,spec in _SPECIALIST_MODULES.items())
+def _existing_columns(db: Session, table: str) -> Optional[set[str]]:
+	getter = getattr(db, "get_bind", None)
+	if getter is None:
+		return None
+	try:
+		return {col["name"] for col in inspect(getter()).get_columns(table)}
+	except Exception:
+		return None
 
 
 def _resolve_currency_id(db: Session) -> Optional[int]:
@@ -249,35 +374,77 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 	reactivated_plans = 0
 	codes: List[str] = []
 
+	plugin_columns = _existing_columns(db, "marketplace_plugins")
 	for spec in _DEFAULT_PLUGINS:
 		codes.append(spec.code)
-		row = db.query(MarketplacePlugin).filter(MarketplacePlugin.code == spec.code).first()
-		if row:
-			updated_plugins += 1
-			row.name = spec.name
-			row.description = spec.description
-			row.category = spec.category
-			row.icon_url = spec.icon_url
-			row.trial_days = spec.trial_days
-			row.trial_allowed = spec.trial_allowed
-			row.is_active = True
-			row.updated_at = now
+		if plugin_columns is None:
+			row = db.query(MarketplacePlugin).filter(MarketplacePlugin.code == spec.code).first()
+			if row:
+				updated_plugins += 1
+				row.name = spec.name
+				row.description = spec.description
+				row.category = spec.category
+				row.icon_url = spec.icon_url
+				row.trial_days = spec.trial_days
+				row.trial_allowed = spec.trial_allowed
+				row.is_active = True
+				row.updated_at = now
+			else:
+				created_plugins += 1
+				row = MarketplacePlugin(
+					code=spec.code,
+					name=spec.name,
+					description=spec.description,
+					category=spec.category,
+					icon_url=spec.icon_url,
+					is_active=True,
+					listed_in_marketplace=True,
+					enabled_for_all_businesses=False,
+					trial_days=spec.trial_days,
+					trial_allowed=spec.trial_allowed,
+				)
+				db.add(row)
+				db.flush()
+			plugin_id = int(row.id)
 		else:
-			created_plugins += 1
-			row = MarketplacePlugin(
-				code=spec.code,
-				name=spec.name,
-				description=spec.description,
-				category=spec.category,
-				icon_url=spec.icon_url,
-				is_active=True,
-				trial_days=spec.trial_days,
-				trial_allowed=spec.trial_allowed,
-			)
-			db.add(row)
-			db.flush()
-
-		plugin_id = int(row.id)
+			found = db.execute(text("SELECT id FROM marketplace_plugins WHERE code = :code"), {"code": spec.code}).first()
+			if found:
+				updated_plugins += 1
+				values = {
+					"name": spec.name,
+					"description": spec.description,
+					"category": spec.category,
+					"icon_url": spec.icon_url,
+					"trial_days": spec.trial_days,
+					"trial_allowed": spec.trial_allowed,
+					"is_active": True,
+					"updated_at": now,
+				}
+				present = {key: value for key, value in values.items() if key in plugin_columns}
+				assignments = ", ".join(f"{key} = :{key}" for key in present)
+				db.execute(text(f"UPDATE marketplace_plugins SET {assignments} WHERE id = :id"), {**present, "id": int(found[0])})
+				plugin_id = int(found[0])
+			else:
+				created_plugins += 1
+				values = {
+					"code": spec.code,
+					"name": spec.name,
+					"description": spec.description,
+					"category": spec.category,
+					"icon_url": spec.icon_url,
+					"is_active": True,
+					"listed_in_marketplace": True,
+					"enabled_for_all_businesses": False,
+					"trial_days": spec.trial_days,
+					"trial_allowed": spec.trial_allowed,
+					"created_at": now,
+					"updated_at": now,
+				}
+				present = {key: value for key, value in values.items() if key in plugin_columns}
+				columns = ", ".join(present)
+				params = ", ".join(f":{key}" for key in present)
+				inserted = db.execute(text(f"INSERT INTO marketplace_plugins ({columns}) VALUES ({params}) RETURNING id"), present).first()
+				plugin_id = int(inserted[0])
 		for period, default_price in spec.plans:
 			plan = (
 				db.query(MarketplacePluginPlan)
@@ -305,12 +472,20 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 			created_plans += 1
 
 	grandfather_result: Dict[str, Any] = {}
-	try:
-		from app.services.moadian_grandfather_service import grant_moadian_grandfather_licenses
+	if plugin_columns is not None and "listed_in_marketplace" not in plugin_columns:
+		grandfather_result = {"ok": False, "skipped": "schema"}
+	else:
+		nested = db.begin_nested() if hasattr(db, "begin_nested") else None
+		try:
+			from app.services.moadian_grandfather_service import grant_moadian_grandfather_licenses
 
-		grandfather_result = grant_moadian_grandfather_licenses(db)
-	except Exception as exc:  # noqa: BLE001
-		grandfather_result = {"ok": False, "error": str(exc)}
+			grandfather_result = grant_moadian_grandfather_licenses(db)
+			if nested is not None:
+				nested.commit()
+		except Exception as exc:  # noqa: BLE001
+			if nested is not None:
+				nested.rollback()
+			grandfather_result = {"ok": False, "error": str(exc)}
 
 	return {
 		"ok": True,

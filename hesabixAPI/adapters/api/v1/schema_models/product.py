@@ -3,11 +3,46 @@ Schema models کامل برای محصولات (Products)
 
 این ماژول شامل تمام schema های مورد نیاز برای مدیریت محصولات است.
 """
-from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo, ConfigDict
-from datetime import datetime
+from typing import Annotated, Optional, List, Literal, Dict, Any
+from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator, ValidationInfo, ConfigDict
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+import re
+
+from app.core.product_measurements import MEASUREMENT_FIELDS, MEASUREMENT_PRECISION, MEASUREMENT_SCALE
+
+
+def _measurement_decimal(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+        if re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", value):
+            return Decimal(value)
+    elif type(value) is int:
+        return Decimal(value)
+    elif isinstance(value, Decimal) and value.is_finite() and not value.is_signed():
+        return value
+    raise ValueError("مقدار باید عدد صحیح یا اعشاری غیرمنفی باشد")
+
+
+PhysicalMeasurement = Annotated[
+    Annotated[
+        Decimal,
+        Field(ge=0, max_digits=MEASUREMENT_PRECISION, decimal_places=MEASUREMENT_SCALE),
+    ] | None,
+    BeforeValidator(_measurement_decimal),
+]
+
+
+class ProductMeasurementsMixin(BaseModel):
+    length_mm: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["length_mm"])
+    width_mm: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["width_mm"])
+    height_mm: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["height_mm"])
+    weight_g: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["weight_g"])
 
 
 class ProductItemType(str, Enum):
@@ -117,6 +152,19 @@ class ProductOpeningBalanceInput(BaseModel):
         default=False,
         description="حذف خط موجودی اولیه از سند تراز افتتاحیه (فقط در ویرایش)",
     )
+    lot_code: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        description="شماره لات موجودی اولیه برای کالای تاریخ‌دار",
+    )
+    manufacturing_date: Optional[date] = Field(
+        default=None,
+        description="تاریخ تولید موجودی اولیه",
+    )
+    expiry_date: Optional[date] = Field(
+        default=None,
+        description="تاریخ انقضای موجودی اولیه",
+    )
 
     @model_validator(mode="after")
     def _validate_quantity_or_clear(self):
@@ -154,7 +202,7 @@ class ProductCatalogProfileMixin(BaseModel):
     )
 
 
-class ProductCreateRequest(ProductCatalogProfileMixin):
+class ProductCreateRequest(ProductCatalogProfileMixin, ProductMeasurementsMixin):
     """درخواست ایجاد محصول جدید"""
     code: Optional[str] = Field(
         None, 
@@ -279,6 +327,23 @@ class ProductCreateRequest(ProductCatalogProfileMixin):
         default=False,
         description="ردیابی بارکد برای کالاهای یونیک"
     )
+    track_expiry: bool = Field(
+        default=False,
+        description="ردیابی لات، تاریخ تولید و انقضا (فقط کالاهای با کنترل موجودی)",
+    )
+    lot_policy: Literal["optional", "required"] = Field(
+        default="optional",
+        description="optional برای سبزی/بدون کد لات، required برای دارو",
+    )
+    shelf_life_days: Optional[int] = Field(default=None, ge=1, description="عمر مفید از تاریخ تولید (روز)")
+    best_before_offset_days: Optional[int] = Field(default=None, ge=0)
+    removal_offset_days: Optional[int] = Field(default=None, ge=0)
+    alert_offset_days: Optional[int] = Field(default=None, ge=0)
+    expired_sale_policy: Literal["block", "manager_confirm"] = Field(
+        default="block",
+        description="block=ممنوع، manager_confirm=با تأیید مدیر",
+    )
+    min_remaining_shelf_life_days: int = Field(default=0, ge=0)
     
     # مالیات
     is_sales_taxable: bool = Field(
@@ -397,7 +462,7 @@ class ProductCreateRequest(ProductCatalogProfileMixin):
         }
 
 
-class ProductUpdateRequest(ProductCatalogProfileMixin):
+class ProductUpdateRequest(ProductCatalogProfileMixin, ProductMeasurementsMixin):
     """درخواست ویرایش محصول"""
     code: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=200)
@@ -425,6 +490,14 @@ class ProductUpdateRequest(ProductCatalogProfileMixin):
     inventory_mode: Optional[Literal["bulk", "unique"]] = None
     track_serial: Optional[bool] = None
     track_barcode: Optional[bool] = None
+    track_expiry: Optional[bool] = None
+    lot_policy: Optional[Literal["optional", "required"]] = None
+    shelf_life_days: Optional[int] = Field(default=None, ge=1)
+    best_before_offset_days: Optional[int] = Field(default=None, ge=0)
+    removal_offset_days: Optional[int] = Field(default=None, ge=0)
+    alert_offset_days: Optional[int] = Field(default=None, ge=0)
+    expired_sale_policy: Optional[Literal["block", "manager_confirm"]] = None
+    min_remaining_shelf_life_days: Optional[int] = Field(default=None, ge=0)
     
     is_sales_taxable: Optional[bool] = None
     is_purchase_taxable: Optional[bool] = None
@@ -514,6 +587,11 @@ class ProductInventoryInfo(BaseModel):
 
 class ProductResponse(BaseModel):
     """پاسخ اطلاعات محصول"""
+    length_mm: str | None = Field(None, description=MEASUREMENT_FIELDS["length_mm"])
+    width_mm: str | None = Field(None, description=MEASUREMENT_FIELDS["width_mm"])
+    height_mm: str | None = Field(None, description=MEASUREMENT_FIELDS["height_mm"])
+    weight_g: str | None = Field(None, description=MEASUREMENT_FIELDS["weight_g"])
+
     id: int = Field(..., description="شناسه محصول")
     code: str = Field(..., description="کد محصول")
     name: str = Field(..., description="نام محصول")
@@ -547,8 +625,18 @@ class ProductResponse(BaseModel):
     
     # حالت موجودی و ردیابی
     inventory_mode: Optional[str] = None
+    variant_mode: Optional[str] = "none"
+    variant_dimensions: Optional[List[dict]] = None
     track_serial: bool = False
     track_barcode: bool = False
+    track_expiry: bool = False
+    lot_policy: Optional[str] = "optional"
+    shelf_life_days: Optional[int] = None
+    best_before_offset_days: Optional[int] = None
+    removal_offset_days: Optional[int] = None
+    alert_offset_days: Optional[int] = None
+    expired_sale_policy: Optional[str] = "block"
+    min_remaining_shelf_life_days: int = 0
     
     is_sales_taxable: bool
     is_purchase_taxable: bool

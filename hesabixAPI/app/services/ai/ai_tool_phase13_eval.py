@@ -6,9 +6,9 @@ Gold Recall is never copied as Production Recall.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Dict
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     ADAPTIVE_DISCOVERY_K,
     CANDIDATE_RETRIEVAL_N,
@@ -32,7 +32,7 @@ from app.services.ai.ai_tool_indexed_evidence import (
 )
 from app.services.ai.ai_tool_phase11_eval import run_phase11_evaluation
 
-PHASE13_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/phase-13")
+PHASE13_DIR = docs_root() / "ai-agent" / "evals" / "phase-13"
 
 
 def run_phase13_evaluation(*, write_files: bool = False) -> Dict[str, Any]:

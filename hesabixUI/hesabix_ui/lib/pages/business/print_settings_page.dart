@@ -176,7 +176,16 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
 
   void _updateCurrentConfig(_PrintConfig cfg) {
     if (_selectedDocType == 'all') {
+      final previousGeneral = _configs['all'];
       _configs['all'] = cfg;
+      // تنظیمات عمومی باید روی انواعی که هنوز همان مقدار قبلی عمومی را دارند اعمال شود؛
+      // وگرنه فلگ‌های جدید (مثل نماد ارز) فقط روی ردیف all ذخیره می‌شوند و فاکتور فروش چاپ‌شده بدون نماد می‌ماند.
+      if (previousGeneral != null) {
+        for (final key in _configs.keys.toList()) {
+          if (key == 'all') continue;
+          _configs[key] = _configs[key]!.inheritChangedGeneral(previousGeneral, cfg);
+        }
+      }
     } else {
       // اگر برای این نوع تنظیم اختصاصی نداریم، آن را ایجاد می‌کنیم
       _configs[_selectedDocType] = cfg;
@@ -610,6 +619,16 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
           },
         ),
         SwitchListTile(
+          title: const Text('نمایش نماد ارز کنار مبالغ'),
+          subtitle: const Text(
+            'نماد ارز فاکتور کنار مبالغ ردیف‌ها و خلاصه در PDF نمایش داده شود. اگر روی تنظیمات عمومی بزنید، روی انواعی که مقدار اختصاصی جدا ندارند هم اعمال می‌شود.',
+          ),
+          value: cfg.showCurrencySymbol,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(showCurrencySymbol: v));
+          }),
+        ),
+        SwitchListTile(
           title: const Text('نمایش تراکنش‌های پرداخت مرتبط'),
           subtitle: const Text('جدول رسیدها / پرداخت‌های متصل به فاکتور در پایین صفحه'),
           value: cfg.showPayments,
@@ -744,6 +763,7 @@ class _PrintConfig {
   final bool showSellerSignatureArea;
   final bool showBuyerSignatureArea;
   final bool showCustomerBalance;
+  final bool showCurrencySymbol;
   final bool showPayments;
   final bool showInstallmentPlan;
   final bool showShareQr;
@@ -768,6 +788,7 @@ class _PrintConfig {
     required this.showSellerSignatureArea,
     required this.showBuyerSignatureArea,
     required this.showCustomerBalance,
+    required this.showCurrencySymbol,
     required this.showPayments,
     required this.showInstallmentPlan,
     required this.showShareQr,
@@ -792,6 +813,7 @@ class _PrintConfig {
       showSellerSignatureArea: true,
       showBuyerSignatureArea: true,
       showCustomerBalance: true,
+      showCurrencySymbol: false,
       showPayments: true,
       showInstallmentPlan: true,
       showShareQr: false,
@@ -837,6 +859,7 @@ class _PrintConfig {
       showSellerSignatureArea: _b('show_seller_signature_area', true),
       showBuyerSignatureArea: _b('show_buyer_signature_area', true),
       showCustomerBalance: _b('show_customer_balance', true),
+      showCurrencySymbol: _b('show_currency_symbol', false),
       showPayments: _b('show_payments', true),
       showInstallmentPlan: _b('show_installment_plan', true),
       showShareQr: _b('show_share_qr', false),
@@ -860,6 +883,66 @@ class _PrintConfig {
     );
   }
 
+  _PrintConfig inheritChangedGeneral(_PrintConfig previousGeneral, _PrintConfig nextGeneral) {
+    return copyWith(
+      showLogo: showLogo == previousGeneral.showLogo ? nextGeneral.showLogo : showLogo,
+      showStamp: showStamp == previousGeneral.showStamp ? nextGeneral.showStamp : showStamp,
+      showSellerSignatureArea: showSellerSignatureArea == previousGeneral.showSellerSignatureArea
+          ? nextGeneral.showSellerSignatureArea
+          : showSellerSignatureArea,
+      showBuyerSignatureArea: showBuyerSignatureArea == previousGeneral.showBuyerSignatureArea
+          ? nextGeneral.showBuyerSignatureArea
+          : showBuyerSignatureArea,
+      showCustomerBalance: showCustomerBalance == previousGeneral.showCustomerBalance
+          ? nextGeneral.showCustomerBalance
+          : showCustomerBalance,
+      showCurrencySymbol: showCurrencySymbol == previousGeneral.showCurrencySymbol
+          ? nextGeneral.showCurrencySymbol
+          : showCurrencySymbol,
+      showPayments: showPayments == previousGeneral.showPayments ? nextGeneral.showPayments : showPayments,
+      showInstallmentPlan: showInstallmentPlan == previousGeneral.showInstallmentPlan
+          ? nextGeneral.showInstallmentPlan
+          : showInstallmentPlan,
+      showShareQr: showShareQr == previousGeneral.showShareQr ? nextGeneral.showShareQr : showShareQr,
+      showFooterPrintTime: showFooterPrintTime == previousGeneral.showFooterPrintTime
+          ? nextGeneral.showFooterPrintTime
+          : showFooterPrintTime,
+      showFooterPreparer: showFooterPreparer == previousGeneral.showFooterPreparer
+          ? nextGeneral.showFooterPreparer
+          : showFooterPreparer,
+      footerNote: footerNote == previousGeneral.footerNote ? nextGeneral.footerNote : footerNote,
+      stampScalePercent: stampScalePercent == previousGeneral.stampScalePercent
+          ? nextGeneral.stampScalePercent
+          : stampScalePercent,
+      signatureScalePercent: signatureScalePercent == previousGeneral.signatureScalePercent
+          ? nextGeneral.signatureScalePercent
+          : signatureScalePercent,
+      lineDiscountDisplay: lineDiscountDisplay == previousGeneral.lineDiscountDisplay
+          ? nextGeneral.lineDiscountDisplay
+          : lineDiscountDisplay,
+      lineTaxDisplay: lineTaxDisplay == previousGeneral.lineTaxDisplay
+          ? nextGeneral.lineTaxDisplay
+          : lineTaxDisplay,
+      lineAmountBeforeDiscountDisplay:
+          lineAmountBeforeDiscountDisplay == previousGeneral.lineAmountBeforeDiscountDisplay
+              ? nextGeneral.lineAmountBeforeDiscountDisplay
+              : lineAmountBeforeDiscountDisplay,
+      lineAmountBeforeTaxDisplay: lineAmountBeforeTaxDisplay == previousGeneral.lineAmountBeforeTaxDisplay
+          ? nextGeneral.lineAmountBeforeTaxDisplay
+          : lineAmountBeforeTaxDisplay,
+      summaryDiscountDisplay: summaryDiscountDisplay == previousGeneral.summaryDiscountDisplay
+          ? nextGeneral.summaryDiscountDisplay
+          : summaryDiscountDisplay,
+      summaryTaxDisplay: summaryTaxDisplay == previousGeneral.summaryTaxDisplay
+          ? nextGeneral.summaryTaxDisplay
+          : summaryTaxDisplay,
+      summaryAmountWithoutTaxDisplay:
+          summaryAmountWithoutTaxDisplay == previousGeneral.summaryAmountWithoutTaxDisplay
+              ? nextGeneral.summaryAmountWithoutTaxDisplay
+              : summaryAmountWithoutTaxDisplay,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'show_logo': showLogo,
@@ -867,6 +950,7 @@ class _PrintConfig {
       'show_seller_signature_area': showSellerSignatureArea,
       'show_buyer_signature_area': showBuyerSignatureArea,
       'show_customer_balance': showCustomerBalance,
+      'show_currency_symbol': showCurrencySymbol,
       'show_payments': showPayments,
       'show_installment_plan': showInstallmentPlan,
       'show_share_qr': showShareQr,
@@ -891,6 +975,7 @@ class _PrintConfig {
     bool? showSellerSignatureArea,
     bool? showBuyerSignatureArea,
     bool? showCustomerBalance,
+    bool? showCurrencySymbol,
     bool? showPayments,
     bool? showInstallmentPlan,
     bool? showShareQr,
@@ -913,6 +998,7 @@ class _PrintConfig {
       showSellerSignatureArea: showSellerSignatureArea ?? this.showSellerSignatureArea,
       showBuyerSignatureArea: showBuyerSignatureArea ?? this.showBuyerSignatureArea,
       showCustomerBalance: showCustomerBalance ?? this.showCustomerBalance,
+      showCurrencySymbol: showCurrencySymbol ?? this.showCurrencySymbol,
       showPayments: showPayments ?? this.showPayments,
       showInstallmentPlan: showInstallmentPlan ?? this.showInstallmentPlan,
       showShareQr: showShareQr ?? this.showShareQr,

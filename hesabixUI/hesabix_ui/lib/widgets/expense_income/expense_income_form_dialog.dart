@@ -21,8 +21,14 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/utils/account_detail_type.dart';
 import 'package:hesabix_ui/constants/frequent_description_scope.dart';
 import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
+
+int? _parseOptionalInt(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  return int.tryParse(value.trim());
+}
 
 int _expenseIncomeStableRowIdSeq = 0;
 
@@ -128,6 +134,8 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
             personName: line.personName,
             accountId: line.accountId?.toString(),
             accountName: line.accountName,
+            accountCode: line.accountCode,
+            accountType: line.accountType,
           ),
         );
       }
@@ -732,123 +740,101 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
     );
   }
 
+  bool _validateCounterpartyAccounts() {
+    for (final line in _counterpartyLines) {
+      if (line.transactionType != TransactionType.account) continue;
+      if (_parseOptionalInt(line.accountId) == null) {
+        SnackBarHelper.showError(
+          context,
+          message: 'انتخاب حساب برای طرف‌حساب الزامی است',
+        );
+        return false;
+      }
+      if (line.needsPersonDetail && _parseOptionalInt(line.personId) == null) {
+        SnackBarHelper.showError(
+          context,
+          message: 'پس از انتخاب این حساب، تفصیل شخص (سهامدار/شریک) را انتخاب کنید',
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  List<ItemLineData> _itemLinePayloads() {
+    return _itemLines
+        .map(
+          (line) => ItemLineData(
+            accountId: _parseOptionalInt(line.accountId),
+            amount: line.amount,
+            description: line.description,
+          ),
+        )
+        .toList();
+  }
+
+  List<CounterpartyLineData> _counterpartyLinePayloads() {
+    return _counterpartyLines
+        .map(
+          (line) => CounterpartyLineData(
+            transactionType: line.transactionType,
+            amount: line.amount,
+            transactionDate: line.transactionDate,
+            description: line.description,
+            commission: line.commission,
+            bankAccountId: _parseOptionalInt(line.bankAccountId),
+            bankAccountName: line.bankAccountName,
+            cashRegisterId: _parseOptionalInt(line.cashRegisterId),
+            cashRegisterName: line.cashRegisterName,
+            pettyCashId: _parseOptionalInt(line.pettyCashId),
+            pettyCashName: line.pettyCashName,
+            checkId: _parseOptionalInt(line.checkId),
+            checkNumber: line.checkNumber,
+            personId: _parseOptionalInt(line.personId),
+            personName: line.personName,
+            accountId: _parseOptionalInt(line.accountId),
+            accountName: line.accountName,
+          ),
+        )
+        .toList();
+  }
+
   Future<void> _onSave() async {
     if (!mounted) return;
-    
+    if (!_validateCounterpartyAccounts()) return;
+
     setState(() {
       _isSaving = true;
     });
     
     try {
       final service = ExpenseIncomeService(widget.apiClient);
-      
-      // تبدیل itemLines به فرمت مورد نیاز API
-      final itemLinesData = _itemLines.map((line) => {
-        'account_id': int.parse(line.accountId!),
-        'amount': line.amount,
-        if (line.description != null && line.description!.isNotEmpty)
-          'description': line.description,
-      }).toList();
-      
-      // تبدیل counterpartyLines به فرمت مورد نیاز API
-      final counterpartyLinesData = _counterpartyLines.map((line) => {
-        'transaction_type': line.transactionType.value,
-        'amount': line.amount,
-        'transaction_date': line.transactionDate.toIso8601String(),
-        if (line.commission != null && line.commission! > 0)
-          'commission': line.commission,
-        if (line.description != null && line.description!.isNotEmpty)
-          'description': line.description,
-        // اطلاعات اضافی بر اساس نوع تراکنش
-        if (line.transactionType == TransactionType.bank) ...{
-          if (line.bankAccountId != null) 'bank_account_id': int.parse(line.bankAccountId!),
-          if (line.bankAccountName != null) 'bank_account_name': line.bankAccountName,
-        },
-        if (line.transactionType == TransactionType.cashRegister) ...{
-          if (line.cashRegisterId != null) 'cash_register_id': int.parse(line.cashRegisterId!),
-          if (line.cashRegisterName != null) 'cash_register_name': line.cashRegisterName,
-        },
-        if (line.transactionType == TransactionType.pettyCash) ...{
-          if (line.pettyCashId != null) 'petty_cash_id': int.parse(line.pettyCashId!),
-          if (line.pettyCashName != null) 'petty_cash_name': line.pettyCashName,
-        },
-        if (line.transactionType == TransactionType.check ||
-            line.transactionType == TransactionType.checkExpense) ...{
-          if (line.checkId != null) 'check_id': int.parse(line.checkId!),
-          if (line.checkNumber != null) 'check_number': line.checkNumber,
-        },
-        if (line.transactionType == TransactionType.person) ...{
-          if (line.personId != null) 'person_id': int.parse(line.personId!),
-          if (line.personName != null) 'person_name': line.personName,
-        },
-        if (line.transactionType == TransactionType.account) ...{
-          if (line.accountId != null) 'account_id': int.parse(line.accountId!),
-          if (line.accountName != null) 'account_name': line.accountName,
-        },
-      }).toList();
-      
-      // اگر initialDocument وجود دارد، حالت ویرایش
+      final itemLines = _itemLinePayloads();
+      final counterpartyLines = _counterpartyLinePayloads();
+      final description = _descriptionController.text.trim().isNotEmpty
+          ? _descriptionController.text.trim()
+          : null;
+
       if (widget.initialDocument != null) {
         await service.update(
           documentId: widget.initialDocument!.id,
           documentDate: _docDate,
           currencyId: _selectedCurrencyId!,
-          description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
+          description: description,
           projectId: _selectedProjectId,
-          itemLines: itemLinesData.map((data) => ItemLineData(
-            accountId: data['account_id'] as int,
-            amount: (data['amount'] as num).toDouble(),
-            description: data['description'] as String?,
-          )).toList(),
-          counterpartyLines: counterpartyLinesData.map((data) => CounterpartyLineData(
-            transactionType: TransactionType.fromValue(data['transaction_type'] as String) ?? TransactionType.bank,
-            amount: (data['amount'] as num).toDouble(),
-            transactionDate: DateTime.parse(data['transaction_date'] as String),
-            description: data['description'] as String?,
-            commission: data['commission'] != null ? (data['commission'] as num).toDouble() : null,
-            bankAccountId: data['bank_account_id'] as int?,
-            bankAccountName: data['bank_account_name'] as String?,
-            cashRegisterId: data['cash_register_id'] as int?,
-            cashRegisterName: data['cash_register_name'] as String?,
-            pettyCashId: data['petty_cash_id'] as int?,
-            pettyCashName: data['petty_cash_name'] as String?,
-            checkId: data['check_id'] as int?,
-            checkNumber: data['check_number'] as String?,
-            personId: data['person_id'] as int?,
-            personName: data['person_name'] as String?,
-          )).toList(),
+          itemLines: itemLines,
+          counterpartyLines: counterpartyLines,
         );
       } else {
-        // ایجاد سند جدید
         await service.create(
           businessId: widget.businessId,
           documentType: _isIncome ? 'income' : 'expense',
           documentDate: _docDate,
           currencyId: _selectedCurrencyId!,
-          description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
+          description: description,
           projectId: _selectedProjectId,
-          itemLines: itemLinesData.map((data) => ItemLineData(
-            accountId: data['account_id'] as int,
-            amount: (data['amount'] as num).toDouble(),
-            description: data['description'] as String?,
-          )).toList(),
-          counterpartyLines: counterpartyLinesData.map((data) => CounterpartyLineData(
-            transactionType: TransactionType.fromValue(data['transaction_type'] as String) ?? TransactionType.bank,
-            amount: (data['amount'] as num).toDouble(),
-            transactionDate: DateTime.parse(data['transaction_date'] as String),
-            description: data['description'] as String?,
-            commission: data['commission'] != null ? (data['commission'] as num).toDouble() : null,
-            bankAccountId: data['bank_account_id'] as int?,
-            bankAccountName: data['bank_account_name'] as String?,
-            cashRegisterId: data['cash_register_id'] as int?,
-            cashRegisterName: data['cash_register_name'] as String?,
-            pettyCashId: data['petty_cash_id'] as int?,
-            pettyCashName: data['petty_cash_name'] as String?,
-            checkId: data['check_id'] as int?,
-            checkNumber: data['check_number'] as String?,
-            personId: data['person_id'] as int?,
-            personName: data['person_name'] as String?,
-          )).toList(),
+          itemLines: itemLines,
+          counterpartyLines: counterpartyLines,
         );
       }
       
@@ -1436,7 +1422,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
           }).toList(),
           onChanged: (type) {
             if (type != null) {
-              widget.onChanged(widget.line.copyWith(transactionType: type));
+              widget.onChanged(widget.line.withTransactionType(type));
             }
           },
         ),
@@ -1512,7 +1498,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
                 }).toList(),
                 onChanged: (type) {
                   if (type != null) {
-                    widget.onChanged(widget.line.copyWith(transactionType: type));
+                    widget.onChanged(widget.line.withTransactionType(type));
                   }
                 },
               ),
@@ -1655,34 +1641,32 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
           ],
         );
       case TransactionType.account:
-        return Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: AccountTreeComboboxWidget(
+            AccountTreeComboboxWidget(
+              businessId: widget.businessId,
+              dense: true,
+              allowPersonControlParents: true,
+              selectedAccount: widget.line.selectedAccount(widget.businessId),
+              onChanged: (acc) => widget.onChanged(widget.line.withAccount(acc)),
+              label: 'حساب',
+              hintText: 'انتخاب حساب',
+              isRequired: true,
+            ),
+            if (widget.line.needsPersonDetail) ...[
+              const SizedBox(height: 7),
+              PersonComboboxWidget(
                 businessId: widget.businessId,
                 dense: true,
-                selectedAccount: widget.line.accountId != null
-                    ? Account(
-                        id: int.tryParse(widget.line.accountId!),
-                        businessId: widget.businessId,
-                        name: widget.line.accountName ?? '',
-                        code: '',
-                        accountType: '',
-                        createdAt: DateTime.now(),
-                        updatedAt: DateTime.now(),
-                      )
-                    : null,
-                onChanged: (acc) {
-                  widget.onChanged(widget.line.copyWith(
-                    accountId: acc?.id?.toString(),
-                    accountName: acc?.displayName ?? acc?.name,
-                  ));
-                },
-                label: 'حساب',
-                hintText: 'انتخاب حساب',
+                showFinancialBalance: true,
+                selectedPerson: widget.line.selectedPerson(widget.businessId),
+                onChanged: (person) => widget.onChanged(widget.line.withPerson(person)),
+                label: 'تفصیل شخص',
+                hintText: 'انتخاب سهامدار / شریک',
                 isRequired: true,
               ),
-            ),
+            ],
           ],
         );
       case TransactionType.person:
@@ -1799,6 +1783,8 @@ class _CounterpartyLine {
   final String? personName;
   final String? accountId;
   final String? accountName;
+  final String? accountCode;
+  final String? accountType;
 
   _CounterpartyLine({
     required this.rowId,
@@ -1819,6 +1805,8 @@ class _CounterpartyLine {
     this.personName,
     this.accountId,
     this.accountName,
+    this.accountCode,
+    this.accountType,
   });
 
   factory _CounterpartyLine.empty() => _CounterpartyLine(
@@ -1827,6 +1815,91 @@ class _CounterpartyLine {
     amount: 0,
     transactionDate: DateTime.now(),
   );
+
+  bool get needsPersonDetail {
+    if (transactionType != TransactionType.account) return false;
+    return isPersonControlAccount(
+      name: accountName,
+      accountType: accountType,
+      code: accountCode,
+    );
+  }
+
+  Account? selectedAccount(int businessId) {
+    if (accountId == null) return null;
+    return Account(
+      id: int.tryParse(accountId!),
+      businessId: businessId,
+      name: accountName ?? '',
+      code: accountCode ?? '',
+      accountType: accountType ?? '',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  Person? selectedPerson(int businessId) {
+    if (personId == null) return null;
+    return Person(
+      id: int.tryParse(personId!),
+      businessId: businessId,
+      aliasName: personName ?? '',
+      personTypes: const [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  _CounterpartyLine withTransactionType(TransactionType type) {
+    return _CounterpartyLine(
+      rowId: rowId,
+      transactionType: type,
+      amount: amount,
+      transactionDate: transactionDate,
+      description: description,
+      commission: commission,
+    );
+  }
+
+  _CounterpartyLine withAccount(Account? acc) {
+    return _CounterpartyLine(
+      rowId: rowId,
+      transactionType: transactionType,
+      amount: amount,
+      transactionDate: transactionDate,
+      description: description,
+      commission: commission,
+      accountId: acc?.id?.toString(),
+      accountName: acc?.name,
+      accountCode: acc?.code,
+      accountType: acc?.accountType,
+    );
+  }
+
+  _CounterpartyLine withPerson(Person? person) {
+    return _CounterpartyLine(
+      rowId: rowId,
+      transactionType: transactionType,
+      amount: amount,
+      transactionDate: transactionDate,
+      description: description,
+      commission: commission,
+      bankAccountId: bankAccountId,
+      bankAccountName: bankAccountName,
+      cashRegisterId: cashRegisterId,
+      cashRegisterName: cashRegisterName,
+      pettyCashId: pettyCashId,
+      pettyCashName: pettyCashName,
+      checkId: checkId,
+      checkNumber: checkNumber,
+      personId: person?.id?.toString(),
+      personName: person?.aliasName,
+      accountId: accountId,
+      accountName: accountName,
+      accountCode: accountCode,
+      accountType: accountType,
+    );
+  }
 
   _CounterpartyLine copyWith({
     String? rowId,
@@ -1847,6 +1920,8 @@ class _CounterpartyLine {
     String? personName,
     String? accountId,
     String? accountName,
+    String? accountCode,
+    String? accountType,
   }) {
     return _CounterpartyLine(
       rowId: rowId ?? this.rowId,
@@ -1867,6 +1942,8 @@ class _CounterpartyLine {
       personName: personName ?? this.personName,
       accountId: accountId ?? this.accountId,
       accountName: accountName ?? this.accountName,
+      accountCode: accountCode ?? this.accountCode,
+      accountType: accountType ?? this.accountType,
     );
   }
 }

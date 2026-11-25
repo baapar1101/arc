@@ -32,6 +32,9 @@ def test_check_quota_and_charge_locks_subscription_row():
     repo.get_by_id_for_update.return_value = locked
 
     with patch(
+        "app.services.ai.ai_service.AISubscriptionRepository",
+        return_value=repo,
+    ), patch(
         "adapters.db.repositories.ai_subscription_repository.AISubscriptionRepository",
         return_value=repo,
     ), patch(

@@ -3,6 +3,7 @@
 # pip / Flutter mirrors: scripts/mirror_config.sh (saved in ${APP_ROOT}/.deploy_env from deploy).
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # PostgreSQL pgvector: scripts/ensure_pgvector.sh (idempotent, non-fatal) before Alembic migrations.
+# PostgreSQL client (pg_dump): scripts/ensure_postgresql_client.sh so existing installs get backup tools.
 # AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # Web build API URL: https if /etc/letsencrypt/live/<API_DOMAIN> exists; else http unless API_PUBLIC_SCHEME is set in env (custom TLS).
@@ -30,12 +31,67 @@ if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh" ]]; then
   source "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh"
 fi
 
+# Persist BRANCH into .deploy_env so the next update does not retry a missing remote branch.
+hesabix_persist_update_branch() {
+  local env_file="${APP_ROOT}/.deploy_env"
+  [[ -f "${env_file}" ]] || return 0
+  python3 - "${env_file}" "${BRANCH}" <<'PY' || true
+import os
+import re
+import sys
+
+path, branch = sys.argv[1], sys.argv[2]
+if not os.path.isfile(path):
+    raise SystemExit(0)
+with open(path, encoding="utf-8", errors="replace") as f:
+    lines = f.readlines()
+out, found = [], False
+for line in lines:
+    if re.match(r"^BRANCH=", line):
+        out.append(f"BRANCH={branch}\n")
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append(f"BRANCH={branch}\n")
+with open(path, "w", encoding="utf-8") as f:
+    f.writelines(out)
+PY
+}
+
+# If BRANCH (often default main) is missing on origin, use origin/HEAD (this repo ships master).
+hesabix_resolve_origin_branch() {
+  if git show-ref -q --verify "refs/remotes/origin/${BRANCH}"; then
+    return 0
+  fi
+  local detected=""
+  local head_ref
+  head_ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [[ -n "${head_ref}" ]]; then
+    detected="${head_ref#origin/}"
+  fi
+  if [[ -z "${detected}" ]] && git show-ref -q --verify refs/remotes/origin/master; then
+    detected="master"
+  fi
+  if [[ -z "${detected}" ]] && git show-ref -q --verify refs/remotes/origin/main; then
+    detected="main"
+  fi
+  if [[ -n "${detected}" ]] && git show-ref -q --verify "refs/remotes/origin/${detected}"; then
+    log_info "origin/${BRANCH} is not on the remote; using origin/${detected} and saving BRANCH=${detected}."
+    BRANCH="${detected}"
+    export BRANCH
+    hesabix_persist_update_branch
+    return 0
+  fi
+  log_err "origin/${BRANCH} is not on the remote. Check BRANCH and REPO_URL in ${APP_ROOT}/.deploy_env"
+  return 1
+}
+
 # If normal checkout/pull fails (local generated file, merge, diverged branch), realign the clone with remote.
 hesabix_force_sync_origin() {
   log_info "Force sync with origin/${BRANCH}: git reset --hard (local changes and commits in this clone will be discarded)."
   git fetch origin --prune
-  if ! git show-ref -q "origin/${BRANCH}"; then
-    log_err "origin/${BRANCH} not found after fetch."
+  if ! hesabix_resolve_origin_branch; then
     return 1
   fi
   if git show-ref -q "refs/heads/${BRANCH}"; then
@@ -89,11 +145,12 @@ configure_pip_hesabix_mirror() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
   fi
-  python3 -m pip config --user set global.index "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.index-url "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.trusted-host "p.mirror.hesabix.ir" 2>/dev/null || true
-  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple) + Aliyun extra-index"
+  python3 -m pip config --user set global.index "https://pypi.org/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.index-url "https://pypi.org/simple" 2>/dev/null || true
+  python3 -m pip config --user unset global.extra-index-url 2>/dev/null || true
+  python3 -m pip config --user unset global.trusted-host 2>/dev/null || true
+  python3 -m pip config --user set global.timeout 15 2>/dev/null || true
+  log_info "pip user config: Official PyPI (pypi.org/simple)"
 }
 
 ensure_api_journalctl_env() {
@@ -167,8 +224,7 @@ if [[ "${current_remote}" != "${REPO_URL}" ]]; then
   git remote set-url origin "${REPO_URL}"
 fi
 git fetch origin --prune
-if ! git show-ref -q "origin/${BRANCH}"; then
-  log_err "origin/${BRANCH} is not on the remote. Check BRANCH and REPO_URL in ${APP_ROOT}/.deploy_env"
+if ! hesabix_resolve_origin_branch; then
   exit 1
 fi
 if git checkout -B "${BRANCH}" "origin/${BRANCH}" && git pull origin "${BRANCH}" --ff-only; then
@@ -245,6 +301,16 @@ if [[ -f "${ensure_pgvector}" ]]; then
     log_info "pgvector package not installed (non-fatal)."
   fi
 fi
+ensure_pg_client="${APP_ROOT}/app/scripts/ensure_postgresql_client.sh"
+if [[ -f "${ensure_pg_client}" ]]; then
+  chmod +x "${ensure_pg_client}" 2>/dev/null || true
+  log_info "Ensuring PostgreSQL client tools (pg_dump/psql) for database backup..."
+  if bash "${ensure_pg_client}"; then
+    log_ok "PostgreSQL client tools are installed."
+  else
+    log_info "postgresql-client install failed (non-fatal). Database backup needs postgresql-client-<version>."
+  fi
+fi
 fixup_db="${APP_ROOT}/app/scripts/hesabix_fixup_db_privileges.sh"
 if [[ -f "${fixup_db}" ]]; then
   chmod +x "${fixup_db}" 2>/dev/null || true
@@ -265,7 +331,11 @@ PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -U hesabix -d hesabix -tAc "
   END \$\$;
 " 2>/dev/null || true
 log_info "Running Alembic migrations..."
+<<<<<<< HEAD
 if ! alembic upgrade heads; then
+=======
+if ! python scripts/check_migration_branches.py --upgrade; then
+>>>>>>> origin/hesabix-upstream
   log_err "Migrations failed."
   exit 1
 fi
@@ -415,6 +485,58 @@ hesabix_nginx_bin() {
   fi
   return 1
 }
+ensure_public_pay_u_location() {
+  local conf="$1"
+  [[ -f "$conf" ]] || return 0
+  if grep -q 'location /u/' "$conf"; then
+    return 0
+  fi
+  python3 - "$conf" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if "location /u/" in text:
+    raise SystemExit(0)
+needle = "  location /i/ {"
+if needle not in text:
+    raise SystemExit(0)
+block = """
+  # Public business pay page: /u/{username} -> backend HTML (no Flutter)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+"""
+path.write_text(text.replace(needle, block + needle))
+PY
+}
+ensure_api_prefix_wins_static() {
+  local conf="$1"
+  [[ -f "$conf" ]] || return 0
+  python3 - "$conf" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+updated = text.replace("  location /api/ {", "  location ^~ /api/ {")
+if updated == text:
+    raise SystemExit(0)
+path.write_text(updated)
+PY
+}
 ensure_ai_chat_sse_location() {
   local conf="$1"
   [[ -f "$conf" ]] || return 0
@@ -427,8 +549,8 @@ import sys
 
 path = Path(sys.argv[1])
 text = path.read_text()
-needle = "  location /api/ {\n"
-if "location ^~ /api/v1/ai/chat/" in text or needle not in text:
+needle = next((n for n in ("  location ^~ /api/ {\n", "  location /api/ {\n") if n in text), None)
+if "location ^~ /api/v1/ai/chat/" in text or needle is None:
     raise SystemExit(0)
 block = """  # AI chat SSE: stream chunks immediately (no proxy buffering)
   location ^~ /api/v1/ai/chat/ {
@@ -464,6 +586,12 @@ fi
 ensure_ai_chat_sse_location /etc/nginx/sites-available/hesabix-api.conf
 ensure_ai_chat_sse_location /etc/nginx/sites-available/hesabix-ui.conf
 log_info "Ensured AI chat SSE nginx location (no proxy buffering)."
+ensure_public_pay_u_location /etc/nginx/sites-available/hesabix-api.conf
+ensure_public_pay_u_location /etc/nginx/sites-available/hesabix-ui.conf
+log_info "Ensured public pay-page nginx location (/u/ -> backend HTML)."
+ensure_api_prefix_wins_static /etc/nginx/sites-available/hesabix-api.conf
+ensure_api_prefix_wins_static /etc/nginx/sites-available/hesabix-ui.conf
+log_info "Ensured nginx /api/ prefix wins over static font/css regex."
 ensure_voice_ws_nginx() {
   local conf="$1"
   [[ -f "$conf" ]] || return 0
@@ -495,8 +623,8 @@ block = """
     proxy_send_timeout 86400;
   }
 """
-needle = "  location /api/ {\n"
-if needle not in text:
+needle = next((n for n in ("  location ^~ /api/ {\n", "  location /api/ {\n") if n in text), None)
+if needle is None:
     raise SystemExit(0)
 path.write_text(text.replace(needle, block + needle, 1))
 PY

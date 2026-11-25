@@ -5,6 +5,8 @@ import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class WalletSettingsPage extends StatefulWidget {
   const WalletSettingsPage({super.key});
@@ -73,14 +75,24 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(t.walletSettingsTitle)),
+    return AdminCompactScaffold(
+      title: t.walletSettingsTitle,
+      subtitle: adminTx(context, 'ارز پایه کیف پول سیستم', 'Base currency of the system wallet'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 12),
+                      FilledButton(onPressed: _load, child: Text(adminTx(context, 'تلاش مجدد', 'Retry'))),
+                    ],
+                  ),
+                )
               : Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: context.settingsHub.pagePadding,
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -88,7 +100,7 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
                       children: [
                         DropdownButtonFormField<String>(
                           initialValue: _selectedCurrencyCode,
-                          decoration: InputDecoration(labelText: t.walletBaseCurrency),
+                          decoration: InputDecoration(isDense: true, labelText: t.walletBaseCurrency),
                           items: _currencies
                               .map((c) => DropdownMenuItem<String>(
                                     value: (c['code'] ?? '').toString(),
@@ -98,10 +110,10 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
                           onChanged: (v) => setState(() => _selectedCurrencyCode = v),
                           validator: (v) => (v == null || v.isEmpty) ? t.walletCurrencyRequired : null,
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
                         FilledButton.icon(
                           onPressed: _save,
-                          icon: const Icon(Icons.save),
+                          icon: const Icon(Icons.save, size: 18),
                           label: Text(t.save),
                         ),
                       ],

@@ -12,6 +12,7 @@ import uuid as uuid_module
 
 from app.core.responses import ApiError
 from app.core.cache import get_cache
+from app.core.product_measurements import MEASUREMENT_FIELDS
 from adapters.db.models.product import Product, ProductItemType
 from adapters.db.models.product_attribute import ProductAttribute
 from adapters.db.models.product_attribute_link import ProductAttributeLink
@@ -353,6 +354,60 @@ def _validate_tax(payload: ProductCreateRequest | ProductUpdateRequest) -> None:
         pass
 
 
+def _expiry_create_kwargs(payload: ProductCreateRequest) -> Dict[str, Any]:
+    track_expiry = bool(getattr(payload, "track_expiry", False))
+    if track_expiry and not bool(getattr(payload, "track_inventory", False)):
+        raise ApiError(
+            "EXPIRY_REQUIRES_INVENTORY",
+            "ردیابی تاریخ انقضا فقط برای کالاهای با کنترل موجودی فعال می‌شود",
+            http_status=422,
+        )
+    return {
+        "track_expiry": track_expiry,
+        "lot_policy": getattr(payload, "lot_policy", None) or "optional",
+        "shelf_life_days": getattr(payload, "shelf_life_days", None),
+        "best_before_offset_days": getattr(payload, "best_before_offset_days", None),
+        "removal_offset_days": getattr(payload, "removal_offset_days", None),
+        "alert_offset_days": getattr(payload, "alert_offset_days", None),
+        "expired_sale_policy": getattr(payload, "expired_sale_policy", None) or "block",
+        "min_remaining_shelf_life_days": int(getattr(payload, "min_remaining_shelf_life_days", 0) or 0),
+    }
+
+
+def _expiry_update_kwargs(payload: ProductUpdateRequest, fields_set: set, existing: Product) -> Dict[str, Any]:
+    kw: Dict[str, Any] = {}
+    mapping = (
+        "track_expiry",
+        "lot_policy",
+        "shelf_life_days",
+        "best_before_offset_days",
+        "removal_offset_days",
+        "alert_offset_days",
+        "expired_sale_policy",
+        "min_remaining_shelf_life_days",
+    )
+    for key in mapping:
+        if key in fields_set:
+            kw[key] = getattr(payload, key)
+    track_inv = (
+        bool(payload.track_inventory)
+        if "track_inventory" in fields_set and payload.track_inventory is not None
+        else bool(existing.track_inventory)
+    )
+    track_exp = (
+        bool(payload.track_expiry)
+        if "track_expiry" in fields_set and payload.track_expiry is not None
+        else bool(getattr(existing, "track_expiry", False))
+    )
+    if track_exp and not track_inv:
+        raise ApiError(
+            "EXPIRY_REQUIRES_INVENTORY",
+            "ردیابی تاریخ انقضا فقط برای کالاهای با کنترل موجودی فعال می‌شود",
+            http_status=422,
+        )
+    return kw
+
+
 def _validate_item_type_inventory(payload: ProductCreateRequest | ProductUpdateRequest, existing_item_type: Optional[str] = None) -> None:
     """بررسی می‌کند که برای خدمات، کنترل موجودی غیرفعال باشد"""
     item_type = getattr(payload, 'item_type', None) or existing_item_type
@@ -401,6 +456,9 @@ def _upsert_attributes(
     """
     if attribute_ids is None:
         return
+    from app.services.product_variant_service import assert_attribute_ids_keep_dimensions
+
+    assert_attribute_ids_keep_dimensions(db, business_id, product_id, attribute_ids)
     db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == product_id).delete()
     if not attribute_ids:
         if auto_commit:
@@ -493,6 +551,7 @@ def create_product(
                 code=code,
                 name=payload.name.strip(),
                 description=payload.description,
+                **payload.model_dump(include=set(MEASUREMENT_FIELDS), exclude_unset=True),
                 category_id=payload.category_id,
                 main_unit=main_unit,
                 secondary_unit=secondary_unit,
@@ -512,6 +571,7 @@ def create_product(
                 inventory_mode=payload.inventory_mode or "bulk",
                 track_serial=payload.track_serial if payload.track_serial is not None else False,
                 track_barcode=payload.track_barcode if payload.track_barcode is not None else False,
+                **_expiry_create_kwargs(payload),
                 is_sales_taxable=payload.is_sales_taxable,
                 is_purchase_taxable=payload.is_purchase_taxable,
                 sales_tax_rate=payload.sales_tax_rate,
@@ -532,6 +592,10 @@ def create_product(
             logger.debug(f"[CREATE_PRODUCT] Flushing to get ID...")
             db.flush()  # Flush برای دریافت id، اما commit نمی‌کند
             logger.info(f"[CREATE_PRODUCT] Product flushed - ID={obj.id}")
+            if bool(getattr(obj, "track_expiry", False)) and str(obj.inventory_mode or "bulk") != "unique":
+                from app.services.inventory_lot_service import ensure_undated_lots_for_product
+
+                ensure_undated_lots_for_product(db, business_id, obj)
 
             assert_tokens_unique_among_products(db, business_id, gb_tokens_create, exclude_product_id=None)
             assert_tokens_not_used_by_unique_instances(db, business_id, gb_tokens_create, exclude_product_id=None)
@@ -831,6 +895,7 @@ def update_product(
     code_to_update = code_value if 'code' in fields_set else None
 
     old_track_inventory = bool(obj.track_inventory)
+    old_track_expiry = bool(getattr(obj, "track_expiry", False))
     new_track_inventory = (
         bool(payload.track_inventory)
         if 'track_inventory' in fields_set and payload.track_inventory is not None
@@ -846,11 +911,20 @@ def update_product(
     old_inventory_mode = obj.inventory_mode or "bulk"
     new_inventory_mode = payload.inventory_mode if 'inventory_mode' in fields_set else old_inventory_mode
     converting_to_unique = (old_inventory_mode != "unique" and new_inventory_mode == "unique")
-    
+    if converting_to_unique:
+        from app.services.product_variant_service import is_variant_inventory_product, list_dimensions, list_variants
+
+        if is_variant_inventory_product(obj) or list_dimensions(db, business_id, product_id) or list_variants(db, business_id, product_id):
+            raise ApiError(
+                "VARIANT_UNIQUE_NOT_SUPPORTED",
+                "کالای دارای تفکیک موجودی ویژگی را نمی‌توان به حالت یونیک تبدیل کرد",
+                http_status=422,
+            )
+
     # اگر در حال تبدیل به unique هستیم و موجودی داریم، باید instance ها ایجاد شوند
     if converting_to_unique and obj.track_inventory:
+        from app.core.business_calendar import business_today
         from app.services.warehouse_service import get_warehouse_stock_report
-        from datetime import date as date_type
         from adapters.db.models.product_instance import ProductInstance
         from decimal import Decimal
         
@@ -860,7 +934,7 @@ def update_product(
             business_id=business_id,
             query={
                 "product_ids": [str(product_id)],
-                "as_of_date": date_type.today().isoformat(),
+                "as_of_date": business_today(business_id).isoformat(),
                 "include_zero": False,
             },
         )
@@ -907,6 +981,7 @@ def update_product(
         price_update_kwargs["base_sales_note"] = payload.base_sales_note
     if "base_purchase_price" in fields_set:
         price_update_kwargs["base_purchase_price"] = payload.base_purchase_price
+        price_update_kwargs["base_purchase_price_sync_meta"] = None
     if "base_purchase_note" in fields_set:
         price_update_kwargs["base_purchase_note"] = payload.base_purchase_note
     if "sales_price_fx" in fields_set:
@@ -967,11 +1042,18 @@ def update_product(
         ),
         **catalog_uuid_kw,
         **catalog_profile_kw,
+        **payload.model_dump(include=set(MEASUREMENT_FIELDS), exclude_unset=True),
         **gb_kw,
         **price_update_kwargs,
+        **_expiry_update_kwargs(payload, fields_set, obj),
     )
     if not updated:
         return None
+    new_track_expiry = bool(getattr(updated, "track_expiry", False))
+    if (not old_track_expiry) and new_track_expiry and str(getattr(updated, "inventory_mode", None) or "bulk") != "unique":
+        from app.services.inventory_lot_service import ensure_undated_lots_for_product
+
+        ensure_undated_lots_for_product(db, business_id, updated)
 
     if gb_handled:
         replace_general_barcode_aliases(db, business_id, product_id, general_tokens)
@@ -1420,6 +1502,22 @@ def delete_product(db: Session, product_id: int, business_id: int) -> tuple[bool
         return False, f"خطا در حذف کالا: {str(e)}"
 
 
+def _variant_dimensions_payload(db: Session, obj: Product) -> List[Dict[str, Any]]:
+    try:
+        from app.services.product_variant_service import list_dimensions
+
+        return [
+            {
+                "attribute_id": int(row.attribute_id),
+                "is_required": bool(row.is_required),
+                "sort_order": int(row.sort_order or 0),
+            }
+            for row in list_dimensions(db, int(obj.business_id), int(obj.id))
+        ]
+    except Exception:
+        return []
+
+
 def _get_image_url(obj: Product) -> str | None:
     """تولید URL برای نمایش عکس محصول (فایل اصلی)"""
     if not obj.image_file_id:
@@ -1435,6 +1533,7 @@ def _get_thumbnail_url(obj: Product) -> str | None:
 
 
 def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
+    measurements = {key: getattr(obj, key) for key in MEASUREMENT_FIELDS}
     # دریافت attribute_ids از ProductAttributeLink
     attribute_ids = []
     if db is not None:
@@ -1448,6 +1547,10 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "code": obj.code,
         "name": obj.name,
         "description": obj.description,
+        **{
+            key: format(value, "f") if value is not None else None
+            for key, value in measurements.items()
+        },
         "category_id": obj.category_id,
         "main_unit": obj.main_unit,
         "secondary_unit": obj.secondary_unit,
@@ -1455,6 +1558,7 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "base_sales_price": obj.base_sales_price,
         "base_sales_note": obj.base_sales_note,
         "base_purchase_price": obj.base_purchase_price,
+        "base_purchase_price_sync_meta": getattr(obj, "base_purchase_price_sync_meta", None),
         "base_purchase_note": obj.base_purchase_note,
         "sales_price_fx": getattr(obj, "sales_price_fx", None),
         "purchase_price_fx": getattr(obj, "purchase_price_fx", None),
@@ -1465,8 +1569,18 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "min_order_qty": obj.min_order_qty,
         "lead_time_days": obj.lead_time_days,
         "inventory_mode": obj.inventory_mode or "bulk",
+        "variant_mode": getattr(obj, "variant_mode", None) or "none",
+        "variant_dimensions": _variant_dimensions_payload(db, obj) if db is not None else [],
         "track_serial": obj.track_serial,
         "track_barcode": obj.track_barcode,
+        "track_expiry": bool(getattr(obj, "track_expiry", False)),
+        "lot_policy": getattr(obj, "lot_policy", None) or "optional",
+        "shelf_life_days": getattr(obj, "shelf_life_days", None),
+        "best_before_offset_days": getattr(obj, "best_before_offset_days", None),
+        "removal_offset_days": getattr(obj, "removal_offset_days", None),
+        "alert_offset_days": getattr(obj, "alert_offset_days", None),
+        "expired_sale_policy": getattr(obj, "expired_sale_policy", None) or "block",
+        "min_remaining_shelf_life_days": int(getattr(obj, "min_remaining_shelf_life_days", 0) or 0),
         "is_sales_taxable": obj.is_sales_taxable,
         "is_purchase_taxable": obj.is_purchase_taxable,
         "sales_tax_rate": obj.sales_tax_rate,
@@ -2423,6 +2537,14 @@ def get_inventory_kardex_report(
     }
 
 
+def _sellable_stock_qty(db, business_id, product, warehouse_id, as_of, physical):
+    from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+    if not is_expiry_tracked_product(product):
+        return physical
+    return sellable_quantity(db, business_id, product, warehouse_id, as_of)
+
+
 def get_inventory_stock_report(
     db: Session,
     business_id: int,
@@ -2482,12 +2604,15 @@ def get_inventory_stock_report(
     from datetime import date as date_type
     
     # تبدیل تاریخ
-    as_of_date_obj = date.today()
+    from app.services.inventory_lot_service import business_as_of
+
+    explicit = None
     if as_of_date:
         try:
-            as_of_date_obj = date_type.fromisoformat(as_of_date) if isinstance(as_of_date, str) else as_of_date
+            explicit = date_type.fromisoformat(as_of_date) if isinstance(as_of_date, str) else as_of_date
         except Exception:
-            pass
+            explicit = None
+    as_of_date_obj = business_as_of(business_id, explicit)
     
     # Query محصولات
     query = db.query(Product).filter(Product.business_id == business_id)
@@ -2637,6 +2762,7 @@ def get_inventory_stock_report(
                 "warehouse_code": None,
                 "warehouse_name": "بدون انبار / کل",
                 "quantity": float(stock),
+                "sellable_quantity": float(_sellable_stock_qty(db, business_id, product, None, as_of_date_obj, stock)),
                 "unit": product.main_unit or "",
                 "track_inventory": product.track_inventory,
                 "has_movements": has_movements,
@@ -2670,6 +2796,7 @@ def get_inventory_stock_report(
                     "warehouse_code": warehouse.code or "",
                     "warehouse_name": warehouse.name,
                     "quantity": float(stock),
+                    "sellable_quantity": float(_sellable_stock_qty(db, business_id, product, warehouse.id, as_of_date_obj, stock)),
                     "unit": product.main_unit or "",
                     "track_inventory": product.track_inventory,
                     "has_movements": has_movements,

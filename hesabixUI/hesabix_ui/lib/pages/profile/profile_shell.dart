@@ -105,8 +105,9 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
 
     // اضافه کردن منوی اپراتور پشتیبانی
     final operatorDestinations = <_Dest>[
-      _Dest('صندوق ورودی', Icons.inbox_outlined, Icons.inbox, '/user/profile/operator'),
       _Dest('داشبورد پشتیبانی', Icons.dashboard_outlined, Icons.dashboard, '/user/profile/operator/dashboard'),
+      _Dest('MCP پشتیبانی', Icons.smart_toy_outlined, Icons.smart_toy, '/user/profile/operator/mcp-connections'),
+      _Dest('صندوق ورودی', Icons.inbox_outlined, Icons.inbox, '/user/profile/operator'),
     ];
 
     // اضافه کردن منوی تنظیمات سیستم برای ادمین‌ها
@@ -229,6 +230,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
     );
 
     // Side colors and styles
+    final nav = context.shellNav;
+    final textTheme = Theme.of(context).textTheme;
     final Color sideBg = Theme.of(context).brightness == Brightness.dark
         ? scheme.surfaceContainerHighest
         : scheme.surfaceContainerLow;
@@ -242,20 +245,18 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
         body: Row(
           children: [
             Container(
-              width: railExtended ? 240 : 72,
+              width: nav.widthFor(extended: railExtended),
               height: double.infinity,
               color: sideBg,
               child: ListView.builder(
-                padding: EdgeInsets.zero,
+                padding: nav.listPadding,
                 itemCount: allDestinations.length,
                 itemBuilder: (ctx, i) {
                   final d = allDestinations[i];
                   final bool isHovered = i == _hoverIndex;
                   final bool isSelected = i == selectedIndex;
                   final bool active = isSelected || isHovered;
-                  final BorderRadius br = (isSelected && useRail)
-                      ? BorderRadius.zero
-                      : (isHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                  final BorderRadius br = nav.itemBorderRadius(flush: isSelected || isHovered);
                   final Color bgColor = active
                       ? (isHovered && !isSelected ? activeBg.withValues(alpha: 0.85) : activeBg)
                       : Colors.transparent;
@@ -267,7 +268,7 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
                       onTap: () => onSelect(i),
                       child: Container(
                         margin: EdgeInsets.zero,
-                        padding: EdgeInsets.symmetric(horizontal: railExtended ? 12 : 0, vertical: 10),
+                        padding: nav.parentPaddingFor(extended: railExtended),
                         decoration: BoxDecoration(
                           color: bgColor,
                           borderRadius: br,
@@ -275,15 +276,20 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
                         child: Row(
                           mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
                           children: [
-                            Icon(d.icon, color: active ? activeFg : sideFg),
+                            Icon(
+                              d.icon,
+                              color: active ? activeFg : sideFg,
+                              size: nav.iconSizeFor(extended: railExtended, child: false),
+                            ),
                             if (railExtended) ...[
-                              const SizedBox(width: 12),
+                              SizedBox(width: nav.iconLabelGap),
                               Expanded(
                                 child: Text(
                                   d.label,
-                                  style: TextStyle(
+                                  style: nav.parentLabelStyle(
+                                    textTheme,
                                     color: active ? activeFg : sideFg,
-                                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                    active: active,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -311,15 +317,28 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
         backgroundColor: sideBg,
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: nav.listPadding,
             children: [
               for (int i = 0; i < allDestinations.length; i++) ...[
                 Builder(builder: (ctx) {
                   final d = allDestinations[i];
                   final bool active = i == selectedIndex;
                   return ListTile(
-                    leading: Icon(d.selectedIcon, color: active ? activeFg : sideFg),
-                    title: Text(d.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
+                    leading: Icon(
+                      d.selectedIcon,
+                      color: active ? activeFg : sideFg,
+                      size: nav.iconSizeFor(extended: true, child: false),
+                    ),
+                    title: Text(
+                      d.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: nav.parentLabelStyle(
+                        textTheme,
+                        color: active ? activeFg : sideFg,
+                        active: active,
+                      ),
+                    ),
                     selected: active,
                     selectedTileColor: activeBg,
                     onTap: () {

@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime, date, timedelta, timezone
 from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import hashlib
+import json
 import logging
 import re
 from collections import defaultdict, deque
@@ -31,10 +33,30 @@ from adapters.db.models.tax_unit import TaxUnit
 from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
 from adapters.db.models.business import Business
 from app.core.calendar import CalendarConverter, CalendarType
+from app.core.business_calendar import business_today
 from app.core.responses import ApiError, success_response
 from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
+from app.services.invoice_adjustments_service import (
+    SALES_RECEIVABLE_TOTAL_KEY,
+    sales_receivable_total_from_totals,
+    total_with_tax_from_totals_dict,
+)
+from app.services.invoice_line_total_guard import validate_invoice_line_totals
+from app.services.invoice_unit_conversion_service import (
+    INVENTORY_QUANTITY_UNIT_MAIN,
+    extra_info_dict,
+    inventory_price_to_main,
+    inventory_quantity_to_main,
+    price_main_to_line,
+    quantity_line_to_main,
+)
+from app.services.invoice_profit_costing import (
+    document_rate_to_base,
+    inventory_line_unit_cost_main_base,
+    stamp_sales_return_in_layer_costs,
+)
 import jdatetime
 import io
 import csv
@@ -294,7 +316,23 @@ def _movement_sort_key(mv: Dict[str, Any]) -> Tuple[Any, Any, int, int]:
     """ترتیب زمانی حرکات؛ در یک روز ابتدا زمان ثبت سند، سپس شناسه سند، سپس خط فاکتور."""
     ra = mv.get("registered_at")
     if ra is None:
-        ra = datetime.min
+        ra = datetime.min.replace(tzinfo=timezone.utc)
+    elif isinstance(ra, datetime):
+        # Documents use timezone-aware timestamps, while warehouse documents
+        # currently use naive UTC timestamps. Normalize both before comparison.
+        if ra.tzinfo is None:
+            ra = ra.replace(tzinfo=timezone.utc)
+        else:
+            ra = ra.astimezone(timezone.utc)
+    else:
+        try:
+            ra = datetime.fromisoformat(str(ra).replace("Z", "+00:00"))
+            if ra.tzinfo is None:
+                ra = ra.replace(tzinfo=timezone.utc)
+            else:
+                ra = ra.astimezone(timezone.utc)
+        except (TypeError, ValueError):
+            ra = datetime.min.replace(tzinfo=timezone.utc)
     return (
         mv["document_date"],
         ra,
@@ -670,6 +708,10 @@ def _apply_invoice_missing_line_warehouse_policy(
         info = dict(ln.get("extra_info") or {})
         if not bool(info.get("inventory_tracked", True)):
             continue
+        from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
+        if invoice_line_skips_warehouse(info):
+            continue
         if _invoice_line_has_resolvable_warehouse(ln, document_extra_info):
             continue
         missing_rows.append(idx)
@@ -820,13 +862,30 @@ def _remove_old_invoice_warehouse_documents(
         # cancelled: بدون اقدام
 
     if posted_documents:
+        receipt_product_ids = set()
+        receipt_lines: List[Any] = []
         for line in db.query(WarehouseDocumentLine).filter(
             WarehouseDocumentLine.warehouse_document_id.in_(list(posted_documents))
         ).all():
             if str(line.movement or "").strip().lower() != "in" or line.warehouse_id is None:
                 continue
+            receipt_lines.append(line)
+            receipt_product_ids.add(int(line.product_id))
+        receipt_products = {
+            int(row.id): row
+            for row in db.query(Product).filter(
+                Product.business_id == int(business_id),
+                Product.id.in_(list(receipt_product_ids)),
+            ).all()
+        } if receipt_product_ids else {}
+        for line in receipt_lines:
             key = (int(line.product_id), int(line.warehouse_id))
-            posted_receipts[key] += Decimal(str(line.quantity or 0))
+            posted_receipts[key] += inventory_quantity_to_main(
+                line.quantity,
+                receipt_products.get(int(line.product_id)),
+                getattr(line, "extra_info", None),
+                strict=False,
+            )
 
         # The invoice lines have already been replaced by update_invoice. Compare the new
         # receipts with the old posted receipt lines and reject only reductions that would
@@ -851,7 +910,11 @@ def _remove_old_invoice_warehouse_documents(
             for line in db.query(InvoiceItemLine).filter(
                 InvoiceItemLine.document_id == int(invoice_document_id)
             ).all():
-                info = line.extra_info or {}
+                info = extra_info_dict(line.extra_info)
+                from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
+                if invoice_line_skips_warehouse(info):
+                    continue
                 if int(line.product_id) not in tracked_product_ids or info.get("inventory_tracked") is False:
                     continue
                 movement = info.get("movement") or _movement_from_type(invoice.document_type)[0]
@@ -862,7 +925,12 @@ def _remove_old_invoice_warehouse_documents(
                     key = (int(line.product_id), int(warehouse_id))
                 except (TypeError, ValueError):
                     continue
-                new_receipts[key] += Decimal(str(line.quantity or 0))
+                new_receipts[key] += inventory_quantity_to_main(
+                    line.quantity,
+                    receipt_products.get(int(line.product_id)),
+                    info,
+                    strict=False,
+                )
 
         reductions = {
             key: quantity - new_receipts.get(key, Decimal(0))
@@ -875,7 +943,10 @@ def _remove_old_invoice_warehouse_documents(
                 {
                     "product_id": product_id,
                     "quantity": float(quantity),
-                    "extra_info": {"warehouse_id": warehouse_id},
+                    "extra_info": {
+                        "warehouse_id": warehouse_id,
+                        "inventory_quantity_unit": INVENTORY_QUANTITY_UNIT_MAIN,
+                    },
                 }
                 for (product_id, warehouse_id), quantity in reductions.items()
             if product_id in tracked_product_ids
@@ -1187,14 +1258,22 @@ def _iter_product_movements(
     if not product_ids:
         return []
     # فقط کالاهای با کنترل موجودی را لحاظ کن
-    tracked_ids: List[int] = [
-        int(pid)
-        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+    tracked_rows = (
+        db.query(
+            Product.id,
+            Product.track_inventory,
+            Product.main_unit,
+            Product.secondary_unit,
+            Product.unit_conversion_factor,
+        )
+        .filter(
             Product.business_id == business_id,
             Product.id.in_(list({int(pid) for pid in product_ids})),
-        ).all()
-        if bool(tracked)
-    ]
+        )
+        .all()
+    )
+    product_by_id = {int(row.id): row for row in tracked_rows if bool(row.track_inventory)}
+    tracked_ids: List[int] = list(product_by_id)
     if not tracked_ids:
         return []
 
@@ -1224,6 +1303,10 @@ def _iter_product_movements(
 
     for line, doc in iil_rows:
         info = line.extra_info or {}
+        from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
+        if invoice_line_skips_inventory_kardex(info):
+            continue
         try:
             posted = info.get("inventory_posted")
             if posted is False:
@@ -1249,7 +1332,10 @@ def _iter_product_movements(
                 continue
         if movement not in ("in", "out"):
             continue
-        qty = Decimal(str(line.quantity or 0))
+        movement_product = product_by_id.get(int(line.product_id))
+        qty = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         if qty <= 0:
             continue
         cost_price = None
@@ -1259,9 +1345,13 @@ def _iter_product_movements(
             except Exception:
                 cost_price = None
         if cost_price is None and info.get("cost_price") is not None:
-            cost_price = Decimal(str(info.get("cost_price")))
+            cost_price = inventory_price_to_main(
+                info.get("cost_price"), movement_product, info, strict=False
+            )
         if cost_price is None and info.get("unit_price") is not None:
-            cost_price = Decimal(str(info.get("unit_price")))
+            cost_price = inventory_price_to_main(
+                info.get("unit_price"), movement_product, info, strict=False
+            )
         movements.append(
             {
                 "document_id": doc.id,
@@ -1321,7 +1411,10 @@ def _iter_product_movements(
                 continue
         if movement not in ("in", "out"):
             continue
-        qty = Decimal(str(line.quantity or 0))
+        movement_product = product_by_id.get(int(line.product_id))
+        qty = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         if qty <= 0:
             continue
         cost_price = None
@@ -1331,9 +1424,13 @@ def _iter_product_movements(
             except Exception:
                 cost_price = None
         if cost_price is None and info.get("cost_price") is not None:
-            cost_price = Decimal(str(info.get("cost_price")))
+            cost_price = inventory_price_to_main(
+                info.get("cost_price"), movement_product, info, strict=False
+            )
         if cost_price is None and info.get("unit_price") is not None:
-            cost_price = Decimal(str(info.get("unit_price")))
+            cost_price = inventory_price_to_main(
+                info.get("unit_price"), movement_product, info, strict=False
+            )
         movements.append(
             {
                 "document_id": doc.id,
@@ -1411,7 +1508,7 @@ def _compute_available_stock(
             _wh_src_doc.business_id == business_id,
         ),
     ).filter(
-        or_(cast(WarehouseDocument.extra_info, JSONB)['sepidar']['managed'].astext == 'true', ~or_(
+        or_(WarehouseDocument.extra_info['sepidar']['managed'].as_boolean().is_(True), ~or_(
             func.lower(func.coalesce(WarehouseDocument.source_type, "")).in_(("invoice", "opening_balance")),
             and_(
                 WarehouseDocument.source_document_id.isnot(None),
@@ -1439,15 +1536,19 @@ def _compute_available_stock(
             )
 
     wh_movements = wh_movements_query.with_entities(WarehouseDocumentLine, WarehouseDocument).all()
+    stock_product = db.get(Product, int(product_id))
     for wh_mv, wh_doc in wh_movements:
         # حوالهٔ معکوس لغو: موجودی با cancelled شدن اصل اصلاح شده؛ شمارش مجدد دوبرابر می‌کند.
         # (شامل معکوس فاکتور و معکوس دستی/کالای هزینه-درآمد)
         if _warehouse_doc_is_cancel_reversal_of_cancelled(db, business_id, wh_doc):
             continue
+        qty_main = inventory_quantity_to_main(
+            wh_mv.quantity, stock_product, wh_mv.extra_info, strict=False
+        )
         if wh_mv.movement == "in":
-            bal += Decimal(str(wh_mv.quantity))
+            bal += qty_main
         elif wh_mv.movement == "out":
-            bal -= Decimal(str(wh_mv.quantity))
+            bal -= qty_main
     
     return bal
 
@@ -1468,7 +1569,7 @@ def get_financial_stock_bulk(
         return {}
     
     if as_of_date is None:
-        as_of_date = datetime.now().date()
+        as_of_date = business_today(business_id)
     
     # دریافت حرکات از اسناد مالی
     movements = _iter_product_movements(
@@ -1523,29 +1624,45 @@ def collect_stock_shortages(
     *,
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
+    exclude_production_order_id: Optional[int] = None,
+    include_production_reservations: bool = False,
+    enforce_sellable: bool = False,
 ) -> List[Dict[str, Any]]:
     # تجمیع نیاز خروجی به تفکیک کالا/انبار
-    required: Dict[Tuple[int, Optional[int]], Decimal] = {}
+    pending_required: List[Tuple[int, Optional[int], Decimal, Dict[str, Any]]] = []
     for ln in outgoing_lines:
         pid = int(ln.get("product_id"))
-        info = ln.get("extra_info") or {}
+        info = extra_info_dict(ln.get("extra_info"))
         wh_id = info.get("warehouse_id")
         qty = Decimal(str(ln.get("quantity", 0) or 0))
-        key = (pid, int(wh_id) if wh_id is not None else None)
-        required[key] = required.get(key, Decimal(0)) + qty
+        pending_required.append((pid, int(wh_id) if wh_id is not None else None, qty, info))
 
     from adapters.db.models.warehouse import Warehouse
 
-    pids = list({k[0] for k in required})
-    wh_ids_unique = sorted({int(k[1]) for k in required if k[1] is not None})
+    pids = list({item[0] for item in pending_required})
+    wh_ids_unique = sorted({int(item[1]) for item in pending_required if item[1] is not None})
     product_labels: Dict[int, Tuple[str, str]] = {}
+    product_units: Dict[int, Any] = {}
     if pids:
         for row in (
-            db.query(Product.id, Product.name, Product.code)
+            db.query(
+                Product.id,
+                Product.name,
+                Product.code,
+                Product.main_unit,
+                Product.secondary_unit,
+                Product.unit_conversion_factor,
+                Product.inventory_mode,
+                Product.variant_mode,
+                Product.track_inventory,
+                Product.track_expiry,
+                Product.min_remaining_shelf_life_days,
+            )
             .filter(Product.business_id == business_id, Product.id.in_(pids))
             .all()
         ):
             product_labels[int(row.id)] = (str(row.name or ""), str(row.code or ""))
+            product_units[int(row.id)] = row
     warehouse_labels: Dict[int, str] = {}
     if wh_ids_unique:
         for row in (
@@ -1554,6 +1671,18 @@ def collect_stock_shortages(
             .all()
         ):
             warehouse_labels[int(row.id)] = str(row.name or "")
+
+    from app.services.variant_inventory_service import (
+        acquire_variant_stock_locks,
+        compute_available_variant_stock,
+        expand_outgoing_shortage_requirements,
+    )
+
+    required_variant, lock_keys = expand_outgoing_shortage_requirements(
+        db, business_id, outgoing_lines, product_units
+    )
+    if lock_keys:
+        acquire_variant_stock_locks(db, business_id, lock_keys)
 
     shortages: List[Dict[str, Any]] = []
     mode_map: Dict[int, str] = {}
@@ -1566,22 +1695,81 @@ def collect_stock_shortages(
         }
 
     # همهٔ کسری‌ها یک‌جا برگردانده می‌شوند تا کاربر مجبور به چند بار ذخیره نباشد.
-    for (pid, wh_id), req in required.items():
-        avail = _compute_available_stock(
-            db,
-            business_id,
-            pid,
-            wh_id,
-            document_date,
-            exclude_document_id,
-            exclude_invoice_source_document_id=exclude_invoice_source_document_id,
-            exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+    for (pid, wh_id, variant_id), req in required_variant.items():
+        if variant_id is not None:
+            avail = compute_available_variant_stock(
+                db,
+                business_id,
+                pid,
+                wh_id,
+                int(variant_id),
+                document_date,
+                exclude_document_id,
+                exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+                exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+            )
+        else:
+            avail = _compute_available_stock(
+                db,
+                business_id,
+                pid,
+                wh_id,
+                document_date,
+                exclude_document_id,
+                exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+                exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+            )
+        # Production reservations affect only explicitly production-linked stock
+        # checks. Keeping this opt-in preserves the established behavior of
+        # sales, purchases, returns, waste, and direct-consumption invoices.
+        if include_production_reservations and wh_id is not None:
+            from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial
+
+            reserved_query = db.query(func.coalesce(func.sum(ProductionOrderMaterial.reserved_quantity), 0)).join(
+                ProductionOrder, ProductionOrder.id == ProductionOrderMaterial.production_order_id
+            ).filter(
+                ProductionOrder.business_id == int(business_id),
+                ProductionOrder.status.in_(("released", "in_progress")),
+                ProductionOrderMaterial.product_id == int(pid),
+                ProductionOrderMaterial.warehouse_id == int(wh_id),
+            )
+            if exclude_production_order_id is not None:
+                reserved_query = reserved_query.filter(ProductionOrder.id != int(exclude_production_order_id))
+            avail -= Decimal(str(reserved_query.scalar() or 0))
+        product_row = product_units.get(pid)
+        from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+        allow_expired_line = any(
+            extra_info_dict(ln.get("extra_info")).get("allow_expired_lot_sale")
+            or extra_info_dict(ln.get("extra_info")).get("manager_confirm_expired")
+            for ln in outgoing_lines
+            if int(ln.get("product_id") or 0) == int(pid)
         )
+        if (
+            enforce_sellable
+            and not allow_expired_line
+            and product_row is not None
+            and is_expiry_tracked_product(product_row)
+        ):
+            sellable = sellable_quantity(
+                db,
+                business_id,
+                product_row,
+                wh_id,
+                document_date,
+                exclude_document_id=exclude_document_id,
+                variant_id=int(variant_id) if variant_id is not None else None,
+                exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+                exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+            )
+            if sellable < req:
+                avail = sellable
         if avail < req:
             pname, pcode = product_labels.get(pid, ("", ""))
             shortages.append(
                 {
                     "product_id": pid,
+                    "variant_id": int(variant_id) if variant_id is not None else None,
                     "product_name": pname or "کالا",
                     "product_code": pcode or None,
                     "warehouse_id": wh_id,
@@ -1593,6 +1781,145 @@ def collect_stock_shortages(
                 }
             )
     return shortages
+
+
+def _persist_invoice_variant_allocations(
+    db: Session,
+    business_id: int,
+    created_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+) -> None:
+    if not created_lines:
+        return
+    from app.services.variant_allocation_service import persist_invoice_allocations
+
+    pids = {int(item.product_id) for item, _payload in created_lines if item.product_id}
+    products = {
+        int(row.id): row
+        for row in db.query(Product).filter(
+            Product.business_id == int(business_id),
+            Product.id.in_(list(pids)),
+        ).all()
+    } if pids else {}
+    for item, payload in created_lines:
+        product = products.get(int(item.product_id))
+        if not product:
+            continue
+        persist_invoice_allocations(db, int(business_id), item, product, payload)
+    _persist_invoice_lot_allocations(db, business_id, created_lines, products)
+
+
+def _apply_expired_sale_confirm_permission(
+    invoice_type: str,
+    lines_input: List[Dict[str, Any]],
+    *,
+    user_can_confirm_expired_sale: bool,
+) -> None:
+    """پرچم فروش منقضی را فقط برای پسماند یا کاربر مجاز نگه می‌دارد."""
+    if invoice_type == INVOICE_WASTE or user_can_confirm_expired_sale:
+        return
+    for ln in lines_input:
+        extra = ln.get("extra_info")
+        if not isinstance(extra, dict):
+            continue
+        extra.pop("allow_expired_lot_sale", None)
+        extra.pop("manager_confirm_expired", None)
+
+
+def _invoice_line_movement(document: Document, extra: Dict[str, Any]) -> str:
+    explicit = extra.get("movement")
+    if explicit in ("in", "out"):
+        return str(explicit)
+    doc_type = str(document.document_type or "")
+    if doc_type in (INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION):
+        return "out"
+    if doc_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN, "opening_balance"):
+        return "in"
+    return str(explicit or "out")
+
+
+def _persist_invoice_lot_allocations(
+    db: Session,
+    business_id: int,
+    created_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+    products: Dict[int, Product],
+) -> None:
+    if not created_lines:
+        return
+    from app.services.inventory_lot_allocation_service import persist_invoice_lot_allocations
+
+    doc_ids = {int(item.document_id) for item, _ in created_lines}
+    docs = {
+        int(d.id): d
+        for d in db.query(Document).filter(Document.id.in_(list(doc_ids))).all()
+    } if doc_ids else {}
+    for item, payload in created_lines:
+        product = products.get(int(item.product_id))
+        if not product:
+            continue
+        document = docs.get(int(item.document_id))
+        if document is None:
+            continue
+        extra = extra_info_dict(item.extra_info)
+        payload_extra = extra_info_dict(payload.get("extra_info") if isinstance(payload, dict) else None)
+        extra = {**payload_extra, **extra}
+        movement = _invoice_line_movement(document, extra)
+        wh_raw = extra.get("warehouse_id")
+        try:
+            warehouse_id = int(wh_raw) if wh_raw is not None else None
+        except (TypeError, ValueError):
+            warehouse_id = None
+        if warehouse_id is None:
+            header = extra_info_dict(document.extra_info)
+            try:
+                warehouse_id = int(header.get("warehouse_id")) if header.get("warehouse_id") is not None else None
+            except (TypeError, ValueError):
+                warehouse_id = None
+        allow_confirm = bool(extra.get("allow_expired_lot_sale") or extra.get("manager_confirm_expired"))
+        allow_unsellable = None
+        restore_from_sales = False
+        source_invoice_id = None
+        doc_type = str(document.document_type or "")
+        if doc_type == INVOICE_WASTE:
+            allow_confirm = True
+            allow_unsellable = True
+        if doc_type == INVOICE_SALES_RETURN:
+            restore_from_sales = True
+            header = extra_info_dict(document.extra_info)
+            source_raw = (
+                extra.get("returned_from_invoice_id")
+                or extra.get("source_invoice_id")
+                or extra.get("copy_from_invoice_id")
+                or header.get("returned_from_invoice_id")
+                or header.get("source_invoice_id")
+                or header.get("copy_from_invoice_id")
+            )
+            try:
+                source_invoice_id = int(source_raw) if source_raw is not None else None
+            except (TypeError, ValueError):
+                source_invoice_id = None
+        if doc_type == "opening_balance":
+            extra["allow_undated_opening"] = True
+            payload_extra["allow_undated_opening"] = True
+            if isinstance(payload, dict):
+                merged = dict(payload)
+                extra_payload = extra_info_dict(merged.get("extra_info"))
+                extra_payload["allow_undated_opening"] = True
+                merged["extra_info"] = extra_payload
+                payload = merged
+        persist_invoice_lot_allocations(
+            db,
+            int(business_id),
+            item,
+            product,
+            payload if isinstance(payload, dict) else {},
+            movement=movement,
+            warehouse_id=warehouse_id,
+            document_date=document.document_date or business_today(business_id),
+            allow_expired_confirm=allow_confirm,
+            allow_unsellable=allow_unsellable,
+            restore_from_sales=restore_from_sales,
+            source_invoice_id=source_invoice_id,
+        )
 
 
 def _acquire_inventory_stock_locks(
@@ -1628,6 +1955,8 @@ def _ensure_stock_sufficient(
     *,
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
+    exclude_production_order_id: Optional[int] = None,
+    include_production_reservations: bool = False,
 ) -> None:
     # قفل تا commit/rollback تراکنش caller نگه داشته می‌شود.
     _acquire_inventory_stock_locks(db, business_id, outgoing_lines)
@@ -1640,6 +1969,8 @@ def _ensure_stock_sufficient(
         exclude_document_id,
         exclude_invoice_source_document_id=exclude_invoice_source_document_id,
         exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+        exclude_production_order_id=exclude_production_order_id,
+        include_production_reservations=include_production_reservations,
     )
     if not shortages:
         return
@@ -1651,8 +1982,9 @@ def _ensure_stock_sufficient(
     wh_id = first.get("warehouse_id")
     wh_disp = f"«{wh_name}»" if wh_name else (f"انبار (شناسه {wh_id})" if wh_id else "—")
     suffix = f" و {len(shortages) - 1} کالای دیگر" if len(shortages) > 1 else ""
+    err_code = "VARIANT_INSUFFICIENT_STOCK" if first.get("variant_id") else "INSUFFICIENT_STOCK"
     raise ApiError(
-        "INSUFFICIENT_STOCK",
+        err_code,
         f"موجودی کافی برای کالا {p_disp}{suffix} در انبار {wh_disp} موجود نیست.",
         http_status=409,
         details={"shortages": shortages},
@@ -1730,7 +2062,7 @@ def _validate_outgoing_stock_before_invoice_commit(
         product = products_by_id.get(int(pid))
         if not product or not getattr(product, "track_inventory", False):
             continue
-        extra = dict(ln.get("extra_info") or {})
+        extra = extra_info_dict(ln.get("extra_info"))
         wh_raw = extra.get("warehouse_id")
         if wh_raw is None:
             wh_raw = inv_wh_int
@@ -1744,14 +2076,23 @@ def _validate_outgoing_stock_before_invoice_commit(
             wh_id = int(wh_raw)
         except (TypeError, ValueError):
             raise ApiError("WAREHOUSE_REQUIRED", "شناسه انبار نامعتبر است", http_status=400)
+        from app.services.variant_allocation_service import parse_payload_allocations
+        from app.services.inventory_lot_allocation_service import parse_payload_lot_allocations
+
         outgoing_lines.append(
             {
                 "product_id": int(pid),
                 "quantity": float(qty),
+                "allocations": parse_payload_allocations(ln),
+                "lot_allocations": parse_payload_lot_allocations(ln),
                 "extra_info": {
                     "warehouse_id": wh_id,
                     "movement": "out",
                     "inventory_tracked": True,
+                    "unit": extra.get("unit"),
+                    "inventory_quantity_unit": extra.get("inventory_quantity_unit"),
+                    "allow_expired_lot_sale": extra.get("allow_expired_lot_sale"),
+                    "lot_allocations": extra.get("lot_allocations"),
                 },
             }
         )
@@ -1785,6 +2126,15 @@ def _validate_outgoing_stock_before_invoice_commit(
         exclude_document_id=int(document.id),
         exclude_invoice_source_document_id=None,
         exclude_warehouse_document_ids=None,
+        exclude_production_order_id=(document.extra_info or {}).get("production_order_id"),
+        include_production_reservations=(
+            getattr(document, "document_type", None) == INVOICE_PRODUCTION
+            and (document.extra_info or {}).get("production_order_id") is not None
+        ),
+        enforce_sellable=str(getattr(document, "document_type", None) or "") in (
+            INVOICE_SALES,
+            INVOICE_PURCHASE_RETURN,
+        ),
     )
     if not shortages:
         return
@@ -2069,6 +2419,107 @@ def _extract_totals_from_lines(lines: List[Dict[str, Any]]) -> Dict[str, Decimal
     }
 
 
+def _apply_purchase_invoice_accounting(
+    db: Session,
+    *,
+    business_id: int,
+    document_id: int,
+    purchase_mode: str,
+    accounts: Dict[str, Account],
+    lines_input: List[Dict[str, Any]],
+    person_id: Optional[int],
+    tax: Decimal,
+    total_with_tax: Decimal,
+    description: Optional[str],
+    invoice_type: str,
+    header_extra: Dict[str, Any],
+) -> None:
+    """ثبت خرید: موجودی/GRNI برای کالای دارای موجودی؛ خدمت به ۷۰۴۰۱؛ سطر سرمایه‌ای بدهکار ۱۰۷."""
+    from app.services.fixed_asset_capital_purchase import split_purchase_debit_amounts
+    from app.services.fixed_asset_service import add_capital_cost_document_lines
+    from app.services.invoice_adjustments_service import add_adjustment_document_lines
+    from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
+
+    split = split_purchase_debit_amounts(lines_input)
+    add_purchase_invoice_debit_lines(
+        db,
+        document_id=int(document_id),
+        mode=purchase_mode,
+        accounts=accounts,
+        gross=split.inventory_gross,
+        service_gross=split.service_gross,
+    )
+    add_capital_cost_document_lines(
+        db,
+        business_id=int(business_id),
+        document_id=int(document_id),
+        capital_net_by_class=split.capital_net_by_class,
+    )
+    if split.purchase_discount_credit > 0:
+        db.add(
+            DocumentLine(
+                document_id=document_id,
+                account_id=accounts["purchase_discount"].id,
+                debit=Decimal(0),
+                credit=split.purchase_discount_credit,
+                description="تخفیفات خرید",
+            )
+        )
+    if tax > 0:
+        db.add(
+            DocumentLine(
+                document_id=document_id,
+                account_id=accounts["vat_in"].id,
+                debit=tax,
+                credit=Decimal(0),
+                description="مالیات بر ارزش افزوده ورودی",
+            )
+        )
+    if person_id:
+        db.add(
+            DocumentLine(
+                document_id=document_id,
+                account_id=accounts["person"].id,
+                person_id=person_id,
+                debit=Decimal(0),
+                credit=total_with_tax,
+                description=description,
+                extra_info={"side": "person", "person_id": person_id},
+            )
+        )
+    add_adjustment_document_lines(
+        db,
+        business_id=business_id,
+        document_id=int(document_id),
+        invoice_type=invoice_type,
+        accounts=accounts,
+        header_extra=header_extra,
+    )
+
+
+def _apply_purchase_return_inventory_credits(
+    db: Session,
+    *,
+    document_id: int,
+    purchase_mode: str,
+    accounts: Dict[str, Account],
+    lines_input: List[Dict[str, Any]],
+) -> None:
+    """برگشت خرید: موجودی/GRNI فقط برای کالای دارای موجودی؛ خدمت به ۷۰۴۰۱."""
+    from app.services.fixed_asset_capital_purchase import split_purchase_debit_amounts
+    from app.services.purchase_accounting_service import add_purchase_return_credit_lines
+
+    split = split_purchase_debit_amounts(lines_input)
+    add_purchase_return_credit_lines(
+        db,
+        document_id=int(document_id),
+        mode=purchase_mode,
+        accounts=accounts,
+        gross=split.inventory_gross,
+        service_gross=split.service_gross,
+    )
+
+
 def _canonicalize_quick_sale_line_amounts(lines: List[Dict[str, Any]]) -> None:
     """Rebuild monetary line fields used by quick sales from their inputs."""
     for line in lines:
@@ -2161,18 +2612,128 @@ def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
     return total
 
 
+def _sync_payload_cost_price_to_item_lines(
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+) -> None:
+    """Copy stamped extra_info.cost_price from payload dicts onto persisted invoice lines."""
+    for item_line, payload in created_invoice_lines:
+        pextra = extra_info_dict(payload.get("extra_info") if isinstance(payload, dict) else None)
+        if pextra.get("cost_price") is None:
+            continue
+        info = dict(item_line.extra_info or {})
+        if info.get("cost_price") == pextra.get("cost_price"):
+            continue
+        info["cost_price"] = pextra.get("cost_price")
+        item_line.extra_info = info
+        flag_modified(item_line, "extra_info")
+
+
+_PRODUCTION_POSTING_DESCRIPTIONS = {
+    "production_wip_materials": "انتقال مواد اولیه به WIP",
+    "production_raw_issue": "خروج مواد اولیه از موجودی",
+    "production_wip_overhead": "هزینه عملیات تولید (انتقال به WIP)",
+    "production_overhead": "هزینه عملیات/سربار تولید",
+    "production_finished_in": "ورود محصول نهایی به موجودی",
+    "production_wip_relief": "انتقال محصول نهایی از WIP",
+    "production_variance_unfavorable": "انحراف نامساعد بهای تولید",
+    "production_variance_favorable": "انحراف مساعد بهای تولید",
+    "production_wip_variance": "انتقال انحراف بها از WIP",
+}
+
+
+def _try_plugin_production_posting(
+    db: Session,
+    document: Document,
+    business_id: int,
+    accounts: Dict[str, Account],
+    header_extra: Optional[Dict[str, Any]],
+    out_lines: List[Dict[str, Any]],
+    in_lines: List[Dict[str, Any]],
+    created_invoice_lines: List[tuple],
+) -> bool:
+    """اگر افزونه تولید پیشرفته برنامهٔ ثبت بدهد، همان را سند می‌زند و True برمی‌گرداند."""
+    from app.services.advanced_production_posting import plan_production_posting
+
+    output_qty = Decimal(0)
+    product_id = None
+    for line in in_lines:
+        qty = Decimal(str(line.get("quantity", 0) or 0))
+        if qty <= 0:
+            continue
+        output_qty += qty
+        if product_id is None and line.get("product_id"):
+            product_id = int(line["product_id"])
+    materials = _extract_cogs_total_for_invoice(out_lines)
+    try:
+        operations = Decimal(str((header_extra or {}).get("production_operations_total", 0) or 0))
+    except Exception:
+        operations = Decimal(0)
+    plan = plan_production_posting(
+        db,
+        int(business_id),
+        header_extra,
+        materials,
+        operations,
+        output_qty,
+        product_id=product_id,
+    )
+    if plan is None:
+        return False
+    role_accounts = {
+        "wip": plan["wip_account_id"] or accounts["wip"].id,
+        "raw_inventory": accounts["inventory"].id,
+        "overhead": accounts["production_overhead"].id,
+        "finished": plan["finished_goods_account_id"] or accounts["inventory"].id,
+        "variance": plan["variance_account_id"] or accounts["production_overhead"].id,
+    }
+    for spec in plan["journal"]:
+        db.add(DocumentLine(
+            document_id=document.id,
+            account_id=role_accounts[spec["role"]],
+            debit=spec["debit"],
+            credit=spec["credit"],
+            description=_PRODUCTION_POSTING_DESCRIPTIONS.get(spec["description_key"], spec["description_key"]),
+            extra_info={"source": spec["description_key"], "advanced_production": True},
+        ))
+    if plan.get("unit_cost") is not None:
+        for line in in_lines:
+            qty = Decimal(str(line.get("quantity", 0) or 0))
+            if qty <= 0:
+                continue
+            extra = dict(line.get("extra_info") or {})
+            extra["cost_price"] = float(plan["unit_cost"])
+            extra["advanced_production_costing_method"] = plan["costing_method"]
+            line["extra_info"] = extra
+        _sync_payload_cost_price_to_item_lines(created_invoice_lines)
+    return True
+
+
+def _waste_expense_account_id(db: Session, business_id: int, accounts: Dict[str, Account]) -> int:
+    from app.services.advanced_production_posting import choose_waste_expense_account, mapped_scrap_expense_account_id
+
+    return choose_waste_expense_account(
+        accounts["waste_expense"].id,
+        mapped_scrap_expense_account_id(db, int(business_id)),
+    )
+
+
 def _extract_cogs_total_for_invoice(lines: List[Dict[str, Any]]) -> Decimal:
     """
     محاسبه COGS برای فاکتورها (بدون بررسی inventory_posted).
     برای مصرف مستقیم، ضایعات و تولید استفاده می‌شود.
+    خدمت و کالای بدون موجودی موجودی کالا را بستانکار نمی‌کنند.
     """
+    from app.services.invoice_inventory_policy import invoice_line_posts_to_inventory
+
     total = Decimal(0)
     for line in lines:
         info = line.get("extra_info") or {}
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if qty <= 0:
             continue
-        
+        if not invoice_line_posts_to_inventory(info):
+            continue
+
         # اولویت: cogs_amount > cost_price > unit_price
         if info.get("cogs_amount") is not None:
             total += Decimal(str(info.get("cogs_amount")))
@@ -2220,6 +2781,7 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
         # تخفیفات فروش و خرید (به‌صورت مجزا)
         "sales_discount": _get_fixed_account_by_code(db, code("sales_discount", "50003")),
         "purchase_discount": _get_fixed_account_by_code(db, code("purchase_discount", "40003")),
+        "purchase_service": _get_fixed_account_by_code(db, code("purchase_service", "70401")),
         # موجودی، GRNI و ساخته‌شده (در نبود حساب مجزا)
         "inventory": _get_fixed_account_by_code(db, code("inventory", "10102")),
         "inventory_finished": _get_fixed_account_by_code(db, code("inventory_finished", "10102")),
@@ -2550,6 +3112,7 @@ def _validate_production_invoice_lines(
     business_id: int,
     lines_input: List[Dict[str, Any]],
     header_extra: Dict[str, Any],
+    exclude_document_id: Optional[int] = None,
 ) -> None:
     """اعتبارسنجی ردیف‌ها و فرمول تولید برای فاکتور تولید."""
     has_out = False
@@ -2570,6 +3133,20 @@ def _validate_production_invoice_lines(
             has_out = True
         elif movement == "in":
             has_in = True
+
+        pid = line.get("product_id")
+        if pid:
+            product = db.query(Product).filter(
+                Product.id == int(pid), Product.business_id == int(business_id)
+            ).first()
+            from app.services.product_variant_service import is_variant_inventory_product
+
+            if is_variant_inventory_product(product):
+                raise ApiError(
+                    "VARIANT_NOT_SUPPORTED_HERE",
+                    "کالای با تفکیک موجودی ویژگی در فاکتور تولید این نسخه پشتیبانی نمی‌شود",
+                    http_status=422,
+                )
 
     if not has_out:
         raise ApiError(
@@ -2647,6 +3224,341 @@ def _validate_production_invoice_lines(
                 http_status=400,
             )
 
+    production_order_id = header_extra.get("production_order_id")
+    if production_order_id is None:
+        return  # legacy production invoices remain supported
+    try:
+        production_order_id = int(production_order_id)
+    except (TypeError, ValueError) as exc:
+        raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید نامعتبر است", http_status=400) from exc
+
+    from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial, ProductionOrderOutput
+
+    acquire_transaction_lock(db, f"production_order:{business_id}:{production_order_id}")
+    order = db.query(ProductionOrder).filter(
+        ProductionOrder.id == production_order_id,
+        ProductionOrder.business_id == int(business_id),
+    ).with_for_update().first()
+    if not order:
+        raise ApiError("PRODUCTION_ORDER_NOT_FOUND", "سفارش تولید مرتبط یافت نشد", http_status=404)
+    if order.status != "in_progress":
+        raise ApiError("PRODUCTION_ORDER_NOT_IN_PROGRESS", "ثبت فاکتور تولید فقط برای سفارش در حال اجرا مجاز است", http_status=409)
+    if int(order.bom_id) not in {int(value) for value in bom_ids if str(value).isdigit()}:
+        raise ApiError("PRODUCTION_ORDER_BOM_MISMATCH", "فرمول فاکتور با فرمول سفارش تولید یکسان نیست", http_status=409)
+
+    planned_inputs: Dict[int, Decimal] = defaultdict(Decimal)
+    planned_input_warehouses: Dict[int, set[int]] = defaultdict(set)
+    for item in db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all():
+        planned_inputs[int(item.product_id)] += Decimal(str(item.planned_quantity or 0))
+        planned_input_warehouses[int(item.product_id)].add(int(item.warehouse_id))
+    planned_outputs: Dict[int, Decimal] = defaultdict(Decimal)
+    order_outputs = db.query(ProductionOrderOutput).filter(ProductionOrderOutput.production_order_id == order.id).all()
+    order_materials = db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all()
+    materials_by_id = {int(item.id): item for item in order_materials}
+    outputs_by_id = {int(item.id): item for item in order_outputs}
+    for item in order_outputs:
+        planned_outputs[int(item.product_id)] += Decimal(str(item.planned_quantity or 0))
+
+    already_used: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    already_used_by_row: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    linked_documents = db.query(Document).filter(
+        Document.business_id == int(business_id),
+        Document.document_type == INVOICE_PRODUCTION,
+        Document.is_proforma.is_(False),
+    ).all()
+    for linked in linked_documents:
+        if exclude_document_id is not None and int(linked.id) == int(exclude_document_id):
+            continue
+        linked_extra = linked.extra_info or {}
+        try:
+            linked_order_id = int(linked_extra.get("production_order_id"))
+        except (TypeError, ValueError):
+            continue
+        if linked_order_id != production_order_id:
+            continue
+        for old_line in db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == linked.id).all():
+            old_extra = old_line.extra_info or {}
+            movement = old_extra.get("movement")
+            if movement in ("in", "out"):
+                already_used[(movement, int(old_line.product_id))] += Decimal(str(old_line.quantity or 0))
+                row_key = "production_order_material_id" if movement == "out" else "production_order_output_id"
+                try:
+                    old_row_id = int(old_extra.get(row_key))
+                    already_used_by_row[(movement, old_row_id)] += Decimal(str(old_line.quantity or 0))
+                except (TypeError, ValueError):
+                    pass
+
+    requested: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    requested_by_row: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    for line in lines_input:
+        line_extra = line.get("extra_info") or {}
+        movement = line_extra.get("movement")
+        product_id = line.get("product_id")
+        row_key = "production_order_material_id" if movement == "out" else "production_order_output_id" if movement == "in" else None
+        if row_key and line_extra.get(row_key) is not None:
+            try:
+                order_row = (materials_by_id if movement == "out" else outputs_by_id).get(int(line_extra[row_key]))
+            except (TypeError, ValueError):
+                order_row = None
+            if order_row is None or int(order_row.product_id) != int(product_id or 0):
+                raise ApiError("PRODUCTION_ORDER_LINE_MISMATCH", "ردیف فاکتور به ردیف معتبری از سفارش تولید متصل نیست", http_status=409)
+            if movement == "out" and line_extra.get("warehouse_id") is not None:
+                try:
+                    if int(line_extra["warehouse_id"]) != int(order_row.warehouse_id):
+                        raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_MISMATCH", "انبار ردیف مواد با ردیف سفارش تولید مطابقت ندارد", http_status=409)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار مصرف ماده نامعتبر است", http_status=400) from exc
+            requested_by_row[(movement, int(order_row.id))] += Decimal(str(line.get("quantity", 0) or 0))
+        if movement in ("in", "out") and product_id:
+            requested[(movement, int(product_id))] += Decimal(str(line.get("quantity", 0) or 0))
+
+    for (movement, product_id), quantity in requested.items():
+        if movement == "out":
+            planned = planned_inputs.get(product_id, Decimal("0"))
+            if planned <= 0:
+                raise ApiError("PRODUCTION_MATERIAL_NOT_PLANNED", f"کالای #{product_id} در مواد این سفارش برنامه‌ریزی نشده است", http_status=409)
+            previous = already_used[("out", product_id)]
+            if previous + quantity > planned:
+                raise ApiError(
+                    "PRODUCTION_MATERIAL_OVER_ISSUE",
+                    f"مصرف ثبت‌شده از مقدار برنامه‌ریزی‌شدهٔ کالای #{product_id} بیشتر می‌شود",
+                    http_status=409,
+                    details={"product_id": product_id, "planned_quantity": float(planned), "previous_quantity": float(previous), "requested_quantity": float(quantity)},
+                )
+        else:
+            planned = planned_outputs.get(product_id, Decimal("0"))
+            if planned <= 0:
+                raise ApiError("PRODUCTION_OUTPUT_NOT_PLANNED", f"کالای خروجی #{product_id} در سفارش برنامه‌ریزی نشده است", http_status=409)
+            previous = already_used[("in", product_id)]
+            if previous + quantity > planned:
+                raise ApiError(
+                    "PRODUCTION_OUTPUT_OVER_REPORT",
+                    f"مقدار محصول ثبت‌شده از برنامهٔ سفارش بیشتر می‌شود (کالا #{product_id})",
+                    http_status=409,
+                    details={"product_id": product_id, "planned_quantity": float(planned), "previous_quantity": float(previous), "requested_quantity": float(quantity)},
+                )
+
+    for (movement, row_id), quantity in requested_by_row.items():
+        row = (materials_by_id if movement == "out" else outputs_by_id)[row_id]
+        planned = Decimal(str(row.planned_quantity or 0))
+        previous = already_used_by_row[(movement, row_id)]
+        if previous + quantity > planned:
+            raise ApiError(
+                "PRODUCTION_ORDER_LINE_OVER_REPORT",
+                f"مقدار ثبت‌شده از برنامهٔ ردیف #{row_id} سفارش تولید بیشتر می‌شود",
+                http_status=409,
+                details={"production_order_line_id": row_id, "planned_quantity": float(planned), "previous_quantity": float(previous), "requested_quantity": float(quantity)},
+            )
+
+    for line in lines_input:
+        extra = dict(line.get("extra_info") or {})
+        movement = extra.get("movement")
+        if movement == "out":
+            product_id = int(line.get("product_id"))
+            material_row_id = extra.get("production_order_material_id")
+            if material_row_id is not None:
+                try:
+                    material_row = materials_by_id[int(material_row_id)]
+                except (TypeError, ValueError, KeyError) as exc:
+                    raise ApiError("PRODUCTION_ORDER_LINE_MISMATCH", "ردیف مادهٔ سفارش تولید معتبر نیست", http_status=409) from exc
+                raw_line_warehouse = extra.get("warehouse_id")
+                if raw_line_warehouse is not None:
+                    try:
+                        if int(raw_line_warehouse) != int(material_row.warehouse_id):
+                            raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_MISMATCH", "انبار ردیف مواد با سفارش تولید مطابقت ندارد", http_status=409)
+                    except (TypeError, ValueError) as exc:
+                        raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار مصرف ماده نامعتبر است", http_status=400) from exc
+                warehouse_id = int(material_row.warehouse_id)
+            else:
+                raw_warehouse = extra.get("warehouse_id", header_extra.get("warehouse_id"))
+                if raw_warehouse is None:
+                    allowed = planned_input_warehouses.get(product_id, set())
+                    if len(allowed) == 1:
+                        raw_warehouse = next(iter(allowed))
+                    else:
+                        raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_REQUIRED", "برای ردیف مادهٔ سفارش، انبار مشخص و بدون ابهام الزامی است", http_status=409)
+                try:
+                    warehouse_id = int(raw_warehouse)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار مصرف ماده نامعتبر است", http_status=400) from exc
+                allowed = planned_input_warehouses.get(product_id, set())
+                if not allowed or warehouse_id not in allowed:
+                    raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_MISMATCH", f"انبار مصرف کالای #{product_id} با سفارش تولید مطابقت ندارد", http_status=409)
+            extra["warehouse_id"] = warehouse_id
+        elif movement == "in":
+            expected_warehouse_id = int(order.output_warehouse_id)
+            raw_warehouse = extra.get("warehouse_id", header_extra.get("warehouse_id"))
+            if raw_warehouse is not None:
+                try:
+                    if int(raw_warehouse) != expected_warehouse_id:
+                        raise ApiError("PRODUCTION_OUTPUT_WAREHOUSE_MISMATCH", "انبار دریافت محصول با انبار خروجی سفارش تولید مطابقت ندارد", http_status=409)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار دریافت محصول نامعتبر است", http_status=400) from exc
+            extra["warehouse_id"] = expected_warehouse_id
+        extra["production_order_id"] = production_order_id
+        line["extra_info"] = extra
+
+
+def _attach_production_order_to_invoice_lines(lines_input: List[Dict[str, Any]], header_extra: Dict[str, Any]) -> None:
+	"""Keep source-order identity on invoice lines so warehouse issue/receipt documents retain it."""
+	order_id = header_extra.get("production_order_id")
+	if order_id is None:
+		return
+	for line in lines_input:
+		extra = dict(line.get("extra_info") or {})
+		extra["production_order_id"] = int(order_id)
+		line["extra_info"] = extra
+
+
+def _strip_production_order_metadata(
+	lines_input: List[Dict[str, Any]],
+	header_extra: Dict[str, Any],
+) -> Dict[str, Any]:
+	"""Prevent production-order metadata from leaking into non-production invoices."""
+	clean_header = dict(header_extra)
+	for key in ("production_order_id", "production_operations_total", "bom_ids"):
+		clean_header.pop(key, None)
+	for line in lines_input:
+		extra = dict(line.get("extra_info") or {})
+		for key in (
+			"production_order_id",
+			"production_order_material_id",
+			"production_order_output_id",
+		):
+			extra.pop(key, None)
+		line["extra_info"] = extra
+	return clean_header
+
+
+def _parse_production_operations_total(value: Any) -> Optional[Decimal]:
+	if value is None:
+		return None
+	try:
+		amount = Decimal(str(value))
+	except Exception as exc:
+		raise ApiError("INVALID_PRODUCTION_OPERATIONS_COST", "هزینهٔ عملیات تولید باید عدد معتبر باشد", http_status=400) from exc
+	if not amount.is_finite() or amount < 0 or amount > Decimal("9999999999999999.99"):
+		raise ApiError("INVALID_PRODUCTION_OPERATIONS_COST", "هزینهٔ عملیات تولید باید نامنفی و در محدودهٔ مجاز باشد", http_status=400)
+	return amount
+
+
+def _attach_production_order_lots_to_invoice_lines(
+	db: Session,
+	business_id: int,
+	lines_input: List[Dict[str, Any]],
+	header_extra: Dict[str, Any],
+) -> None:
+	"""Pass light lot codes from the manufacturing order onto invoice lines when present."""
+	order_id = header_extra.get("production_order_id")
+	if order_id is None:
+		return
+	from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial, ProductionOrderOutput
+
+	order = db.query(ProductionOrder).filter(
+		ProductionOrder.id == int(order_id),
+		ProductionOrder.business_id == int(business_id),
+	).first()
+	if not order:
+		return
+	material_rows = db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all()
+	output_rows = db.query(ProductionOrderOutput).filter(ProductionOrderOutput.production_order_id == order.id).all()
+	from adapters.db.models.product import Product as ProductModel
+	from app.services.inventory_lot_service import pick_unique_instances_fefo
+
+	for line in lines_input:
+		extra = dict(line.get("extra_info") or {})
+		movement = extra.get("movement")
+		pid = line.get("product_id")
+		if not pid:
+			continue
+		pid = int(pid)
+		product = (
+			db.query(ProductModel)
+			.filter(ProductModel.id == pid, ProductModel.business_id == int(business_id))
+			.first()
+		)
+		is_unique = product is not None and str(getattr(product, "inventory_mode", None) or "bulk") == "unique"
+		if extra.get("lot_code") and not is_unique:
+			continue
+		if movement == "out":
+			rows = [row for row in material_rows if int(row.product_id) == pid]
+			row_id = extra.get("production_order_material_id")
+			warehouse_id = extra.get("warehouse_id", header_extra.get("warehouse_id"))
+			if warehouse_id is not None:
+				try:
+					matches = [row for row in rows if int(row.warehouse_id) == int(warehouse_id)]
+					if matches:
+						rows = matches
+				except (TypeError, ValueError):
+					pass
+		elif movement == "in":
+			rows = [row for row in output_rows if int(row.product_id) == pid]
+			row_id = extra.get("production_order_output_id")
+		else:
+			rows = []
+			row_id = None
+		if row_id is not None:
+			try:
+				rows = [row for row in rows if int(row.id) == int(row_id)]
+			except (TypeError, ValueError):
+				rows = []
+		# Product-only fallback is safe only for a unique BOM/order line. With
+		# duplicate lines, assigning a lot or standard cost to an arbitrary row
+		# would corrupt traceability and valuation.
+		row = rows[0] if len(rows) == 1 else None
+		if is_unique:
+			if movement == "out" and not (extra.get("selected_instance_ids") or extra.get("instance_ids")):
+				stored = None
+				if row is not None:
+					stored = ((order.extra_info or {}).get("material_instance_ids") or {}).get(str(row.id))
+				if stored:
+					ids = [int(x) for x in stored]
+				else:
+					wh_id = extra.get("warehouse_id")
+					if wh_id is None and row is not None:
+						wh_id = getattr(row, "warehouse_id", None)
+					ids = pick_unique_instances_fefo(
+						db,
+						int(business_id),
+						product,
+						int(wh_id) if wh_id is not None else None,
+						line.get("quantity"),
+						business_today(business_id),
+					)
+				extra["selected_instance_ids"] = ids
+				extra["instance_ids"] = ids
+			elif movement == "in" and row is not None:
+				if row.lot_code and not extra.get("lot_code"):
+					extra["lot_code"] = row.lot_code
+				if getattr(row, "manufacturing_date", None) and not extra.get("manufacturing_date"):
+					extra["manufacturing_date"] = row.manufacturing_date.isoformat()
+				if getattr(row, "expiry_date", None) and not extra.get("expiry_date"):
+					extra["expiry_date"] = row.expiry_date.isoformat()
+			line["extra_info"] = extra
+			continue
+		if row and (row.lot_code or getattr(row, "manufacturing_date", None) or getattr(row, "expiry_date", None)):
+			if row.lot_code:
+				extra["lot_code"] = row.lot_code
+			if getattr(row, "manufacturing_date", None):
+				extra["manufacturing_date"] = row.manufacturing_date.isoformat()
+			if getattr(row, "expiry_date", None):
+				extra["expiry_date"] = row.expiry_date.isoformat()
+			alloc = {
+				"lot_code": extra.get("lot_code"),
+				"manufacturing_date": extra.get("manufacturing_date"),
+				"expiry_date": extra.get("expiry_date"),
+				"quantity": line.get("quantity"),
+			}
+			extra["lot_allocations"] = [alloc]
+			line["lot_allocations"] = [alloc]
+			line["extra_info"] = extra
+		if movement == "in" and extra.get("cost_price") is None and row is not None:
+			std = Decimal(str(row.standard_unit_cost or 0))
+			if std is not None and std > 0:
+				extra["cost_price"] = float(std)
+				extra["standard_cost"] = float(std)
+				line["extra_info"] = extra
+
 
 def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """ساخت یک خط حساب برای پرداخت فاکتور؛ مبالغ غیرمثبت نادیده گرفته می‌شوند."""
@@ -2676,6 +3588,8 @@ def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str,
         "bank_account_id",
         "detail_type",
         "detail_name",
+        "digipay_provider_id",
+        "extra_info",
     ):
         if p.get(key) is not None:
             account_line[key] = p.get(key)
@@ -2906,6 +3820,7 @@ def _create_receipt_payment_documents_for_invoice_payments(
         if not account_line:
             continue
 
+        # تاریخ سند دریافت/پرداخت = تاریخ وقوع وجه، نه تاریخ فاکتور
         rp_document_date = resolve_receipt_document_date_from_account_lines(
             document.document_date,
             [account_line],
@@ -3028,6 +3943,15 @@ def _create_receipt_payment_documents_for_invoice_payments(
                 http_status=500,
             )
 
+    try:
+        from app.services.digipay_service import link_purchases_from_invoice_payments
+
+        link_purchases_from_invoice_payments(
+            db, int(business_id), int(document.id), payment_docs, payments
+        )
+    except Exception:
+        logger.exception("digipay invoice payment link failed invoice_id=%s", document.id)
+
     return payment_docs
 
 
@@ -3045,7 +3969,9 @@ def _quick_sale_payment_target(document: Document) -> Decimal:
             return max(Decimal(0), Decimal(str(meta["payment_target"])))
         except Exception:
             pass
-    return Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+    totals = (document.extra_info or {}).get("totals") or {}
+    receivable = sales_receivable_total_from_totals(totals)
+    return receivable if receivable is not None else Decimal(str(totals.get("net", 0) or 0))
 
 
 def _adjust_quick_sale_invoice_paid(document: Document, total_paid: Decimal) -> Decimal:
@@ -3056,9 +3982,10 @@ def _adjust_quick_sale_invoice_paid(document: Document, total_paid: Decimal) -> 
     try:
         prior_debt = max(Decimal(0), Decimal(str(meta.get("prior_debt_amount", 0) or 0)))
         credit_applied = max(Decimal(0), Decimal(str(meta.get("credit_applied_amount", 0) or 0)))
-        invoice_total = Decimal(
-            str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0)
-        )
+        totals = (document.extra_info or {}).get("totals") or {}
+        invoice_total = sales_receivable_total_from_totals(totals)
+        if invoice_total is None:
+            invoice_total = Decimal(str(totals.get("net", 0) or 0))
     except Exception:
         return total_paid
     old_debt_settled = min(max(total_paid, Decimal(0)), prior_debt)
@@ -3929,6 +4856,34 @@ def _build_invoice_code(db: Session, business_id: int, invoice_type: str) -> str
     return f"{prefix}-{next_num:04d}"
 
 
+def _normalize_unique_instance_ids(extra_info: Dict[str, Any]) -> Dict[str, Any]:
+    """یکسان‌سازی instance_id تکی فروش سریع با selected_instance_ids فاکتور."""
+    ids: List[int] = []
+    seen: Set[int] = set()
+    candidates: List[Any] = []
+    for key in ("selected_instance_ids", "instance_ids"):
+        raw = extra_info.get(key)
+        if isinstance(raw, list):
+            candidates.extend(raw)
+    one = extra_info.get("instance_id")
+    if one is not None:
+        candidates.append(one)
+    for raw in candidates:
+        try:
+            iid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if iid in seen:
+            continue
+        seen.add(iid)
+        ids.append(iid)
+    if ids:
+        extra_info["selected_instance_ids"] = ids
+        extra_info["instance_ids"] = ids
+        extra_info["instance_id"] = ids[0]
+    return extra_info
+
+
 def _validate_selected_instances(
     db: Session,
     business_id: int,
@@ -3936,6 +4891,8 @@ def _validate_selected_instances(
     selected_instance_ids: List[Any],
     quantity: int,
     invoice_type: str,
+    allow_expired_confirm: bool = False,
+    document_date: Optional[date] = None,
 ) -> None:
     """
     اعتبارسنجی selected_instance_ids برای کالاهای یونیک در فاکتور.
@@ -4011,6 +4968,114 @@ def _validate_selected_instances(
                 f"کالای یونیک با ID {inst_id_int} یافت نشد یا در دسترس نیست (status != available)",
                 http_status=404
             )
+        from app.core.business_calendar import business_today
+        from app.services.inventory_lot_service import (
+            EXPIRED_SALE_CONFIRM,
+            is_expiry_tracked_product,
+            is_instance_sellable,
+        )
+
+        if is_expiry_tracked_product(product):
+            as_of = document_date or business_today(business_id)
+            if not is_instance_sellable(instance, product, as_of):
+                policy = str(getattr(product, "expired_sale_policy", None) or "block")
+                if policy != EXPIRED_SALE_CONFIRM or not allow_expired_confirm:
+                    raise ApiError(
+                        "EXPIRED_INSTANCE_BLOCKED",
+                        "فروش واحد یونیک منقضی برای این کالا مجاز نیست",
+                        http_status=409,
+                        details={"instance_id": inst_id_int},
+                    )
+
+
+def _ensure_unique_sales_return_instances(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    extra_info: Dict[str, Any],
+    quantity: int,
+    invoice_type: str,
+    *,
+    source_invoice_id: Optional[int] = None,
+    document_date: Optional[date] = None,
+) -> Dict[str, Any]:
+    """برگشت کالای یونیک را روی همان واحدهای فروخته‌شده ثبت می‌کند."""
+    if invoice_type != INVOICE_SALES_RETURN:
+        return extra_info
+    product = db.query(Product).filter(
+        and_(Product.id == int(product_id), Product.business_id == int(business_id))
+    ).first()
+    if product is None or str(product.inventory_mode or "bulk") != "unique":
+        return extra_info
+
+    from adapters.db.models.product_instance import ProductInstance
+
+    raw_ids = extra_info.get("selected_instance_ids") or extra_info.get("returned_from_instance_ids")
+    ids: List[int] = []
+    if isinstance(raw_ids, list):
+        for raw in raw_ids:
+            try:
+                parsed = int(raw)
+            except (TypeError, ValueError) as exc:
+                raise ApiError("INVALID_INSTANCE_ID", f"شناسه instance معتبر نیست: {raw}", http_status=400) from exc
+            if parsed in ids:
+                raise ApiError("DUPLICATE_INSTANCE", f"instance با ID {parsed} به صورت تکراری انتخاب شده است", http_status=400)
+            ids.append(parsed)
+
+    qty = int(quantity)
+    if qty <= 0:
+        return extra_info
+
+    if not ids:
+        src = source_invoice_id or extra_info.get("returned_from_invoice_id") or extra_info.get("source_invoice_id") or extra_info.get("copy_from_invoice_id")
+        try:
+            src = int(src) if src is not None else None
+        except (TypeError, ValueError):
+            src = None
+        sold_q = db.query(ProductInstance).filter(
+            ProductInstance.business_id == int(business_id),
+            ProductInstance.product_id == int(product_id),
+            ProductInstance.status == "sold",
+        )
+        if src is not None:
+            sourced = sold_q.filter(ProductInstance.current_invoice_id == int(src)).order_by(ProductInstance.id.asc()).all()
+            if len(sourced) >= qty:
+                ids = [int(row.id) for row in sourced[:qty]]
+        if not ids:
+            fallback = sold_q.order_by(
+                ProductInstance.last_movement_date.desc().nullslast(),
+                ProductInstance.id.desc(),
+            ).limit(qty).all()
+            ids = [int(row.id) for row in fallback]
+
+    if len(ids) != qty:
+        raise ApiError(
+            "UNIQUE_RETURN_INSTANCES_REQUIRED",
+            f"برای برگشت کالای یونیک باید دقیقاً {qty} واحد فروخته‌شده انتخاب شود",
+            http_status=422,
+            details={"product_id": int(product_id), "required": qty, "selected": len(ids)},
+        )
+
+    warehouse_id = extra_info.get("warehouse_id")
+    try:
+        warehouse_id = int(warehouse_id) if warehouse_id is not None else None
+    except (TypeError, ValueError):
+        warehouse_id = None
+    from app.services.warehouse_service import _restore_sold_unique_instances
+
+    _restore_sold_unique_instances(
+        db,
+        int(business_id),
+        int(product_id),
+        ids,
+        warehouse_id,
+        document_date or business_today(business_id),
+        f"کالای {product.name}",
+    )
+    extra_info["selected_instance_ids"] = ids
+    extra_info["returned_from_instance_ids"] = ids
+    extra_info["instance_ids"] = ids
+    return extra_info
 
 
 # ==================== توابع محاسبه سود فاکتور ====================
@@ -4037,10 +5102,7 @@ def _calculate_average_purchase_cost(
     product_id: int,
     as_of_date: date
 ) -> Decimal:
-    """
-    محاسبه میانگین قیمت خرید محصول از تاریخچه
-    """
-    # دریافت تمام ردیف‌های خرید از جدول اقلام فاکتور تا تاریخ مشخص
+    """میانگین قیمت خرید تا تاریخ سند، به واحد اصلی و ارز پایه."""
     purchase_lines = (
         db.query(InvoiceItemLine, Document)
         .join(Document, Document.id == InvoiceItemLine.document_id)
@@ -4059,16 +5121,29 @@ def _calculate_average_purchase_cost(
     total_cost = Decimal(0)
     total_qty = Decimal(0)
     
-    for line, _doc in purchase_lines:
-        qty = Decimal(str(line.quantity or 0))
+    from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
+    avg_product = db.get(Product, int(product_id))
+    business = db.get(Business, int(business_id))
+    rate_cache: Dict[int, Decimal] = {}
+    for line, doc in purchase_lines:
+        extra_info = extra_info_dict(line.extra_info)
+        if invoice_line_skips_inventory_kardex(extra_info):
+            continue
+        qty = inventory_quantity_to_main(line.quantity, avg_product, extra_info, strict=False)
         if qty <= 0:
             continue
-        extra_info = line.extra_info or {}
-        cost_per_unit = Decimal(0)
-        if extra_info.get("cost_price") is not None:
-            cost_per_unit = Decimal(str(extra_info.get("cost_price")))
-        elif extra_info.get("unit_price") is not None:
-            cost_per_unit = Decimal(str(extra_info.get("unit_price")))
+        rate = document_rate_to_base(db, doc, business=business, cache=rate_cache)
+        cost_per_unit = inventory_line_unit_cost_main_base(
+            avg_product,
+            extra_info,
+            line.quantity,
+            document_type=str(doc.document_type or ""),
+            fx_rate=rate,
+            movement="in",
+        )
+        if cost_per_unit is None:
+            cost_per_unit = Decimal(0)
         total_cost += qty * cost_per_unit
         total_qty += qty
     
@@ -4083,6 +5158,9 @@ def _iter_profit_movements_from_invoice_lines(
     product_id: int,
     as_of_date: date,
     warehouse_id: Optional[int] = None,
+    *,
+    include_untracked: bool = False,
+    normalize_quantity_to_main: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     حرکات کالا برای محاسبه هزینه سود (FIFO/LIFO) از روی اقلام فاکتور.
@@ -4108,16 +5186,27 @@ def _iter_profit_movements_from_invoice_lines(
         .all()
     )
     movements: List[Dict[str, Any]] = []
+    from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
+    movement_product = db.get(Product, int(product_id))
+    business = db.get(Business, int(business_id))
+    rate_cache: Dict[int, Decimal] = {}
+    from app.services.woo_return_source_service import return_quantity_main
+
     for line, doc in rows:
-        info = line.extra_info or {}
-        if info.get("inventory_tracked") is False:
+        info = extra_info_dict(line.extra_info)
+        if invoice_line_skips_inventory_kardex(info):
+            continue
+        if info.get("inventory_tracked") is False and not include_untracked:
             continue
         movement = (info.get("movement") or None)
         if movement is None:
             movement, _ = _movement_from_type(doc.document_type)
         if movement not in ("in", "out"):
             continue
-        qty = Decimal(str(line.quantity or 0))
+        qty = return_quantity_main(doc, line.id) or inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         if qty <= 0:
             continue
         wh_id_raw = info.get("warehouse_id")
@@ -4129,16 +5218,15 @@ def _iter_profit_movements_from_invoice_lines(
         if warehouse_id is not None:
             if wh_id is None or int(wh_id) != int(warehouse_id):
                 continue
-        cost_price = None
-        if info.get("cogs_amount") is not None and qty > 0 and movement == "out":
-            try:
-                cost_price = Decimal(str(info.get("cogs_amount"))) / qty
-            except Exception:
-                cost_price = None
-        if cost_price is None and info.get("cost_price") is not None:
-            cost_price = Decimal(str(info.get("cost_price")))
-        if cost_price is None and info.get("unit_price") is not None:
-            cost_price = Decimal(str(info.get("unit_price")))
+        rate = document_rate_to_base(db, doc, business=business, cache=rate_cache)
+        cost_price = inventory_line_unit_cost_main_base(
+            movement_product,
+            info,
+            line.quantity,
+            document_type=str(doc.document_type or ""),
+            fx_rate=rate,
+            movement=movement,
+        )
         movements.append(
             {
                 "document_id": int(doc.id),
@@ -4153,9 +5241,9 @@ def _iter_profit_movements_from_invoice_lines(
                 "invoice_item_line_id": int(line.id),
             }
         )
-    # کالای درآمدشده یک ورود واقعی و قیمت‌دار به انبار است و باید در لایه‌های
-    # FIFO/LIFO دیده شود. حواله‌های فاکتور و افتتاحیه عمداً اینجا اضافه نمی‌شوند
-    # چون حرکت متناظرشان از invoice_item_lines محاسبه شده است.
+    # ورودهای خرید کالای متفرقه و موجودی افتتاحیه فقط در اسناد انبار ثبت می‌شوند؛
+    # آن‌ها را هم به لایه‌های FIFO اضافه می‌کنیم. ورود/خروج‌های خود فاکتور از
+    # invoice_item_lines آمده‌اند و نباید از اسناد انبار دوباره شمرده شوند.
     from adapters.db.models.warehouse_document import WarehouseDocument
     from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 
@@ -4168,7 +5256,9 @@ def _iter_profit_movements_from_invoice_lines(
         .filter(
             WarehouseDocument.business_id == int(business_id),
             WarehouseDocument.status == "posted",
-            WarehouseDocument.source_type == "goods_expense_income",
+            WarehouseDocument.source_type.in_(
+                ["goods_expense_income", "opening_balance"]
+            ),
             WarehouseDocument.document_date <= as_of_date,
             WarehouseDocumentLine.product_id == int(product_id),
             WarehouseDocumentLine.movement == "in",
@@ -4178,7 +5268,10 @@ def _iter_profit_movements_from_invoice_lines(
     for line, doc in warehouse_rows:
         if warehouse_id is not None and int(line.warehouse_id or 0) != int(warehouse_id):
             continue
-        info = line.extra_info or {}
+        info = extra_info_dict(line.extra_info)
+        qty_main = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         movements.append(
             {
                 "document_id": -int(doc.id),
@@ -4188,8 +5281,10 @@ def _iter_profit_movements_from_invoice_lines(
                 "product_id": int(product_id),
                 "warehouse_id": int(line.warehouse_id) if line.warehouse_id else None,
                 "movement": "in",
-                "quantity": Decimal(str(line.quantity or 0)),
-                "cost_price": Decimal(str(info.get("unit_cost") or 0)),
+                "quantity": qty_main,
+                "cost_price": inventory_price_to_main(
+                    info.get("unit_cost") or 0, movement_product, info, strict=False
+                ),
                 "invoice_item_line_id": -int(line.id),
             }
         )
@@ -4234,26 +5329,62 @@ def _historical_sale_line_unit_cost(
 
     nb = _normalize_invoice_profit_basis(normalized_basis)
 
-    extra_info = ln.extra_info or {}
-    qty = Decimal(str(ln.quantity or 0))
+    extra_info = extra_info_dict(ln.extra_info)
+    qty = inventory_quantity_to_main(ln.quantity, product, extra_info, strict=False)
 
     if nb == "purchase_price":
-        base_cost = product.base_purchase_price or 0
-        if base_cost == 0 and extra_info.get("cost_price") is not None:
-            base_cost = extra_info.get("cost_price")
-        return Decimal(str(base_cost))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            purchase_price_unit_cost_base_from_snapshot,
+        )
+
+        biz = db.get(Business, int(business_id))
+        policy = getattr(biz, "invoice_profit_missing_purchase_price_policy", "zero_cost") if biz else "zero_cost"
+        unit_cost_line = purchase_price_unit_cost_base_from_snapshot(
+            ln,
+            missing_policy=policy,
+            allow_legacy_ledger=True,
+            expected_base_currency_id=(
+                int(biz.default_currency_id)
+                if biz and biz.default_currency_id is not None
+                else None
+            ),
+        )
+        snapshot_factor = getattr(ln, "purchase_price_snapshot_factor", None)
+        if snapshot_factor is not None:
+            return unit_cost_line * Decimal(str(snapshot_factor))
+        from app.services.invoice_unit_conversion_service import price_line_to_main
+
+        return price_line_to_main(unit_cost_line, product, extra_info.get("unit"))
 
     if nb == "cost_price":
         if extra_info.get("cost_price") is not None:
-            return Decimal(str(extra_info.get("cost_price")))
-        return Decimal(str(product.base_purchase_price or 0))
+            return inventory_price_to_main(
+                extra_info.get("cost_price"), product, extra_info, strict=False
+            )
+        from app.services.invoice_purchase_price_snapshot_service import (
+            resolve_catalog_purchase_price_main_base,
+        )
+        catalog_main, _src = resolve_catalog_purchase_price_main_base(
+            db, business_id, product, sale_document_date
+        )
+        return catalog_main if catalog_main is not None else Decimal(0)
 
     if nb == "actual_cost":
         if extra_info.get("cost_price") is not None:
-            return Decimal(str(extra_info.get("cost_price")))
+            return inventory_price_to_main(
+                extra_info.get("cost_price"), product, extra_info, strict=False
+            )
         if extra_info.get("cogs_amount") is not None and qty > 0:
-            return Decimal(str(extra_info.get("cogs_amount"))) / qty
-        return Decimal(str(product.base_purchase_price or 0))
+            sale_doc = db.get(Document, int(ln.document_id)) if ln.document_id else None
+            rate = document_rate_to_base(db, sale_doc) if sale_doc is not None else Decimal(1)
+            return (Decimal(str(extra_info.get("cogs_amount"))) / qty) * rate
+        from app.services.invoice_purchase_price_snapshot_service import (
+            resolve_catalog_purchase_price_main_base,
+        )
+        catalog_main, _src = resolve_catalog_purchase_price_main_base(
+            db, business_id, product, sale_document_date
+        )
+        return catalog_main if catalog_main is not None else Decimal(0)
 
     if nb == "average_cost":
         return _calculate_average_purchase_cost(db, business_id, product.id, sale_document_date)
@@ -4316,9 +5447,21 @@ def _historical_sale_line_unit_cost(
     if nb == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return Decimal(str(product.base_purchase_price or 0))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            resolve_catalog_purchase_price_main_base,
+        )
+        catalog_main, _src = resolve_catalog_purchase_price_main_base(
+            db, business_id, product, sale_document_date
+        )
+        return catalog_main if catalog_main is not None else Decimal(0)
 
-    return Decimal(str(product.base_purchase_price or 0))
+    from app.services.invoice_purchase_price_snapshot_service import (
+        resolve_catalog_purchase_price_main_base,
+    )
+    catalog_main, _src = resolve_catalog_purchase_price_main_base(
+        db, business_id, product, sale_document_date
+    )
+    return catalog_main if catalog_main is not None else Decimal(0)
 
 
 def _movement_warehouse_matches(a: Any, b: Any) -> bool:
@@ -4375,6 +5518,8 @@ def _restoration_unit_cost_sales_return_match_prior_sales(
     return_mv_idx: int,
     return_document_as_of_date: date,
     prior_adjust_end_idx_exclusive: Optional[int],
+    fallback_line: Optional[Any] = None,
+    missing_purchase_price_policy: str = "zero_cost",
 ) -> Decimal:
     """
     واحد بازگشت جریمهٔ COGS برای برگشت از فروش: تخصیص LIFO نسبت به مقادیر باقی‌ماندهٔ
@@ -4451,8 +5596,33 @@ def _restoration_unit_cost_sales_return_match_prior_sales(
         j -= 1
 
     if qty_left > 0:
-        avg_fallback = _calculate_average_purchase_cost(db, business_id, product_id, return_document_as_of_date)
-        sum_cost += qty_left * avg_fallback
+        if _normalize_invoice_profit_basis(normalized_basis) == "purchase_price":
+            from app.services.invoice_purchase_price_snapshot_service import (
+                resolve_missing_purchase_price_unit_cost,
+            )
+
+            fallback_line_unit = resolve_missing_purchase_price_unit_cost(
+                fallback_line,
+                missing_purchase_price_policy,
+            )
+            from app.services.invoice_unit_conversion_service import price_line_to_main
+
+            fallback_product = db.get(Product, int(product_id))
+            fallback_info = dict(getattr(fallback_line, "extra_info", None) or {})
+            fallback = (
+                price_line_to_main(
+                    fallback_line_unit,
+                    fallback_product,
+                    fallback_info.get("unit"),
+                )
+                if fallback_product is not None
+                else fallback_line_unit
+            )
+        else:
+            fallback = _calculate_average_purchase_cost(
+                db, business_id, product_id, return_document_as_of_date
+            )
+        sum_cost += qty_left * fallback
         qty_left = Decimal(0)
 
     return sum_cost / qty_need if qty_need > 0 else Decimal(0)
@@ -4483,6 +5653,7 @@ def _calculate_fifo_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, reverse=False)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -4652,6 +5823,7 @@ def _calculate_fifo_jbfn_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, reverse=False)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -4694,6 +5866,7 @@ def _calculate_lifo_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, reverse=True)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -4737,6 +5910,7 @@ def _calculate_moving_weighted_average_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, wma=True)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -4768,6 +5942,36 @@ def _calculate_weighted_average_cost(
     return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
 
 
+def _invoice_line_qty_main(product: Product, line: Any) -> Decimal:
+    extra = extra_info_dict(getattr(line, "extra_info", None))
+    return inventory_quantity_to_main(getattr(line, "quantity", 0), product, extra, strict=False)
+
+
+def _main_cost_to_line_unit(cost_main: Decimal, product: Product, line: Any) -> Decimal:
+    extra = extra_info_dict(getattr(line, "extra_info", None))
+    return price_main_to_line(cost_main, product, extra.get("unit"), strict=False)
+
+
+def _base_purchase_as_line_unit(
+    product: Product,
+    line: Any,
+    db: Optional[Session] = None,
+    business_id: Optional[int] = None,
+    as_of_date: Optional[date] = None,
+) -> Decimal:
+    extra = extra_info_dict(getattr(line, "extra_info", None))
+    from app.services.invoice_purchase_price_snapshot_service import (
+        resolve_catalog_purchase_price_main_base,
+    )
+
+    main, _source = resolve_catalog_purchase_price_main_base(
+        db, business_id, product, as_of_date
+    )
+    if main is None:
+        main = Decimal(0)
+    return price_main_to_line(main, product, extra.get("unit"), strict=False)
+
+
 def _get_cost_per_unit_by_basis(
     db: Session,
     business_id: int,
@@ -4778,102 +5982,147 @@ def _get_cost_per_unit_by_basis(
     warehouse_id: Optional[int] = None,
     *,
     fifo_shortage_mode: str = "perpetual_mixed",
+    document_fx_rate: Optional[Decimal] = None,
 ) -> Decimal:
     """
     محاسبه هزینه هر واحد بر اساس مبنای انتخاب شده
     """
-    extra_info = line.extra_info or {}
+    extra_info = extra_info_dict(line.extra_info)
     normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
     sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    qty_main = _invoice_line_qty_main(product, line)
+    catalog_kwargs = dict(db=db, business_id=business_id, as_of_date=document_date)
     
     if normalized_basis == "purchase_price":
-        return Decimal(str(product.base_purchase_price or 0))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            purchase_price_unit_cost_base_from_snapshot,
+        )
+
+        biz = db.get(Business, int(business_id))
+        policy = getattr(biz, "invoice_profit_missing_purchase_price_policy", "zero_cost") if biz else "zero_cost"
+        return purchase_price_unit_cost_base_from_snapshot(
+            line,
+            missing_policy=policy,
+            allow_legacy_ledger=True,
+            expected_base_currency_id=(
+                int(biz.default_currency_id)
+                if biz and biz.default_currency_id is not None
+                else None
+            ),
+        )
     
     elif normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
+            # قرارداد: extra_info.cost_price روی ردیف فروش به ارز پایه و واحد ردیف است.
             return Decimal(str(extra_info.get("cost_price")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
     
     elif normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and line.quantity > 0:
-            return Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
-        return Decimal(str(product.base_purchase_price or 0))
+            unit_doc = Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
+            rate = document_fx_rate if document_fx_rate is not None and document_fx_rate > 0 else Decimal(1)
+            return unit_doc * rate
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
     
     elif normalized_basis == "average_cost":
-        return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_average_purchase_cost(db, business_id, product.id, document_date),
+            product,
+            line,
+        )
     
     elif normalized_basis == "fifo":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_fifo_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
 
     elif normalized_basis == "fifo_jbfn":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_fifo_jbfn_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_jbfn_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
 
     elif normalized_basis == "lifo":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_lifo_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_lifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
 
     elif normalized_basis == "moving_weighted_average":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_moving_weighted_average_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_moving_weighted_average_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
     
     elif normalized_basis == "weighted_average":
-        return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_weighted_average_cost(db, business_id, product.id, document_date),
+            product,
+            line,
+        )
     
     elif normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
     
     else:
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
 
 
 def _calculate_overhead_cost(
@@ -4917,92 +6166,141 @@ def _invoice_profit_line_sale_cost_per_unit(
     warehouse_id: Any,
     document_id_hdr: int,
     fifo_sm: str,
+    *,
+    missing_purchase_price_policy: str = "zero_cost",
+    allow_current_purchase_price_preview: bool = False,
+    expected_base_currency_id: int | None = None,
+    document_fx_rate: Optional[Decimal] = None,
 ) -> Decimal:
     """بهای هر واحد در ردیف فاکتور فروش یا خدمت (مسیر عمومی)، بدون منطق خاص بازگشت کالای ورودی."""
-    extra_info = item_line.extra_info or {}
+    extra_info = extra_info_dict(item_line.extra_info)
+    qty_main = inventory_quantity_to_main(qty, product, extra_info, strict=False)
 
     if normalized_basis == "purchase_price":
-        base_cost = product.base_purchase_price or 0
-        if base_cost == 0 and extra_info.get("cost_price") is not None:
-            base_cost = extra_info.get("cost_price")
-        return Decimal(str(base_cost))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            preview_purchase_price_unit_cost_base,
+            purchase_price_unit_cost_base_from_snapshot,
+        )
 
+        if allow_current_purchase_price_preview:
+            return preview_purchase_price_unit_cost_base(
+                product,
+                item_line,
+                missing_policy=missing_purchase_price_policy,
+                db=db,
+                business_id=business_id,
+                as_of=document_date,
+            )
+        return purchase_price_unit_cost_base_from_snapshot(
+            item_line,
+            missing_policy=missing_purchase_price_policy,
+            allow_legacy_ledger=True,
+            expected_base_currency_id=expected_base_currency_id,
+        )
+
+    catalog_kwargs = dict(db=db, business_id=business_id, as_of_date=document_date)
     if normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
     if normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and qty > 0:
-            return Decimal(str(extra_info.get("cogs_amount"))) / qty
-        return Decimal(str(product.base_purchase_price or 0))
+            unit_doc = Decimal(str(extra_info.get("cogs_amount"))) / qty
+            rate = document_fx_rate if document_fx_rate is not None and document_fx_rate > 0 else Decimal(1)
+            return unit_doc * rate
+        return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
     if normalized_basis == "average_cost":
-        return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_average_purchase_cost(db, business_id, product.id, document_date),
+            product,
+            item_line,
+        )
 
     if normalized_basis == "fifo":
-        return _calculate_fifo_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "fifo_jbfn":
-        return _calculate_fifo_jbfn_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_jbfn_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "lifo":
-        return _calculate_lifo_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_lifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "moving_weighted_average":
-        return _calculate_moving_weighted_average_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_moving_weighted_average_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "weighted_average":
-        return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_weighted_average_cost(db, business_id, product.id, document_date),
+            product,
+            item_line,
+        )
 
     if normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
-    return Decimal(str(product.base_purchase_price or 0))
+    return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
 
 def _invoice_line_net_before_global_discount(item_line: Any) -> Decimal:
@@ -5147,6 +6445,32 @@ def _calculate_invoice_profit(
     # فقط برای فاکتورهای فروش و تولید محاسبه می‌شود
     if document.document_type not in ["invoice_sales", "invoice_sales_return", "invoice_production"]:
         return _empty_profit_response()
+
+    business = db.get(Business, int(business_id))
+    if not business or business.default_currency_id is None:
+        raise ApiError(
+            "BASE_CURRENCY_REQUIRED",
+            "برای محاسبه سود، ارز پایه کسب‌وکار باید تعیین شده باشد",
+            http_status=409,
+        )
+    from app.services.document_line_fx_service import resolve_document_fx_rate
+
+    profit_fx_rate, _profit_fx_source = resolve_document_fx_rate(
+        db,
+        document,
+        business=business,
+        allow_infer=True,
+        fallback_one_on_missing=False,
+    )
+    if profit_fx_rate is None or profit_fx_rate <= 0:
+        raise ApiError(
+            "INVOICE_FX_RATE_REQUIRED_FOR_PROFIT",
+            "نرخ تبدیل ارز سند به ارز پایه برای محاسبه سود موجود نیست",
+            http_status=409,
+        )
+    missing_purchase_price_policy = getattr(
+        business, "invoice_profit_missing_purchase_price_policy", "zero_cost"
+    )
     
     total_gross_profit = Decimal(0)
     total_net_profit = Decimal(0)
@@ -5177,11 +6501,12 @@ def _calculate_invoice_profit(
                 db, business_id, product, line, normalized_basis,
                 document.document_date, line_warehouse_id,
                 fifo_shortage_mode=fifo_sm,
+                document_fx_rate=profit_fx_rate,
             )
             total_materials_cost += qty * cost_per_unit
 
         extra_info = document.extra_info or {}
-        operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0))
+        operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0)) * profit_fx_rate
 
         total_production_cost = total_materials_cost + operations_total
 
@@ -5194,15 +6519,21 @@ def _calculate_invoice_profit(
             if line.product_id:
                 product = db.query(Product).filter(Product.id == line.product_id).first()
             if unit_price <= 0 and product is not None:
-                unit_price = Decimal(str(product.base_sales_price or 0))
-            sales_amt = qty * unit_price
+                # base_sales_price در ارز پایه است؛ unit_price پاسخ باید در ارز سند بماند.
+                unit_price = Decimal(str(product.base_sales_price or 0)) / profit_fx_rate
+            sales_amt_document = qty * unit_price
+            sales_amt = sales_amt_document * profit_fx_rate
             pname = (product.name if product else None) or (line.description or "").strip() or "—"
             pcode = product.code if product else None
             pid_i = int(product.id) if product else (int(line.product_id) if line.product_id else None)
+            qty_main = _invoice_line_qty_main(product, line) if product is not None else qty
             out_specs.append({
                 "line": line,
                 "qty": qty,
+                "qty_main": qty_main,
                 "unit_price": unit_price,
+                "unit_price_base": unit_price * profit_fx_rate,
+                "sales_amount_document": sales_amt_document,
                 "sales_amount": sales_amt,
                 "product_code": pcode,
                 "product_name": pname,
@@ -5210,6 +6541,7 @@ def _calculate_invoice_profit(
             })
 
         weight_sum = sum(s["sales_amount"] for s in out_specs)
+        qty_main_sum = sum((s.get("qty_main") or Decimal(0)) for s in out_specs)
         n_out = len(out_specs)
 
         for spec in out_specs:
@@ -5219,6 +6551,8 @@ def _calculate_invoice_profit(
             sales_amount = spec["sales_amount"]
             if weight_sum > 0:
                 line_cost = total_production_cost * (sales_amount / weight_sum)
+            elif qty_main_sum > 0:
+                line_cost = total_production_cost * (spec["qty_main"] / qty_main_sum)
             elif n_out > 0:
                 line_cost = total_production_cost / Decimal(n_out)
             else:
@@ -5239,6 +6573,8 @@ def _calculate_invoice_profit(
                 "product_name": spec["product_name"],
                 "quantity": float(qty),
                 "unit_price": float(unit_price),
+                "unit_price_base": float(spec["unit_price_base"]),
+                "sales_amount_document": float(spec["sales_amount_document"]),
                 "cost_per_unit": float(line_cost / qty) if qty > 0 else 0,
                 "sales_amount": float(sales_amount),
                 "total_cost": float(line_cost),
@@ -5278,14 +6614,18 @@ def _calculate_invoice_profit(
                     int(pid_v),
                     document.document_date,
                     warehouse_id=wh_key,
+                    include_untracked=(normalized_basis == "purchase_price"),
+                    normalize_quantity_to_main=(normalized_basis == "purchase_price"),
                 )
             return mv_cache[cache_k]
 
         gd_amt = _document_global_discount_amount_for_profit(document, item_lines)
         gd_alloc = _allocate_global_discount_to_lines(item_lines, gd_amt, is_sales_return=is_sales_return)
-        adjustments_net_total = _document_adjustments_net_for_profit(document)
+        adjustments_net_total = _document_adjustments_net_for_profit(document) * profit_fx_rate
 
         profit_rows: List[Dict[str, Any]] = []
+
+        from app.services.invoice_inventory_policy import invoice_line_posts_to_inventory
 
         for item_line in item_lines:
             extra_info = item_line.extra_info or {}
@@ -5306,11 +6646,12 @@ def _calculate_invoice_profit(
 
             if is_sales_return:
                 if raw_after_global > 0:
-                    sales_amount = -raw_after_global
+                    sales_amount_document = -raw_after_global
                 else:
-                    sales_amount = raw_after_global
+                    sales_amount_document = raw_after_global
             else:
-                sales_amount = raw_after_global
+                sales_amount_document = raw_after_global
+            sales_amount = sales_amount_document * profit_fx_rate
 
             product = None
             if item_line.product_id:
@@ -5330,18 +6671,35 @@ def _calculate_invoice_profit(
             line_gross_profit = Decimal(0)
 
             if product:
+                posts_inventory = invoice_line_posts_to_inventory(extra_info, product)
                 inbound_return_goods = (
-                    bool(is_sales_return) and (effective_move == "in") and inv_tracked_ok is not False
+                    bool(is_sales_return)
+                    and (effective_move == "in")
+                    and posts_inventory
+                    and (inv_tracked_ok is not False or normalized_basis == "purchase_price")
                 )
 
-                if inbound_return_goods:
+                if not posts_inventory:
+                    cost_per_unit = Decimal(0)
+                    total_line_cost = Decimal(0)
+                    line_gross_profit = sales_amount
+                elif inbound_return_goods:
                     cp_raw = extra_info.get("cost_price")
-                    if cp_raw is not None:
+                    if cp_raw is not None and normalized_basis != "purchase_price":
                         cost_per_unit = Decimal(str(cp_raw))
                     else:
                         mvl = _mv_list_pid_wh(product.id, wh_iter)
                         idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
                         if idx_ln is not None:
+                            from app.services.woo_return_source_service import return_quantity_main
+
+                            posted_return_qty = return_quantity_main(document, item_line.id)
+                            restoration_qty_for_match = posted_return_qty or quantity_line_to_main(
+                                qty,
+                                product,
+                                extra_info.get("unit"),
+                                strict=False,
+                            )
                             cost_per_unit = _restoration_unit_cost_sales_return_match_prior_sales(
                                 db,
                                 business_id,
@@ -5349,16 +6707,38 @@ def _calculate_invoice_profit(
                                 wh_iter,
                                 normalized_basis=normalized_basis,
                                 fifo_sm=fifo_sm,
-                                restoration_qty=qty,
+                                restoration_qty=restoration_qty_for_match,
                                 movements=mvl,
                                 return_mv_idx=int(idx_ln),
                                 return_document_as_of_date=document.document_date,
                                 prior_adjust_end_idx_exclusive=int(idx_ln),
+                                fallback_line=item_line,
+                                missing_purchase_price_policy=missing_purchase_price_policy,
                             )
+                            if posted_return_qty is not None:
+                                cost_per_unit = cost_per_unit * posted_return_qty / qty
+                            else:
+                                cost_per_unit = price_main_to_line(
+                                    cost_per_unit, product, extra_info.get("unit"), strict=False,
+                                )
                         else:
-                            cost_per_unit = _calculate_average_purchase_cost(
-                                db, business_id, product.id, document.document_date
-                            )
+                            if normalized_basis == "purchase_price":
+                                from app.services.invoice_purchase_price_snapshot_service import (
+                                    resolve_missing_purchase_price_unit_cost,
+                                )
+
+                                cost_per_unit = resolve_missing_purchase_price_unit_cost(
+                                    item_line,
+                                    missing_purchase_price_policy,
+                                )
+                            else:
+                                cost_per_unit = _main_cost_to_line_unit(
+                                    _calculate_average_purchase_cost(
+                                        db, business_id, product.id, document.document_date
+                                    ),
+                                    product,
+                                    item_line,
+                                )
                     total_line_cost = qty * cost_per_unit
                     line_gross_profit = sales_amount + total_line_cost
                 else:
@@ -5373,6 +6753,10 @@ def _calculate_invoice_profit(
                         warehouse_id,
                         int(document.id),
                         fifo_sm,
+                        missing_purchase_price_policy=missing_purchase_price_policy,
+                        allow_current_purchase_price_preview=bool(document.is_proforma),
+                        expected_base_currency_id=int(business.default_currency_id),
+                        document_fx_rate=profit_fx_rate,
                     )
                     total_line_cost = qty * cost_per_unit
                     line_gross_profit = sales_amount - total_line_cost
@@ -5399,6 +6783,8 @@ def _calculate_invoice_profit(
                 "product_name": pname,
                 "quantity": float(qty),
                 "unit_price": float(unit_price),
+                "unit_price_base": float(unit_price * profit_fx_rate),
+                "sales_amount_document": float(sales_amount_document),
                 "cost_per_unit": float(cost_per_unit),
                 "sales_amount": sales_amount,
                 "total_line_cost": total_line_cost,
@@ -5446,6 +6832,8 @@ def _calculate_invoice_profit(
                 "product_name": pr["product_name"],
                 "quantity": pr["quantity"],
                 "unit_price": pr["unit_price"],
+                "unit_price_base": pr["unit_price_base"],
+                "sales_amount_document": pr["sales_amount_document"],
                 "cost_per_unit": pr["cost_per_unit"],
                 "sales_amount": float(pr["sales_amount"]),
                 "total_cost": float(tlc),
@@ -5479,6 +6867,9 @@ def _calculate_invoice_profit(
         "total_cost": float(total_cost),
         "total_sales": float(total_sales),
         "line_profits": line_profits,
+        "profit_currency_id": int(business.default_currency_id),
+        "document_currency_id": int(document.currency_id) if document.currency_id else None,
+        "document_to_base_rate": float(profit_fx_rate),
     }
     
     if normalized_type in ["gross", "both"]:
@@ -5500,6 +6891,53 @@ def _calculate_invoice_profit(
     return result
 
 
+def _woo_invoice_create_operation(
+    db: Session, business_id: int, data: Dict[str, Any]
+) -> tuple[dict[str, str] | None, dict[str, Any] | None]:
+    if "woo_create_key" not in data:
+        return None, None
+    key = data["woo_create_key"]
+    extra = data.get("extra_info") or {}
+    if not isinstance(extra, dict):
+        extra = {}
+    order_id = extra.get("wc_order_id")
+    if (
+        not isinstance(key, str)
+        or not re.fullmatch(r"[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}", key)
+        or data.get("invoice_type") != "invoice_sales"
+        or extra.get("source") != "woocommerce"
+        or type(order_id) is not int
+        or order_id < 1
+        or extra.get("quick_sale")
+    ):
+        raise ApiError(
+            "INVALID_WOO_CREATE_KEY", "کلید عملیات صدور ووکامرس یا اطلاعات سفارش نامعتبر است.", http_status=422
+        )
+    fingerprint = hashlib.sha256(
+        json.dumps(data, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    operation = {"key": key, "fingerprint": fingerprint}
+    acquire_transaction_lock(db, f"woo_invoice_create:{business_id}:{key}")
+    matches = db.query(Document).filter(
+        Document.business_id == business_id,
+        Document.developer_settings["woo_invoice_create"]["key"].as_string() == key,
+    ).limit(2).all()
+    if not matches:
+        return operation, None
+    if len(matches) != 1 or matches[0].developer_settings["woo_invoice_create"] != operation:
+        raise ApiError(
+            "WOO_CREATE_KEY_REUSED", "این کلید قبلاً برای درخواست صدور دیگری استفاده شده است.", http_status=409
+        )
+    invoice = matches[0]
+    return operation, {
+        "id": invoice.id,
+        "code": invoice.code,
+        "document_type": invoice.document_type,
+        "woo_create_replayed": True,
+    }
+
+
+
 def create_invoice(
     db: Session,
     business_id: int,
@@ -5507,6 +6945,7 @@ def create_invoice(
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
     user_can_change_invoice_unit_price: bool = True,
+    user_can_confirm_expired_sale: bool = False,
     *,
     commit: bool = True,
     skip_post_commit_hooks: bool = False,
@@ -5517,6 +6956,12 @@ def create_invoice(
     invoice_type = str(data.get("invoice_type", "")).strip()
     if invoice_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("INVALID_INVOICE_TYPE", "Unsupported invoice_type", http_status=400)
+
+    woo_operation, replay = _woo_invoice_create_operation(db, business_id, data)
+    if replay is not None:
+        if commit:
+            db.rollback()  # Release the transaction lock before the next bulk item.
+        return replay
 
     document_date = _parse_iso_date(data.get("document_date", datetime.now()))
     currency_id = data.get("currency_id")
@@ -5532,11 +6977,57 @@ def create_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not isinstance(lines_input, list) or len(lines_input) == 0:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+    from app.services.woo_return_source_service import STOCK_KEY, prepare_woo_return_stock
+
+    woo_return_stock = prepare_woo_return_stock(db, business_id, data, lines_input, invoice_type)
+    validate_invoice_line_totals(
+        data, lines_input, currency, db=db, business_id=business_id, invoice_type=invoice_type,
+        prepare_discount_lines=(
+            _canonicalize_quick_sale_line_amounts
+            if extra_info_dict(data.get("extra_info")).get("quick_sale") is True else None
+        ),
+    )
+    _apply_expired_sale_confirm_permission(
+        invoice_type,
+        lines_input,
+        user_can_confirm_expired_sale=user_can_confirm_expired_sale,
+    )
 
     # اعتبارسنجی ویژه برای فاکتور تولید
     if invoice_type == INVOICE_PRODUCTION:
-        header_extra_check = data.get("extra_info") or {}
+        raw_header_extra_check = data.get("extra_info")
+        header_extra_check = dict(raw_header_extra_check) if isinstance(raw_header_extra_check, dict) else {}
+        # اگر سفارش تولید لینک شده و هزینه عملیات خالی باشد، استاندارد باقیماندهٔ سفارش را پیشنهاد بده.
+        order_id_hint = header_extra_check.get("production_order_id")
+        ops_hint = _parse_production_operations_total(header_extra_check.get("production_operations_total"))
+        if order_id_hint is not None and (ops_hint is None or ops_hint <= 0):
+            try:
+                order_id_hint = int(order_id_hint)
+            except (TypeError, ValueError):
+                order_id_hint = None  # The production-order validator returns the precise API error below.
+        if order_id_hint is not None and (ops_hint is None or ops_hint <= 0):
+            from adapters.db.models.production_order import ProductionOrder
+            from app.services.production_order_service import suggested_operations_total_for_order
+
+            linked_order = db.query(ProductionOrder).filter(
+                ProductionOrder.id == order_id_hint,
+                ProductionOrder.business_id == int(business_id),
+            ).first()
+            if linked_order:
+                primary_output_qty = sum(
+                    (Decimal(str(line.get("quantity", 0) or 0)) for line in lines_input
+                     if (line.get("extra_info") or {}).get("movement") == "in"
+                     and int(line.get("product_id") or 0) == int(linked_order.product_id)),
+                    Decimal("0"),
+                )
+                suggested = suggested_operations_total_for_order(
+                    db, business_id, order_id_hint, primary_output_qty
+                )
+                header_extra_check["production_operations_total"] = float(suggested)
+                data["extra_info"] = header_extra_check
         _validate_production_invoice_lines(db, business_id, lines_input, header_extra_check)
+        _attach_production_order_to_invoice_lines(lines_input, header_extra_check)
+        _attach_production_order_lots_to_invoice_lines(db, business_id, lines_input, header_extra_check)
 
     _stamp_movement_on_invoice_lines(invoice_type, lines_input)
 
@@ -5548,6 +7039,8 @@ def create_invoice(
     # جمع‌ها: تخفیف کلی (در صورت وجود) سپس totals از extra_info یا خطوط
     raw_extra = data.get("extra_info")
     header_extra: Dict[str, Any] = dict(raw_extra) if isinstance(raw_extra, dict) else {}
+    if invoice_type == INVOICE_PRODUCTION and header_extra.get("production_order_id") is not None:
+        header_extra["production_order_id"] = int(header_extra["production_order_id"])
     if person_id and header_extra.get("person_id") is None:
         header_extra["person_id"] = int(person_id)
     dd_top = data.get("due_date")
@@ -5592,7 +7085,7 @@ def create_invoice(
     try:
         from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
 
-        maybe_apply_loyalty_redemption_to_invoice_payload(
+        club_discount_applied = maybe_apply_loyalty_redemption_to_invoice_payload(
             db,
             business_id,
             invoice_type,
@@ -5602,6 +7095,7 @@ def create_invoice(
             header_extra,
             data,
             user_id,
+            invoice_lines=lines_input,
         )
     except ApiError:
         raise
@@ -5616,6 +7110,7 @@ def create_invoice(
 
     header_extra = dict(data.get("extra_info") or {})
     totals = dict(header_extra.get("totals") or {})
+    total_with_tax = total_with_tax_from_totals_dict(totals)
 
     if (
         invoice_type == INVOICE_SALES
@@ -5630,7 +7125,7 @@ def create_invoice(
             currency_id=int(currency_id),
             document_date=document_date,
             fiscal_year_id=int(fiscal_year.id),
-            invoice_total=Decimal(str(totals.get("net", 0) or 0)),
+            invoice_total=total_with_tax if club_discount_applied else Decimal(str(totals.get("net", 0) or 0)),
             header_extra=header_extra,
         )
         data["extra_info"] = header_extra
@@ -5657,12 +7152,16 @@ def create_invoice(
     # Resolve inventory tracking per product and annotate lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
     track_map: Dict[int, bool] = {}
+    item_type_map: Dict[int, Any] = {}
     if all_product_ids:
-        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+        for pid, tracked, item_type in db.query(
+            Product.id, Product.track_inventory, Product.item_type
+        ).filter(
             Product.business_id == business_id,
             Product.id.in_(all_product_ids),
         ).all():
             track_map[int(pid)] = bool(tracked)
+            item_type_map[int(pid)] = item_type
 
     product_tax_map = _build_product_tax_snapshot_map(db, business_id, all_product_ids)
 
@@ -5672,12 +7171,18 @@ def create_invoice(
             continue
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        item_type = item_type_map.get(int(pid))
+        if item_type is not None:
+            info["item_type"] = getattr(item_type, "value", item_type)
         tax_meta = product_tax_map.get(int(pid))
         if tax_meta:
             snapshot = {k: v for k, v in tax_meta.items() if v is not None}
             snapshot["captured_at"] = datetime.utcnow().isoformat()
             info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
+    from app.services.fixed_asset_service import prepare_invoice_capital_lines
+
+    prepare_invoice_capital_lines(db, business_id, invoice_type, lines_input)
     _apply_invoice_missing_line_warehouse_policy(
         db,
         business_id,
@@ -5696,10 +7201,6 @@ def create_invoice(
     discount = Decimal(str(totals["discount"]))
     net = gross - discount
     tax = Decimal(str(totals["tax"]))
-    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
-
-    total_with_tax = total_with_tax_from_totals_dict(totals)
-
     ensure_document_policy_allows_creation(
         db,
         business_id,
@@ -5718,6 +7219,9 @@ def create_invoice(
         "adjustments_net": float(Decimal(str(totals.get("adjustments_net", 0)))),
         "adjustments_tax": float(Decimal(str(totals.get("adjustments_tax", 0)))),
     }
+
+    if club_discount_applied:
+        new_extra_info["totals"][SALES_RECEIVABLE_TOTAL_KEY] = str(total_with_tax)
 
     from app.services.invoice_fx_revaluation import apply_fx_revaluation_to_invoice_extra
 
@@ -5884,6 +7388,9 @@ def create_invoice(
                 http_status=409,
             )
 
+    if woo_operation is not None:
+        document.developer_settings = {"woo_invoice_create": woo_operation}
+
     from app.services.invoice_line_unit_price_guard import validate_invoice_lines_unit_price_policy
 
     validate_invoice_lines_unit_price_policy(
@@ -5896,30 +7403,66 @@ def create_invoice(
     )
 
     # ذخیره اقلام فاکتور در جدول مجزا (invoice_item_lines)
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]] = []
     for line in lines_input:
         product_id = line.get("product_id")
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
         extra_info = dict(line.get("extra_info") or {})
-        extra_info.pop("inventory_posted", None)
-        
+        from app.services.fixed_asset_capital_purchase import is_capital_invoice_line
+
+        if not is_capital_invoice_line(extra_info):
+            extra_info.pop("inventory_posted", None)
+
+        extra_info = _ensure_unique_sales_return_instances(
+            db,
+            business_id,
+            int(product_id),
+            extra_info,
+            int(qty),
+            invoice_type,
+            source_invoice_id=(extra_info_dict(document.extra_info).get("returned_from_invoice_id")
+                               or extra_info_dict(document.extra_info).get("copy_from_invoice_id")),
+            document_date=document.document_date,
+        )
+        extra_info = _normalize_unique_instance_ids(extra_info)
+        line["extra_info"] = extra_info
+
         # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
         selected_instance_ids = extra_info.get("selected_instance_ids")
         if selected_instance_ids:
             _validate_selected_instances(
-                db, business_id, int(product_id), selected_instance_ids, int(qty), invoice_type
+                db,
+                business_id,
+                int(product_id),
+                selected_instance_ids,
+                int(qty),
+                invoice_type,
+                allow_expired_confirm=bool(
+                    extra_info.get("allow_expired_lot_sale") or extra_info.get("manager_confirm_expired")
+                ),
+                document_date=document.document_date,
             )
 
         _validate_invoice_line_custom_attributes(db, business_id, line)
 
-        db.add(InvoiceItemLine(
+        item_line = InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
             quantity=qty,
             description=line.get("description"),
             extra_info=extra_info,
-        ))
+        )
+        db.add(item_line)
+        created_invoice_lines.append((item_line, line))
+    db.flush()
+    _persist_invoice_variant_allocations(db, business_id, created_invoice_lines)
+    if woo_return_stock:
+        document.developer_settings = {
+            **(document.developer_settings or {}),
+            STOCK_KEY: {str(created_invoice_lines[index][0].id): stock for index, stock in woo_return_stock.items()},
+        }
 
     # Accounting lines for finalized invoices (COGS/Inventory در invoice_cogs_gl_service ثبت می‌شود)
     if not document.is_proforma:
@@ -6054,63 +7597,29 @@ def create_invoice(
 
         # Purchase
         elif invoice_type == INVOICE_PURCHASE:
-            from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
-
-            add_purchase_invoice_debit_lines(
-                db,
-                document_id=int(document.id),
-                mode=_purchase_mode,
-                accounts=accounts,
-                gross=gross,
-            )
-            # تخفیفات خرید به صورت جداگانه
-            if discount > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["purchase_discount"].id,
-                    debit=Decimal(0),
-                    credit=discount,
-                    description="تخفیفات خرید",
-                ))
-            # VAT ورودی
-            if tax > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["vat_in"].id,
-                    debit=tax,
-                    credit=Decimal(0),
-                    description="مالیات بر ارزش افزوده ورودی",
-                ))
-            # طرف‌شخص (حساب‌های پرداختنی) به مبلغ خالص با مالیات
-            if person_id:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["person"].id,
-                    person_id=person_id,
-                    debit=Decimal(0),
-                    credit=total_with_tax,
-                    description=data.get("description"),
-                    extra_info={"side": "person", "person_id": person_id},
-                ))
-            add_adjustment_document_lines(
+            _apply_purchase_invoice_accounting(
                 db,
                 business_id=business_id,
                 document_id=int(document.id),
-                invoice_type=invoice_type,
+                purchase_mode=_purchase_mode,
                 accounts=accounts,
+                lines_input=lines_input,
+                person_id=person_id,
+                tax=tax,
+                total_with_tax=total_with_tax,
+                description=data.get("description"),
+                invoice_type=invoice_type,
                 header_extra=_adj_extra,
             )
 
         # Purchase Return
         elif invoice_type == INVOICE_PURCHASE_RETURN:
-            from app.services.purchase_accounting_service import add_purchase_return_credit_lines
-
-            add_purchase_return_credit_lines(
+            _apply_purchase_return_inventory_credits(
                 db,
                 document_id=int(document.id),
-                mode=_purchase_mode,
+                purchase_mode=_purchase_mode,
                 accounts=accounts,
-                gross=gross,
+                lines_input=lines_input,
             )
             # برگشت تخفیفات خرید
             if discount > 0:
@@ -6178,7 +7687,7 @@ def create_invoice(
                     # بدهکار: هزینه ضایعات
                     db.add(DocumentLine(
                         document_id=document.id,
-                        account_id=accounts["waste_expense"].id,
+                        account_id=_waste_expense_account_id(db, int(business_id), accounts),
                         debit=total_cogs,
                         credit=Decimal(0),
                         description="هزینه کسری و ضایعات کالا",
@@ -6197,13 +7706,20 @@ def create_invoice(
                 # جداسازی خطوط ورودی و خروجی
                 out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
                 in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+                posting_header = header_extra
+                if _try_plugin_production_posting(
+                    db, document, int(business_id), accounts, header_extra, out_lines, in_lines, created_invoice_lines
+                ):
+                    out_lines = []
+                    in_lines = []
+                    posting_header = {}
                 
                 # محاسبه COGS برای مواد اولیه (خروج)
                 total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
 
                 # هزینه عملیات/سربار تولید (در صورت ارسال از UI)
                 try:
-                    operations_total = Decimal(str((header_extra or {}).get("production_operations_total", 0) or 0))
+                    operations_total = Decimal(str((posting_header or {}).get("production_operations_total", 0) or 0))
                 except Exception:
                     operations_total = Decimal(0)
                 
@@ -6247,11 +7763,13 @@ def create_invoice(
                     cost_per_unit = remaining_cost / remaining_quantity if remaining_quantity > 0 else Decimal(0)
                     
                     for line in in_lines:
-                        extra_info = line.get("extra_info") or {}
+                        extra_info = dict(line.get("extra_info") or {})
                         qty = Decimal(str(line.get("quantity", 0) or 0))
                         if qty > 0 and extra_info.get("cost_price") is None:
                             cost_line = qty * cost_per_unit
                             total_finished_cost += cost_line
+                            extra_info["cost_price"] = float(cost_per_unit)
+                            line["extra_info"] = extra_info
                 
                 # مرحله 3: اعتبارسنجی توازن WIP
                 # اگر همه خطوط cost_price دستی دارند، باید بررسی کنیم که توازن برقرار است
@@ -6271,6 +7789,9 @@ def create_invoice(
                             qty = Decimal(str(line.get("quantity", 0) or 0))
                             if qty > 0:
                                 total_finished_cost += qty * cost_per_unit
+                                extra_info = dict(line.get("extra_info") or {})
+                                extra_info["cost_price"] = float(cost_per_unit)
+                                line["extra_info"] = extra_info
                 
                 # اعتبارسنجی نهایی توازن WIP
                 total_wip_debit = total_materials_cost + operations_total
@@ -6344,6 +7865,7 @@ def create_invoice(
                         credit=total_finished_cost,
                         description="انتقال محصول نهایی از WIP",
                     ))
+                _sync_payload_cost_price_to_item_lines(created_invoice_lines)
 
         # --- پورسانت فروشنده/بازاریاب (تکمیلی پس از ثبت خطوط انواع فاکتور) ---
         if invoice_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
@@ -6385,6 +7907,15 @@ def create_invoice(
                         credit=commission_amount,
                         description="تعدیل هزینه پورسانت",
                     ))
+
+    # snapshot قیمت خرید فروش/مصرف تولید قبل از هر محاسبه ledger یا تغییر بعدی قیمت کالا
+    if not document.is_proforma:
+        db.flush()
+        from app.services.invoice_purchase_price_snapshot_service import (
+            stamp_document_purchase_price_snapshots,
+        )
+
+        stamp_document_purchase_price_snapshots(db, document, overwrite=False)
 
     # همگام‌سازی قیمت پایه کالا (ارز پیش‌فرض کسب‌وکار) از فاکتور قطعی
     # Session با autoflush=False است؛ بدون flush، کوئری invoice_item_lines خالی می‌ماند.
@@ -6486,6 +8017,11 @@ def create_invoice(
     elif payments and isinstance(payments, list) and payments:
         logger.debug(f"No payment_docs for invoice {document.id}; payments payload present: {payments}")
 
+    if invoice_type == INVOICE_PURCHASE and not document.is_proforma:
+        from app.services.fixed_asset_service import sync_capital_assets_from_purchase_invoice
+
+        sync_capital_assets_from_purchase_invoice(db, business_id, document, user_id)
+
     # ایجاد حواله انبار در صورت نیاز (همان منطق در _create_warehouse_documents_for_invoice)
     try:
         created_wh_ids = _create_warehouse_documents_for_invoice(
@@ -6559,6 +8095,33 @@ def create_invoice(
     except Exception:
         logger.exception("stamp_document_lines_fx_base failed (create) doc_id=%s", getattr(document, "id", None))
         raise ApiError("FX_BASE_STAMP_ERROR", "خطا در ثبت مبالغ پایه خطوط سند", http_status=400)
+
+    if (
+        not document.is_proforma
+        and invoice_type == INVOICE_PRODUCTION
+        and (document.extra_info or {}).get("production_order_id") is not None
+    ):
+        try:
+            from app.services.production_order_service import refresh_production_order_actual_costs
+
+            refresh_production_order_actual_costs(
+                db,
+                business_id,
+                int((document.extra_info or {})["production_order_id"]),
+            )
+        except ApiError:
+            raise
+        except Exception as cost_ex:
+            logger.exception(
+                "production order costing refresh failed doc_id=%s err=%s",
+                document.id,
+                cost_ex,
+            )
+            raise ApiError(
+                "PRODUCTION_COSTING_REFRESH_FAILED",
+                "به‌روزرسانی بهای واقعی سفارش تولید ناموفق بود؛ فاکتور ذخیره نشد",
+                http_status=409,
+            ) from cost_ex
 
     if commit:
         db.commit()
@@ -6644,6 +8207,676 @@ def create_invoice(
     return result
 
 
+_INVOICE_BODY_EXTRA_KEYS = (
+    "person_id",
+    "seller_id",
+    "customer_id",
+    "supplier_id",
+    "invoice_adjustments",
+    "global_discount",
+    "installment_plan",
+    "purchase_accounting_mode",
+    "post_inventory",
+    "auto_post_warehouse",
+    "quick_sale",
+    "customer_club",
+    "production_order_id",
+    "production_operations_total",
+)
+_LINE_BODY_EXTRA_KEYS = (
+    "unit_price",
+    "line_discount",
+    "tax_amount",
+    "discount_type",
+    "discount_value",
+    "tax_rate",
+    "unit",
+    "warehouse_id",
+    "fixed_asset",
+    "fixed_asset_class_id",
+    "fixed_asset_location_id",
+    "fixed_asset_custodian_person_id",
+    "fixed_asset_salvage",
+    "fixed_asset_useful_life_months",
+    "fixed_asset_declining_annual_rate",
+    "fixed_asset_name",
+    "fixed_asset_commission_date",
+    "selected_instance_ids",
+    "returned_from_instance_ids",
+    "inventory_tracked",
+    "capitalization",
+)
+_LINE_BODY_IGNORE_EXTRA_KEYS = frozenset(
+    {
+        "fixed_asset_id",
+        "line_total",
+        "movement",
+        "tax_snapshot",
+        "inventory_posted",
+        "unit_price_source",
+    }
+)
+_LINE_BODY_OPTIONAL_EXTRA_KEYS = frozenset(
+    {
+        "discount_type",
+        "discount_value",
+        "tax_rate",
+        "unit",
+        "inventory_tracked",
+    }
+)
+
+
+def _canonical_optional_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _canonical_amount(value: Any) -> Optional[str]:
+    if value is None or value == "":
+        return None
+    try:
+        quantized = Decimal(str(value)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, TypeError, ValueError):
+        text = str(value).strip()
+        return text or None
+    return format(quantized, "f")
+
+
+def _canonical_jsonish(value: Any) -> Any:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for key in sorted(value.keys(), key=lambda item: str(item)):
+            canonical = _canonical_jsonish(value[key])
+            if canonical is None:
+                continue
+            out[str(key)] = canonical
+        return out or None
+    if isinstance(value, (list, tuple)):
+        items = [_canonical_jsonish(item) for item in value]
+        return items or None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (int, float, Decimal)):
+        return _canonical_amount(value)
+    text = str(value).strip()
+    return text or None
+
+
+def _picked_extra(extra: Any, keys: Tuple[str, ...]) -> Dict[str, Any]:
+    info = extra_info_dict(extra)
+    picked: Dict[str, Any] = {}
+    for key in keys:
+        if key in info:
+            picked[key] = info[key]
+    return picked
+
+
+def _invoice_line_parts(line: Any) -> Tuple[Optional[int], Optional[str], Optional[str], Dict[str, Any]]:
+    if isinstance(line, dict):
+        product_id = line.get("product_id")
+        quantity = line.get("quantity")
+        description = line.get("description")
+        extra = extra_info_dict(line.get("extra_info"))
+    else:
+        product_id = getattr(line, "product_id", None)
+        quantity = getattr(line, "quantity", None)
+        description = getattr(line, "description", None)
+        extra = extra_info_dict(getattr(line, "extra_info", None))
+    extra_part = _picked_extra(extra, _LINE_BODY_EXTRA_KEYS)
+    for key, value in extra.items():
+        key_name = str(key)
+        if key_name in _LINE_BODY_IGNORE_EXTRA_KEYS:
+            continue
+        if key_name.startswith("fixed_asset"):
+            extra_part[key_name] = value
+    desc = str(description).strip() if description is not None else ""
+    return (
+        _canonical_optional_int(product_id),
+        _canonical_amount(quantity),
+        desc or None,
+        extra_part,
+    )
+
+
+def _invoice_line_extras_equal(existing_extra: Dict[str, Any], incoming_extra: Dict[str, Any]) -> bool:
+    keys = set(existing_extra) | set(incoming_extra)
+    for key in keys:
+        if key in _LINE_BODY_OPTIONAL_EXTRA_KEYS and (key not in existing_extra or key not in incoming_extra):
+            continue
+        if _canonical_jsonish(existing_extra.get(key)) != _canonical_jsonish(incoming_extra.get(key)):
+            return False
+    return True
+
+
+def _invoice_lines_economically_equal(existing_lines: List[Any], incoming_lines: List[Any]) -> bool:
+    if len(existing_lines) != len(incoming_lines):
+        return False
+    for old, new in zip(existing_lines, incoming_lines):
+        old_pid, old_qty, old_desc, old_extra = _invoice_line_parts(old)
+        new_pid, new_qty, new_desc, new_extra = _invoice_line_parts(new)
+        if (old_pid, old_qty, old_desc) != (new_pid, new_qty, new_desc):
+            return False
+        if not _invoice_line_extras_equal(old_extra, new_extra):
+            return False
+    return True
+
+
+def _normalize_invoice_body_extra(extra: Any) -> Dict[str, Any]:
+    picked = _picked_extra(extra, _INVOICE_BODY_EXTRA_KEYS)
+    if "post_inventory" not in picked:
+        picked["post_inventory"] = True
+    if "auto_post_warehouse" not in picked:
+        picked["auto_post_warehouse"] = False
+    return picked
+
+
+def _invoice_extra_body_equal(existing_extra: Any, incoming_extra: Any) -> bool:
+    return _canonical_jsonish(_normalize_invoice_body_extra(existing_extra)) == _canonical_jsonish(
+        _normalize_invoice_body_extra(incoming_extra)
+    )
+
+
+def _invoice_payload_preserves_invoice_body(
+    db: Session,
+    document: Document,
+    data: Dict[str, Any],
+    *,
+    inv_type: str,
+    old_document_type: str,
+) -> bool:
+    """True اگر payload بدنهٔ فاکتور (اقلام، بها، طرف‌حساب، نوع) را عوض نکند."""
+    if inv_type != old_document_type:
+        return False
+    if "is_proforma" in data and bool(data.get("is_proforma")) != bool(document.is_proforma):
+        return False
+    if data.get("document_date") not in (None, ""):
+        if _parse_iso_date(data.get("document_date")) != _parse_iso_date(document.document_date):
+            return False
+    if data.get("currency_id") not in (None, ""):
+        if _canonical_optional_int(data.get("currency_id")) != _canonical_optional_int(document.currency_id):
+            return False
+    if "code" in data and str(data.get("code") or "").strip() != str(document.code or "").strip():
+        return False
+    if "project_id" in data and _canonical_optional_int(data.get("project_id")) != _canonical_optional_int(
+        document.project_id
+    ):
+        return False
+    if "description" in data:
+        incoming_desc = str(data.get("description") or "").strip() or None
+        current_desc = str(document.description or "").strip() or None
+        if incoming_desc != current_desc:
+            return False
+    if data.get("fx_rate_id") not in (None, ""):
+        extra = extra_info_dict(document.extra_info)
+        fx = extra.get("fx") if isinstance(extra.get("fx"), dict) else {}
+        current_fx_id = fx.get("rate_row_id") if fx.get("mode") == "selected" else None
+        if _canonical_optional_int(data.get("fx_rate_id")) != _canonical_optional_int(current_fx_id):
+            return False
+    if isinstance(data.get("extra_info"), dict) and not _invoice_extra_body_equal(
+        document.extra_info, data.get("extra_info")
+    ):
+        return False
+    if "lines" in data:
+        existing_lines = (
+            db.query(InvoiceItemLine)
+            .filter(InvoiceItemLine.document_id == document.id)
+            .order_by(InvoiceItemLine.id.asc())
+            .all()
+        )
+        incoming_lines = list(data.get("lines") or [])
+        if not _invoice_lines_economically_equal(existing_lines, incoming_lines):
+            return False
+    return True
+
+
+def _woo_posted_issue_update(
+    db: Session, document: Document, data: Dict[str, Any], invoice_type: str,
+) -> Optional[bool]:
+    """True preserves a proven posted issue. False runs the normal stock rewrite."""
+    extra = extra_info_dict(document.extra_info)
+    if (
+        document.document_type != INVOICE_SALES
+        or invoice_type != INVOICE_SALES
+        or document.is_proforma
+        or extra.get("source") != "woocommerce"
+        or "lines" not in data
+    ):
+        return None
+
+    from adapters.db.models.product_variant_allocation import (
+        InvoiceItemLineVariantAllocation, WarehouseLineVariantAllocation,
+    )
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+    from app.services.variant_allocation_service import _normalized_items, parse_payload_allocations
+
+    old_lines = db.query(InvoiceItemLine).filter_by(document_id=document.id).all()
+    fiscal_allocations = {
+        row.id: row
+        for row in db.query(InvoiceItemLineVariantAllocation)
+        .filter(InvoiceItemLineVariantAllocation.invoice_item_line_id.in_([line.id for line in old_lines]))
+        .all()
+    }
+    issues = (
+        db.query(WarehouseDocumentLine, WarehouseLineVariantAllocation)
+        .join(WarehouseDocument, WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id)
+        .outerjoin(
+            WarehouseLineVariantAllocation,
+            WarehouseLineVariantAllocation.warehouse_document_line_id == WarehouseDocumentLine.id,
+        )
+        .filter(
+            WarehouseDocument.business_id == document.business_id,
+            WarehouseDocument.source_type == "invoice",
+            WarehouseDocument.source_document_id == document.id,
+            WarehouseDocument.status == "posted",
+            WarehouseDocument.doc_type == "issue",
+            WarehouseDocumentLine.movement == "out",
+        )
+        .all()
+    )
+    if not issues or not (fiscal_allocations or any(allocation for _, allocation in issues)):
+        return None
+
+    def ambiguous() -> ApiError:
+        return ApiError(
+            "WOO_POSTED_ISSUE_SOURCE_AMBIGUOUS",
+            "تخصیص قطعی حوالهٔ فروش ووکامرس قابل تطبیق نیست. سند و حواله را بررسی کنید.",
+            http_status=409,
+        )
+
+    def index_by_item(lines):
+        indexed = {}
+        for line in lines:
+            if line is None or (not isinstance(line, dict) and not isinstance(line, InvoiceItemLine)):
+                raise ambiguous()
+            info = extra_info_dict(line.get("extra_info") if isinstance(line, dict) else line.extra_info)
+            item_id = _canonical_optional_int(info.get("wc_item_id"))
+            if item_id is None and info.get("wc_line_kind") in {"shipping", "fee"}:
+                identity = (info["wc_line_kind"], info.get("wc_fee_label"))
+            elif item_id is not None and item_id > 0:
+                identity = ("item", item_id)
+            else:
+                raise ambiguous()
+            if identity in indexed:
+                raise ambiguous()
+            indexed[identity] = line
+        return indexed
+
+    old_by_item = index_by_item(old_lines)
+    new_by_item = index_by_item(list(data.get("lines") or []))
+    incoming_header = extra_info_dict(data.get("extra_info"))
+    same_woo_order = (
+        extra.get("wc_order_id") is not None
+        and incoming_header.get("source") == "woocommerce"
+        and incoming_header.get("wc_order_id") == extra.get("wc_order_id")
+    )
+    allocation_by_line: Dict[int, list[Any]] = defaultdict(list)
+    for row in fiscal_allocations.values():
+        allocation_by_line[row.invoice_item_line_id].append(row)
+
+    old_by_id = {line.id: line for line in old_lines}
+    covered = set()
+    quantities_by_issue: Dict[int, Decimal] = defaultdict(Decimal)
+    issue_quantities = {}
+    for issue, allocation in issues:
+        line_id = _canonical_optional_int(extra_info_dict(issue.extra_info).get("invoice_item_line_id"))
+        if allocation is None:
+            if line_id in allocation_by_line or line_id is None:
+                raise ambiguous()
+            continue
+        original = fiscal_allocations.get(allocation.source_document_allocation_id)
+        if (
+            original is None
+            or original.invoice_item_line_id != line_id
+            or original.business_id != document.business_id
+            or allocation.business_id != document.business_id
+            or old_by_id[line_id].product_id != issue.product_id
+            or (extra_info_dict(old_by_id[line_id].extra_info).get("warehouse_id") is not None
+                and _canonical_optional_int(old_by_id[line_id].extra_info.get("warehouse_id")) != issue.warehouse_id)
+            or original.product_id != issue.product_id
+            or allocation.product_id != issue.product_id
+            or allocation.variant_id != original.variant_id
+            or allocation.quantity <= 0
+        ):
+            raise ambiguous()
+        covered.add(original.id)
+        quantities_by_issue[issue.id] += allocation.quantity
+        issue_quantities[issue.id] = issue.quantity
+    if covered != fiscal_allocations.keys() or quantities_by_issue != issue_quantities:
+        raise ambiguous()
+
+    if old_by_item.keys() != new_by_item.keys():
+        return False
+
+    ordered_old = []
+    ordered_new = []
+    money_changed = False
+    for key, previous in old_by_item.items():
+        incoming = new_by_item[key]
+        old_info = extra_info_dict(previous.extra_info)
+        new_info = extra_info_dict(incoming.get("extra_info"))
+        raw_qty = incoming.get("quantity")
+        try:
+            qty = Decimal(str(raw_qty))
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            raise ambiguous() from exc
+        if not qty.is_finite() or qty <= 0:
+            raise ambiguous()
+        if (
+            _canonical_optional_int(incoming.get("product_id")) != previous.product_id
+            or qty != previous.quantity
+            or _canonical_optional_int(new_info.get("warehouse_id")) != _canonical_optional_int(old_info.get("warehouse_id"))
+            or _canonical_optional_int(incoming.get("warehouse_location_id", new_info.get("warehouse_location_id")))
+                != _canonical_optional_int(old_info.get("warehouse_location_id"))
+            or new_info.get("movement", "out") != old_info.get("movement", "out")
+            or sorted(
+                (vid, amount, _canonical_amount(price))
+                for vid, amount, price in _normalized_items(parse_payload_allocations(incoming))
+            ) != sorted(
+                (row.variant_id, row.quantity, _canonical_amount(row.unit_price))
+                for row in allocation_by_line[previous.id]
+            )
+        ):
+            return False
+        if allocation_by_line[previous.id]:
+            if any(
+                not old_info.get(field) or new_info.get(field) != old_info[field]
+                for field in ("wc_product_id", "wc_variation_id")
+            ):
+                raise ambiguous()
+            # The Woo mapper historically sent 'عدد' even for a sale saved in 'main'.
+            if not old_info.get("unit"):
+                raise ambiguous()
+            if new_info.get("unit") != old_info["unit"] and not (
+                same_woo_order and new_info.get("unit") == "عدد"
+            ):
+                raise ambiguous()
+            incoming = {**incoming, "extra_info": {**new_info, "unit": old_info["unit"]}}
+        try:
+            money_changed |= any(
+                Decimal(str(new_info.get(field) or 0)) != Decimal(str(old_info.get(field) or 0))
+                for field in ("unit_price", "line_discount", "tax_amount")
+            )
+        except InvalidOperation as exc:
+            raise ApiError("INVALID_LINE", "مبلغ ردیف فاکتور نامعتبر است.", http_status=422) from exc
+        ordered_old.append(previous)
+        ordered_new.append(incoming)
+
+    # Only a header description, tags and payments may change without recomputing the invoice.
+    header = dict(data)
+    header.pop("description", None)
+    header.pop("lines")
+    if isinstance(header.get("extra_info"), dict):
+        supplied = dict(header["extra_info"])
+        if any(
+            _canonical_jsonish(value) != _canonical_jsonish(extra.get(key))
+            for key, value in supplied.items()
+            if key not in {"totals", "ignore_credit_check", *_INVOICE_BODY_EXTRA_KEYS}
+        ):
+            raise ambiguous()
+        header["extra_info"] = {**extra, **supplied}
+    if (
+        header.keys() - {
+            "invoice_type", "document_date", "currency_id", "is_proforma", "code", "project_id",
+            "fx_rate_id", "extra_info", "payments", "tag_ids",
+        }
+        or not _invoice_payload_preserves_invoice_body(
+            db, document, header, inv_type=invoice_type, old_document_type=document.document_type,
+        )
+        or money_changed
+        or not _invoice_lines_economically_equal(ordered_old, ordered_new)
+    ):
+        raise ApiError(
+            "WOO_POSTED_ISSUE_REWRITE_REQUIRED",
+            "این تغییر نیازمند بازسازی حواله و بهای قطعی فروش ووکامرس است. فاکتور تغییر نکرد.",
+            http_status=409,
+        )
+
+    validate_invoice_line_totals(
+        data, ordered_new, db.get(Currency, document.currency_id),
+        db=db, business_id=document.business_id, invoice_type=invoice_type,
+    )
+    return True
+
+
+
+def _sync_invoice_linked_payments(
+    db: Session,
+    *,
+    document: Document,
+    user_id: int,
+    invoice_type: str,
+    old_document_type: str,
+    data: Dict[str, Any],
+    old_change_payment_id: Any,
+) -> List[int]:
+    """جایگزینی اسناد دریافت/پرداخت پیوندی فاکتور؛ بدنهٔ فاکتور را دست نمی‌زند."""
+    payment_docs: List[int] = []
+    invoice_type_changed = invoice_type != old_document_type
+    payments_provided = "payments" in data and isinstance(data.get("payments"), list)
+    payments = list(data["payments"]) if payments_provided else []
+
+    if invoice_type_changed and not document.is_proforma and not payments_provided:
+        _clear_invoice_linked_receipt_payments(
+            db,
+            int(document.business_id),
+            int(document.id),
+            document,
+        )
+        return payment_docs
+
+    if payments_provided and not document.is_proforma:
+        from app.services.receipt_payment_service import delete_receipt_payment
+
+        header_extra_pm = document.extra_info or {}
+        person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
+
+        old_receipt_payment_ids = _get_receipt_payment_ids_linked_to_invoice(
+            db,
+            document.business_id,
+            int(document.id),
+            extra_info=header_extra_pm,
+        )
+
+        has_positive_payment = any(
+            Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
+        )
+        if payments and has_positive_payment:
+            person_id_pm = _resolve_and_validate_person_id(db, document.business_id, person_id_pm)
+            if not person_id_pm:
+                raise ApiError(
+                    "PERSON_REQUIRED",
+                    "برای ثبت تراکنش‌های پرداخت، انتخاب طرف حساب الزامی است.",
+                    http_status=400,
+                )
+
+        for old_rp_id in old_receipt_payment_ids:
+            delete_receipt_payment(db, int(old_rp_id), commit=False)
+        if old_change_payment_id is not None:
+            delete_receipt_payment(db, int(old_change_payment_id), commit=False)
+
+        extra = dict(document.extra_info) if document.extra_info else {}
+        links = dict(extra.get("links", {}))
+        links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
+        extra["links"] = links
+        document.extra_info = _normalize_document_extra_info_for_storage(extra)
+        flag_modified(document, "extra_info")
+
+        if not payments:
+            extra = dict(document.extra_info) if document.extra_info else {}
+            links = dict(extra.get("links", {}))
+            links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+            extra["links"] = links
+            document.extra_info = _normalize_document_extra_info_for_storage(extra)
+            flag_modified(document, "extra_info")
+        else:
+            payment_docs = _create_receipt_payment_documents_for_invoice_payments(
+                db,
+                business_id=int(document.business_id),
+                user_id=user_id,
+                document=document,
+                person_id=int(person_id_pm),
+                payments=payments,
+                invoice_type=invoice_type,
+            )
+            if payment_docs:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            else:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+
+        is_quick_sale_pm = bool((document.extra_info or {}).get("quick_sale", False))
+        if payments and invoice_type == INVOICE_SALES and is_quick_sale_pm and person_id_pm:
+            change_amount = _quick_sale_change_amount(document, payments)
+            if change_amount <= Decimal("0.01"):
+                extra = dict(document.extra_info) if document.extra_info else {}
+                extra.pop("quick_sale_change", None)
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            change_payment_id = _create_quick_sale_change_payment(
+                db,
+                business_id=int(document.business_id),
+                user_id=user_id,
+                document=document,
+                person_id=int(person_id_pm),
+                payments=payments,
+                change_request=(document.extra_info or {}).get("quick_sale_change"),
+            )
+            if change_payment_id:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = change_payment_id
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+    return payment_docs
+
+
+def _apply_invoice_payments_only_update(
+    db: Session,
+    *,
+    document: Document,
+    user_id: int,
+    data: Dict[str, Any],
+    inv_type: str,
+    old_document_type: str,
+    old_change_payment_id: Any,
+) -> Dict[str, Any]:
+    """ذخیرهٔ تراکنش‌های فاکتور بدون حذف/بازایجاد اقلام، سند حسابداری و کارت دارایی."""
+    logger.info(
+        "invoice %s payments-only update; skipping line rewrite",
+        document.id,
+    )
+    _sync_invoice_linked_payments(
+        db,
+        document=document,
+        user_id=user_id,
+        invoice_type=inv_type,
+        old_document_type=old_document_type,
+        data=data,
+        old_change_payment_id=old_change_payment_id,
+    )
+    if "tag_ids" in data:
+        from app.services.invoice_tag_service import replace_document_invoice_tags
+
+        replace_document_invoice_tags(
+            db, int(document.business_id), int(document.id), data.get("tag_ids")
+        )
+    db.commit()
+    db.refresh(document)
+    result = invoice_document_to_dict(db, document)
+    invalidate_invoices_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        invoice_id=document.id,
+        document_type=document.document_type,
+        project_id=document.project_id,
+    )
+    from app.services.document_service import invalidate_documents_cache
+
+    invalidate_documents_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_type=document.document_type,
+    )
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_invoice_updated
+
+        trigger_invoice_updated(
+            db=db,
+            business_id=int(document.business_id),
+            document=document,
+            user_id=user_id,
+        )
+    except Exception as wfe:
+        logger.warning("invoice.updated workflow trigger failed: %s", wfe, exc_info=True)
+    return result
+
+
+def _restore_procurement_receipt_stock_flags(
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+    preserved: List[Dict[str, Any]],
+) -> None:
+    """کالایی که با رسید سفارش موجودی گرفته، بعد از ویرایش فاکتور دوباره وارد کاردکس نمی‌شود."""
+    flagged_products = {int(row["product_id"]) for row in preserved if not row.get("skip")}
+    skipped_products = {int(row["product_id"]) for row in preserved if row.get("skip")}
+    order_line_by_product: Dict[int, Any] = {}
+    for row in preserved:
+        if row.get("order_line_id") is not None:
+            order_line_by_product.setdefault(int(row["product_id"]), row["order_line_id"])
+    for item_line, payload in created_invoice_lines:
+        payload_info = extra_info_dict(payload.get("extra_info") if isinstance(payload, dict) else None)
+        info = dict(item_line.extra_info or {})
+        stocked = bool(info.get("procurement_stocked_on_receipt") or payload_info.get("procurement_stocked_on_receipt"))
+        if int(item_line.product_id) in flagged_products:
+            stocked = True
+        skip = (not stocked) and bool(
+            info.get("procurement_skip_inventory")
+            or payload_info.get("procurement_skip_inventory")
+            or int(item_line.product_id) in skipped_products
+        )
+        if skip:
+            info["procurement_skip_inventory"] = True
+            info["inventory_posted"] = False
+        elif stocked:
+            info["procurement_stocked_on_receipt"] = True
+            info["inventory_posted"] = False
+        else:
+            continue
+        if info.get("procurement_order_line_id") is None:
+            remembered = payload_info.get("procurement_order_line_id") or order_line_by_product.get(int(item_line.product_id))
+            if remembered is not None:
+                info["procurement_order_line_id"] = remembered
+        item_line.extra_info = info
+        try:
+            from sqlalchemy import inspect as sa_inspect
+
+            sa_inspect(item_line)
+        except Exception:
+            continue
+        flag_modified(item_line, "extra_info")
+
+
 def update_invoice(
     db: Session,
     document_id: int,
@@ -6651,12 +8884,31 @@ def update_invoice(
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
     user_can_change_invoice_unit_price: bool = True,
+    user_can_confirm_expired_sale: bool = False,
 ) -> Dict[str, Any]:
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
     from app.services.sepidar_native_service import assert_document_editable
     assert_document_editable(document)
+
+    if document.document_type == INVOICE_SALES and (document.extra_info or {}).get("source") == "woocommerce":
+        document = db.query(Document).filter_by(id=document_id).with_for_update().populate_existing().first()
+        if document is None or document.document_type not in SUPPORTED_INVOICE_TYPES:
+            raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+
+    from app.services.woo_return_source_service import STOCK_KEY
+
+    if (
+        document.document_type == INVOICE_SALES_RETURN
+        and (document.developer_settings or {}).get(STOCK_KEY)
+        and any(key not in {"payments", "tag_ids"} for key in data)
+    ):
+        raise ApiError(
+            "WOO_RETURN_STOCK_REWRITE_REQUIRED",
+            "بازنویسی برگشت ووکامرس با حوالهٔ مبدأ ثبت‌شده مجاز نیست.",
+            http_status=409,
+        )
 
     _pre_links_wh = (document.extra_info or {}).get("links") or {}
     _old_warehouse_document_ids = list(_pre_links_wh.get("warehouse_document_ids") or [])
@@ -6678,15 +8930,71 @@ def update_invoice(
         pass
 
     _old_document_type = str(document.document_type or "")
+    _old_production_order_id: Optional[int] = None
+    if _old_document_type == INVOICE_PRODUCTION:
+        try:
+            raw_old_order_id = (document.extra_info or {}).get("production_order_id")
+            _old_production_order_id = int(raw_old_order_id) if raw_old_order_id is not None else None
+        except (TypeError, ValueError):
+            raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید قبلی نامعتبر است", http_status=409)
     inv_type = _resolve_invoice_type_from_payload(data, fallback=_old_document_type)
     if inv_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("INVALID_INVOICE_TYPE", "Unsupported invoice_type", http_status=400)
+    _new_production_order_id: Optional[int] = None
+    if inv_type == INVOICE_PRODUCTION:
+        proposed_extra = data.get("extra_info")
+        if not isinstance(proposed_extra, dict):
+            proposed_extra = document.extra_info or {}
+        raw_new_order_id = proposed_extra.get("production_order_id")
+        if raw_new_order_id is not None:
+            try:
+                _new_production_order_id = int(raw_new_order_id)
+            except (TypeError, ValueError) as exc:
+                raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید نامعتبر است", http_status=400) from exc
+    # Serialize order-link changes in stable order so concurrent edits/invoices
+    # cannot race their usage limits or deadlock while switching orders.
+    for linked_order_id in sorted({
+        order_id for order_id in (_old_production_order_id, _new_production_order_id)
+        if order_id is not None
+    }):
+        acquire_transaction_lock(
+            db, f"production_order:{int(document.business_id)}:{linked_order_id}"
+        )
     if inv_type != _old_document_type:
         from app.services.tax_reference_service import validate_invoice_type_change_for_tax
 
         validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
-        document.document_type = inv_type
     data["invoice_type"] = inv_type
+
+    from app.services.woo_proforma_service import prepare_woo_proforma_finalization
+
+    data = prepare_woo_proforma_finalization(db, document, data, inv_type)
+    preserve_issue = _woo_posted_issue_update(db, document, data, inv_type)
+    if preserve_issue and isinstance(data.get("description"), str):
+        document.description = data["description"]
+    preserve_body = preserve_issue
+    if preserve_body is None:
+        preserve_body = _invoice_payload_preserves_invoice_body(
+            db,
+            document,
+            data,
+            inv_type=inv_type,
+            old_document_type=_old_document_type,
+        )
+    if preserve_body:
+        return _apply_invoice_payments_only_update(
+            db,
+            document=document,
+            user_id=user_id,
+            data=data,
+            inv_type=inv_type,
+            old_document_type=_old_document_type,
+            old_change_payment_id=_old_change_payment_id,
+        )
+
+    # Later steps may fill extra_info from the existing document.
+    input_extra = data.get("extra_info")
+    has_input_totals = isinstance(input_extra, dict) and bool(input_extra.get("totals"))
 
     # Update header
     document_date = _parse_iso_date(data.get("document_date", document.document_date))
@@ -6697,6 +9005,20 @@ def update_invoice(
     if not currency:
         raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
 
+    discount_input = data
+    if not isinstance(data.get("extra_info"), dict):
+        discount_input = {
+            **data,
+            "extra_info": _sanitize_extra_info_for_invoice_type_change(
+                document.extra_info or {}, inv_type, _old_document_type,
+            ),
+        }
+    validate_invoice_line_totals(
+        discount_input, data.get("lines") or [], currency,
+        db=db, business_id=int(document.business_id), invoice_type=inv_type,
+    )
+    if inv_type != _old_document_type:
+        document.document_type = inv_type
     document.document_date = document_date
     document.currency_id = int(currency_id)
     # به‌روزرسانی وضعیت پیش‌فاکتور
@@ -6736,7 +9058,14 @@ def update_invoice(
             except Exception:
                 pass
         # merge کردن: new_extra فیلدهای old_extra را override می‌کند؛ نرمال‌سازی برای ذخیره یکسان
-        merged_extra = _normalize_document_extra_info_for_storage({**old_extra, **new_extra})
+        header_for_storage = {**old_extra, **new_extra}
+        incoming_totals = header_for_storage.get("totals")
+        if isinstance(incoming_totals, dict) and SALES_RECEIVABLE_TOTAL_KEY in incoming_totals:
+            header_for_storage["totals"] = {
+                key: value for key, value in incoming_totals.items()
+                if key != SALES_RECEIVABLE_TOTAL_KEY
+            }
+        merged_extra = _normalize_document_extra_info_for_storage(header_for_storage)
         if inv_type != _old_document_type:
             merged_extra = _sanitize_extra_info_for_invoice_type_change(
                 merged_extra, inv_type, _old_document_type
@@ -6810,6 +9139,22 @@ def update_invoice(
                         },
                         synchronize_session=False
                     )
+        if _old_document_type == INVOICE_SALES_RETURN:
+            for old_line in old_invoice_lines:
+                extra_old = extra_info_dict(old_line.extra_info)
+                returned_ids = extra_old.get("selected_instance_ids") or extra_old.get("returned_from_instance_ids")
+                if returned_ids and isinstance(returned_ids, list):
+                    db.query(ProductInstance).filter(
+                        and_(
+                            ProductInstance.id.in_([int(x) for x in returned_ids]),
+                            ProductInstance.business_id == document.business_id,
+                            ProductInstance.product_id == old_line.product_id,
+                            ProductInstance.status == "available",
+                        )
+                    ).update(
+                        {"status": "sold", "warehouse_id": None},
+                        synchronize_session=False,
+                    )
         db.flush()
     except Exception as e:
         # اگر خطایی رخ داد، فقط log می‌کنیم و ادامه می‌دهیم
@@ -6826,17 +9171,95 @@ def update_invoice(
     )
 
     # Recreate lines: حذف سطرهای حسابداری و اقلام فاکتور و بازایجاد
+    from app.services.fixed_asset_service import assert_invoice_capital_assets_rebuildable
+
+    assert_invoice_capital_assets_rebuildable(db, int(document.business_id), int(document.id))
+    _procurement_receipt_stock = []
+    for old_line in db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all():
+        old_info = dict(old_line.extra_info or {})
+        if old_info.get("procurement_stocked_on_receipt") or old_info.get("procurement_skip_inventory"):
+            _procurement_receipt_stock.append(
+                {
+                    "product_id": int(old_line.product_id),
+                    "order_line_id": old_info.get("procurement_order_line_id"),
+                    "skip": bool(old_info.get("procurement_skip_inventory")) and not old_info.get("procurement_stocked_on_receipt"),
+                }
+            )
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
     db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).delete(synchronize_session=False)
 
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not lines_input:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+    _apply_expired_sale_confirm_permission(
+        inv_type,
+        lines_input,
+        user_can_confirm_expired_sale=user_can_confirm_expired_sale,
+    )
 
     if inv_type == INVOICE_PRODUCTION:
         prod_extra = dict(data.get("extra_info") or document.extra_info or {})
+        explicit_operations_total = (
+            isinstance(data.get("extra_info"), dict)
+            and "production_operations_total" in data["extra_info"]
+        )
+        operations_total = _parse_production_operations_total(
+            prod_extra.get("production_operations_total")
+        )
+        if (
+            _new_production_order_id == _old_production_order_id
+            and not explicit_operations_total
+            and (document.extra_info or {}).get("production_operations_total") is not None
+        ):
+            operations_total = _parse_production_operations_total(
+                (document.extra_info or {}).get("production_operations_total")
+            )
+            prod_extra["production_operations_total"] = float(operations_total or 0)
+        if (
+            _new_production_order_id is not None
+            and not explicit_operations_total
+            and (
+                _new_production_order_id != _old_production_order_id
+                or operations_total is None
+                or operations_total <= 0
+            )
+        ):
+            from adapters.db.models.production_order import ProductionOrder
+            from app.services.production_order_service import suggested_operations_total_for_order
+
+            linked_order = db.query(ProductionOrder).filter(
+                ProductionOrder.id == _new_production_order_id,
+                ProductionOrder.business_id == int(document.business_id),
+            ).first()
+            if linked_order:
+                primary_output_qty = sum(
+                    (Decimal(str(line.get("quantity", 0) or 0)) for line in lines_input
+                     if (line.get("extra_info") or {}).get("movement") == "in"
+                     and int(line.get("product_id") or 0) == int(linked_order.product_id)),
+                    Decimal("0"),
+                )
+                operations_total = suggested_operations_total_for_order(
+                    db,
+                    int(document.business_id),
+                    _new_production_order_id,
+                    primary_output_qty,
+                )
+                prod_extra["production_operations_total"] = float(operations_total)
+                data["extra_info"] = prod_extra
         _validate_production_invoice_lines(
+            db, int(document.business_id), lines_input, prod_extra, exclude_document_id=int(document.id)
+        )
+        _attach_production_order_to_invoice_lines(lines_input, prod_extra)
+        _attach_production_order_lots_to_invoice_lines(
             db, int(document.business_id), lines_input, prod_extra
+        )
+    else:
+        non_production_extra = data.get("extra_info")
+        if not isinstance(non_production_extra, dict):
+            non_production_extra = document.extra_info or {}
+        data["extra_info"] = _strip_production_order_metadata(
+            lines_input,
+            non_production_extra,
         )
 
     _stamp_movement_on_invoice_lines(inv_type, lines_input)
@@ -6847,12 +9270,16 @@ def update_invoice(
     # Resolve and annotate inventory tracking for all lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
     track_map: Dict[int, bool] = {}
+    item_type_map: Dict[int, Any] = {}
     if all_product_ids:
-        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+        for pid, tracked, item_type in db.query(
+            Product.id, Product.track_inventory, Product.item_type
+        ).filter(
             Product.business_id == document.business_id,
             Product.id.in_(all_product_ids),
         ).all():
             track_map[int(pid)] = bool(tracked)
+            item_type_map[int(pid)] = item_type
     product_tax_map = _build_product_tax_snapshot_map(db, document.business_id, all_product_ids)
 
     for ln in lines_input:
@@ -6861,12 +9288,24 @@ def update_invoice(
             continue
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        item_type = item_type_map.get(int(pid))
+        if item_type is not None:
+            info["item_type"] = getattr(item_type, "value", item_type)
         tax_meta = product_tax_map.get(int(pid))
         if tax_meta:
             snapshot = {k: v for k, v in tax_meta.items() if v is not None}
             snapshot["captured_at"] = datetime.utcnow().isoformat()
             info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
+    from app.services.fixed_asset_service import prepare_invoice_capital_lines
+
+    prepare_invoice_capital_lines(
+        db,
+        int(document.business_id),
+        inv_type,
+        lines_input,
+        existing_invoice_id=int(document.id),
+    )
     _doc_ex_work = dict(document.extra_info or {})
     _apply_invoice_missing_line_warehouse_policy(
         db,
@@ -6888,7 +9327,7 @@ def update_invoice(
     try:
         from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
 
-        apply_global_discount_to_invoice_payload(
+        global_discount_applied = apply_global_discount_to_invoice_payload(
             db, int(document.business_id), inv_type, lines_input, data
         )
     except ApiError:
@@ -6931,29 +9370,58 @@ def update_invoice(
     header_for_costing = data if data else {"extra_info": document.extra_info}
     post_inventory_update: bool = _is_inventory_posting_enabled(header_for_costing)
 
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]] = []
     for line in lines_input:
         product_id = line.get("product_id")
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
         extra_info = dict(line.get("extra_info") or {})
-        
+        extra_info = _ensure_unique_sales_return_instances(
+            db,
+            int(document.business_id),
+            int(product_id),
+            extra_info,
+            int(qty),
+            inv_type,
+            source_invoice_id=(extra_info_dict(document.extra_info).get("returned_from_invoice_id")
+                               or extra_info_dict(document.extra_info).get("copy_from_invoice_id")),
+            document_date=document.document_date,
+        )
+        extra_info = _normalize_unique_instance_ids(extra_info)
+        line["extra_info"] = extra_info
+
         # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
         selected_instance_ids = extra_info.get("selected_instance_ids")
         if selected_instance_ids:
             _validate_selected_instances(
-                db, document.business_id, int(product_id), selected_instance_ids, int(qty), inv_type
+                db,
+                document.business_id,
+                int(product_id),
+                selected_instance_ids,
+                int(qty),
+                inv_type,
+                allow_expired_confirm=bool(
+                    extra_info.get("allow_expired_lot_sale") or extra_info.get("manager_confirm_expired")
+                ),
+                document_date=document.document_date,
             )
 
         _validate_invoice_line_custom_attributes(db, document.business_id, line)
 
-        db.add(InvoiceItemLine(
+        item_line = InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
             quantity=qty,
             description=line.get("description"),
             extra_info=extra_info,
-        ))
+        )
+        db.add(item_line)
+        created_invoice_lines.append((item_line, line))
+    db.flush()
+    _restore_procurement_receipt_stock_flags(created_invoice_lines, _procurement_receipt_stock)
+    db.flush()
+    _persist_invoice_variant_allocations(db, int(document.business_id), created_invoice_lines)
 
     # Accounting lines if finalized
     if not document.is_proforma:
@@ -6971,7 +9439,9 @@ def update_invoice(
             **(data or {}),
         }
         accounts = _resolve_accounts_for_invoice(db, header_for_accounts)
-        totals = dict(header_extra.get("totals") or {})
+        totals = {}
+        if global_discount_applied or has_input_totals:
+            totals = dict(header_extra.get("totals") or {})
         if not totals:
             totals = _extract_totals_from_lines(lines_input)
         header_extra["totals"] = totals
@@ -6987,7 +9457,7 @@ def update_invoice(
             from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
 
             pid_for_club = _person_id_from_header({"extra_info": header_extra})
-            maybe_apply_loyalty_redemption_to_invoice_payload(
+            club_discount_applied = maybe_apply_loyalty_redemption_to_invoice_payload(
                 db,
                 int(document.business_id),
                 inv_type,
@@ -6997,17 +9467,20 @@ def update_invoice(
                 header_extra,
                 data,
                 user_id,
+                invoice_lines=lines_input,
+                document_id=int(document.id),
             )
         except ApiError:
             raise
         from app.services.invoice_adjustments_service import (
             merge_invoice_adjustments_into_header_extra,
             add_adjustment_document_lines,
-            total_with_tax_from_totals_dict,
         )
 
         merge_invoice_adjustments_into_header_extra(db, int(document.business_id), inv_type, header_extra)
         totals = dict(header_extra.get("totals") or {})
+        totals.pop(SALES_RECEIVABLE_TOTAL_KEY, None)
+        total_with_tax = total_with_tax_from_totals_dict(totals)
         _adj_extra_hdr = dict(header_extra)
         ex_merge = dict(document.extra_info or {})
         if isinstance(header_extra, dict):
@@ -7015,7 +9488,13 @@ def update_invoice(
                 ex_merge["global_discount"] = header_extra["global_discount"]
             else:
                 ex_merge.pop("global_discount", None)
-        ex_merge["totals"] = totals
+        # Match CREATE's JSON number format while retaining Decimal for accounting.
+        ex_merge["totals"] = {
+            key: float(value) if isinstance(value, Decimal) else value
+            for key, value in totals.items()
+        }
+        if club_discount_applied:
+            ex_merge["totals"][SALES_RECEIVABLE_TOTAL_KEY] = str(total_with_tax)
         if "invoice_adjustments" in header_extra:
             ex_merge["invoice_adjustments"] = header_extra["invoice_adjustments"]
         else:
@@ -7039,7 +9518,6 @@ def update_invoice(
         discount = Decimal(str(totals.get("discount", 0)))
         net = gross - discount
         tax = Decimal(str(totals.get("tax", 0)))
-        total_with_tax = total_with_tax_from_totals_dict(totals)
         person_id = _person_id_from_header({"extra_info": header_extra})
         person_id = _resolve_and_validate_person_id(db, document.business_id, person_id)
 
@@ -7161,62 +9639,29 @@ def update_invoice(
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=tax, credit=Decimal(0), description="تعدیل VAT برگشت از فروش"))
             # Inventory/COGS handled in warehouse posting
         elif inv_type == INVOICE_PURCHASE:
-            from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
-
             _purchase_mode_upd = (header_extra.get("purchase_accounting_mode") or "").strip()
-            add_purchase_invoice_debit_lines(
-                db,
-                document_id=int(document.id),
-                mode=_purchase_mode_upd,
-                accounts=accounts,
-                gross=gross,
-            )
-            # تخفیفات خرید
-            if discount > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["purchase_discount"].id,
-                    debit=Decimal(0),
-                    credit=discount,
-                    description="تخفیفات خرید",
-                ))
-            # VAT ورودی
-            if tax > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["vat_in"].id,
-                    debit=tax,
-                    credit=Decimal(0),
-                    description="مالیات ورودی",
-                ))
-            # طرف‌شخص
-            if person_id:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["person"].id,
-                    person_id=person_id,
-                    debit=Decimal(0),
-                    credit=total_with_tax,
-                    description=document.description,
-                ))
-            add_adjustment_document_lines(
+            _apply_purchase_invoice_accounting(
                 db,
                 business_id=int(document.business_id),
                 document_id=int(document.id),
-                invoice_type=inv_type,
+                purchase_mode=_purchase_mode_upd,
                 accounts=accounts,
+                lines_input=lines_input,
+                person_id=person_id,
+                tax=tax,
+                total_with_tax=total_with_tax,
+                description=document.description,
+                invoice_type=inv_type,
                 header_extra=_adj_extra_hdr,
             )
         elif inv_type == INVOICE_PURCHASE_RETURN:
-            from app.services.purchase_accounting_service import add_purchase_return_credit_lines
-
             _purchase_mode_upd = (header_extra.get("purchase_accounting_mode") or "").strip()
-            add_purchase_return_credit_lines(
+            _apply_purchase_return_inventory_credits(
                 db,
                 document_id=int(document.id),
-                mode=_purchase_mode_upd,
+                purchase_mode=_purchase_mode_upd,
                 accounts=accounts,
-                gross=gross,
+                lines_input=lines_input,
             )
             # برگشت تخفیفات خرید
             if discount > 0:
@@ -7276,7 +9721,7 @@ def update_invoice(
                 # بدهکار: هزینه ضایعات
                 db.add(DocumentLine(
                     document_id=document.id,
-                    account_id=accounts["waste_expense"].id,
+                    account_id=_waste_expense_account_id(db, int(document.business_id), accounts),
                     debit=total_cogs,
                     credit=Decimal(0),
                     description="هزینه کسری و ضایعات کالا",
@@ -7294,12 +9739,19 @@ def update_invoice(
             # جداسازی خطوط ورودی و خروجی
             out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
             in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+            posting_header = header_extra
+            if _try_plugin_production_posting(
+                db, document, int(document.business_id), accounts, header_extra, out_lines, in_lines, created_invoice_lines
+            ):
+                out_lines = []
+                in_lines = []
+                posting_header = {}
             
             # محاسبه COGS برای مواد اولیه (خروج)
             total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
 
             # هزینه عملیات/سربار تولید (در صورت ارسال از UI)
-            operations_total_raw = (header_extra or {}).get("production_operations_total", 0)
+            operations_total_raw = (posting_header or {}).get("production_operations_total", 0)
             try:
                 operations_total = Decimal(str(operations_total_raw or 0))
             except Exception:
@@ -7345,11 +9797,13 @@ def update_invoice(
                 cost_per_unit = remaining_cost / remaining_quantity if remaining_quantity > 0 else Decimal(0)
                 
                 for line in in_lines:
-                    extra_info = line.get("extra_info") or {}
+                    extra_info = dict(line.get("extra_info") or {})
                     qty = Decimal(str(line.get("quantity", 0) or 0))
                     if qty > 0 and extra_info.get("cost_price") is None:
                         cost_line = qty * cost_per_unit
                         total_finished_cost += cost_line
+                        extra_info["cost_price"] = float(cost_per_unit)
+                        line["extra_info"] = extra_info
             
             # مرحله 3: اعتبارسنجی توازن WIP
             # اگر همه خطوط cost_price دستی دارند، باید بررسی کنیم که توازن برقرار است
@@ -7369,6 +9823,9 @@ def update_invoice(
                         qty = Decimal(str(line.get("quantity", 0) or 0))
                         if qty > 0:
                             total_finished_cost += qty * cost_per_unit
+                            extra_info = dict(line.get("extra_info") or {})
+                            extra_info["cost_price"] = float(cost_per_unit)
+                            line["extra_info"] = extra_info
             
             # اعتبارسنجی نهایی توازن WIP
             total_wip_debit = total_materials_cost + operations_total
@@ -7442,6 +9899,7 @@ def update_invoice(
                     credit=total_finished_cost,
                     description="انتقال محصول نهایی از WIP",
                 ))
+            _sync_payload_cost_price_to_item_lines(created_invoice_lines)
 
         # --- پورسانت فروشنده/بازاریاب (به‌صورت تکمیلی) ---
         if inv_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
@@ -7484,116 +9942,21 @@ def update_invoice(
                         description="تعدیل هزینه پورسانت",
                     ))
 
-    # پردازش تراکنش‌های پرداخت (مشابه create_invoice)
-    payment_docs: List[int] = []
-    _invoice_type_changed = inv_type != _old_document_type
-    payments_provided = "payments" in data and isinstance(data.get("payments"), list)
-    payments = list(data["payments"]) if payments_provided else []
+    # پردازش تراکنش‌های پرداخت (مشابه create_invoice) — جدا از بازنویسی اقلام
+    _sync_invoice_linked_payments(
+        db,
+        document=document,
+        user_id=user_id,
+        invoice_type=inv_type,
+        old_document_type=_old_document_type,
+        data=data,
+        old_change_payment_id=_old_change_payment_id,
+    )
 
-    # تغییر نوع فاکتور بدون ارسال payments: اسناد دریافت/پرداخت قبلی با نوع قدیم نامعتبرند
-    if _invoice_type_changed and not document.is_proforma and not payments_provided:
-        _clear_invoice_linked_receipt_payments(
-            db,
-            int(document.business_id),
-            int(document.id),
-            document,
-        )
-
-    if payments_provided and not document.is_proforma:
-        from app.services.receipt_payment_service import delete_receipt_payment
-
-        # person_id از extra_info مرج‌شده روی خود سند (نه فقط payload خام) تا با API ناقص هم‌خوان باشد
-        header_extra_pm = document.extra_info or {}
-        person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
-
-        old_receipt_payment_ids = _get_receipt_payment_ids_linked_to_invoice(
-            db,
-            document.business_id,
-            int(document.id),
-            extra_info=header_extra_pm,
-        )
-
-        has_positive_payment = any(
-            Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
-        )
-        if payments and has_positive_payment:
-            person_id_pm = _resolve_and_validate_person_id(db, document.business_id, person_id_pm)
-            if not person_id_pm:
-                raise ApiError(
-                    "PERSON_REQUIRED",
-                    "برای ثبت تراکنش‌های پرداخت، انتخاب طرف حساب الزامی است.",
-                    http_status=400,
-                )
-
-        # هرگاه payments در payload باشد، اسناد دریافت/پرداخت قبلی حذف می‌شوند؛ خطای حذف باید به کاربر برگردد
-        for old_rp_id in old_receipt_payment_ids:
-            delete_receipt_payment(db, int(old_rp_id), commit=False)
-        if _old_change_payment_id is not None:
-            delete_receipt_payment(db, int(_old_change_payment_id), commit=False)
-
-        extra = dict(document.extra_info) if document.extra_info else {}
-        links = dict(extra.get("links", {}))
-        links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
-        extra["links"] = links
-        document.extra_info = _normalize_document_extra_info_for_storage(extra)
-        flag_modified(document, "extra_info")
-
-        if not payments:
-            extra = dict(document.extra_info) if document.extra_info else {}
-            links = dict(extra.get("links", {}))
-            links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
-            extra["links"] = links
-            document.extra_info = _normalize_document_extra_info_for_storage(extra)
-            flag_modified(document, "extra_info")
-        else:
-            payment_docs = _create_receipt_payment_documents_for_invoice_payments(
-                db,
-                business_id=int(document.business_id),
-                user_id=user_id,
-                document=document,
-                person_id=int(person_id_pm),
-                payments=payments,
-                invoice_type=inv_type,
-            )
-            if payment_docs:
-                extra = dict(document.extra_info) if document.extra_info else {}
-                links = dict(extra.get("links", {}))
-                links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-            else:
-                extra = dict(document.extra_info) if document.extra_info else {}
-                links = dict(extra.get("links", {}))
-                links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-
-        is_quick_sale_pm = bool((document.extra_info or {}).get("quick_sale", False))
-        if payments and inv_type == INVOICE_SALES and is_quick_sale_pm and person_id_pm:
-            change_amount = _quick_sale_change_amount(document, payments)
-            if change_amount <= Decimal("0.01"):
-                extra = dict(document.extra_info) if document.extra_info else {}
-                extra.pop("quick_sale_change", None)
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-            change_payment_id = _create_quick_sale_change_payment(
-                db,
-                business_id=int(document.business_id),
-                user_id=user_id,
-                document=document,
-                person_id=int(person_id_pm),
-                payments=payments,
-                change_request=(document.extra_info or {}).get("quick_sale_change"),
-            )
-            if change_payment_id:
-                extra = dict(document.extra_info) if document.extra_info else {}
-                links = dict(extra.get("links", {}))
-                links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = change_payment_id
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
+    # SessionLocal uses autoflush=False. Persist the replacement invoice lines before
+    # _remove_old_invoice_warehouse_documents queries them to distinguish unchanged
+    # receipts from actual quantity reductions.
+    db.flush()
 
     try:
         _old_posted_warehouse_types = _remove_old_invoice_warehouse_documents(
@@ -7610,6 +9973,13 @@ def update_invoice(
         document.extra_info = _normalize_document_extra_info_for_storage(extra_wh)
         flag_modified(document, "extra_info")
         db.flush()
+
+        if inv_type == INVOICE_PURCHASE and not document.is_proforma:
+            from app.services.fixed_asset_service import sync_capital_assets_from_purchase_invoice
+
+            sync_capital_assets_from_purchase_invoice(
+                db, int(document.business_id), document, user_id
+            )
 
         if not document.is_proforma:
             _post_warehouse_types_for_rebuild = set(_old_posted_warehouse_types)
@@ -7636,6 +10006,42 @@ def update_invoice(
             "همگام‌سازی حواله انبار با فاکتور ناموفق بود. در صورت حواله قطعی، وضعیت انبار یا وابستگی‌ها را بررسی کنید.",
             http_status=409,
         )
+
+    if not document.is_proforma and (
+        _old_document_type == INVOICE_PRODUCTION or inv_type == INVOICE_PRODUCTION
+    ):
+        try:
+            from app.services.production_order_service import refresh_production_order_actual_costs
+
+            new_order_id = _new_production_order_id if inv_type == INVOICE_PRODUCTION else None
+            for production_order_id in sorted({
+                order_id for order_id in (_old_production_order_id, new_order_id)
+                if order_id is not None
+            }):
+                refresh_production_order_actual_costs(
+                    db, int(document.business_id), production_order_id
+                )
+        except ApiError:
+            raise
+        except Exception as cost_ex:
+            logger.exception(
+                "production order costing refresh on update failed doc_id=%s err=%s",
+                document.id,
+                cost_ex,
+            )
+            raise ApiError(
+                "PRODUCTION_COSTING_REFRESH_FAILED",
+                "به‌روزرسانی بهای واقعی سفارش تولید ناموفق بود؛ فاکتور ذخیره نشد",
+                http_status=409,
+            ) from cost_ex
+
+    if not document.is_proforma:
+        db.flush()
+        from app.services.invoice_purchase_price_snapshot_service import (
+            stamp_document_purchase_price_snapshots,
+        )
+
+        stamp_document_purchase_price_snapshots(db, document, overwrite=False)
 
     if not document.is_proforma:
         db.flush()
@@ -7834,11 +10240,32 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         assert_document_editable(document)
         
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found document - code={document.code}, type={document.document_type}, business_id={document.business_id}")
+
+        from app.services.fixed_asset_service import delete_invoice_capital_assets
+
+        delete_invoice_capital_assets(db, int(document.business_id), int(document.id))
         
         # بررسی نوع سند
         if document.document_type not in SUPPORTED_INVOICE_TYPES:
             logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Invalid document type {document.document_type}")
             raise ApiError("INVALID_DOCUMENT_TYPE", "Document is not an invoice", http_status=400)
+
+        _deleted_invoice_product_ids = _distinct_product_ids_for_invoice(
+            db, int(document.id)
+        )
+
+        _deleted_production_order_id: Optional[int] = None
+        if document.document_type == INVOICE_PRODUCTION:
+            raw_order_id = (document.extra_info or {}).get("production_order_id")
+            if raw_order_id is not None:
+                try:
+                    _deleted_production_order_id = int(raw_order_id)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید متصل به فاکتور نامعتبر است", http_status=409) from exc
+                acquire_transaction_lock(
+                    db,
+                    f"production_order:{int(document.business_id)}:{_deleted_production_order_id}",
+                )
         
         # 1) جلوگیری از حذف در سال مالی غیر جاری
         try:
@@ -7894,22 +10321,9 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
             logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking tax workspace: {ex}")
             pass
         
-        # 3.5) جلوگیری از حذف اگر سند به تراکنش‌های کیف پول مرتبط باشد
-        try:
-            from app.services.wallet_service import check_document_has_wallet_transactions
-            wallet_check = check_document_has_wallet_transactions(db, document_id)
-            if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
-                logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Cannot delete - has wallet transactions")
-                raise ApiError(
-                    "DOCUMENT_HAS_WALLET_TRANSACTIONS",
-                    wallet_check["message"],
-                    http_status=409,
-                )
-        except ApiError:
-            raise
-        except Exception as ex:
-            logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking wallet transactions: {ex}")
-            pass
+        # 3.5) جلوگیری از حذف اگر خود فاکتور به تراکنش سیستمی کیف‌پول وصل باشد
+        from app.services.wallet_service import raise_if_protected_wallet_document
+        raise_if_protected_wallet_document(db, document_id)
         
         # 4) بررسی و حذف حواله‌های انبار مرتبط و اسناد دریافت/پرداخت
         # همه عملیات در یک transaction انجام می‌شوند و در صورت خطا rollback می‌شود
@@ -8027,6 +10441,10 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
                 except Exception as ex:
                     logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking receipt/payment {rp_doc.id} constraints: {ex}")
                     raise  # هر خطای دیگری را هم propagate کن
+
+                # سند دریافت پرداخت آنلاین به تراکنش کیف‌پول وصل است؛ حذف مستقیم آن
+                # به‌خاطر ON DELETE SET NULL تراکنش را «موفق» و بدون سند باقی می‌گذارد.
+                raise_if_protected_wallet_document(db, int(rp_doc.id))
                 
                 # حذف خطوط سند دریافت/پرداخت
                 rp_lines_deleted = db.query(DocumentLine).filter(
@@ -8059,6 +10477,18 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         fiscal_year_id = document.fiscal_year_id
         document_type = document.document_type
         project_id = document.project_id
+
+        if document_type == INVOICE_PURCHASE and _deleted_invoice_product_ids:
+            from app.services.invoice_product_price_sync_service import (
+                mark_deleted_purchase_price_source,
+            )
+
+            mark_deleted_purchase_price_source(
+                db,
+                business_id=int(business_id),
+                document_id=int(document_id),
+                product_ids=_deleted_invoice_product_ids,
+            )
         
         # برگشت امتیاز باشگاه مشتریان (قبل از حذف سند)
         try:
@@ -8076,6 +10506,30 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         # حذف سند فاکتور
         db.delete(document)
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked invoice document for deletion")
+
+        if _deleted_production_order_id is not None:
+            db.flush()
+            try:
+                from app.services.production_order_service import refresh_production_order_actual_costs
+
+                refresh_production_order_actual_costs(
+                    db,
+                    int(document.business_id),
+                    _deleted_production_order_id,
+                )
+            except ApiError:
+                raise
+            except Exception as cost_ex:
+                logger.exception(
+                    "production order costing refresh after invoice delete failed doc_id=%s err=%s",
+                    document_id,
+                    cost_ex,
+                )
+                raise ApiError(
+                    "PRODUCTION_COSTING_REFRESH_FAILED",
+                    "بازمحاسبهٔ بهای واقعی سفارش تولید پس از حذف فاکتور ناموفق بود؛ حذف انجام نشد",
+                    http_status=409,
+                ) from cost_ex
         
         # commit یا flush (برای حذف گروهی / برگشت سال مالی بدون commit میانی)
         if commit:
@@ -8285,7 +10739,17 @@ def invoice_document_to_dict(
     )
     product_lines: List[Dict[str, Any]] = []
     for it, product in item_rows:
-        line_extra = it.extra_info or {}
+        line_extra = dict(it.extra_info or {})
+        from app.services.inventory_lot_allocation_service import invoice_lot_allocations_payload
+        from adapters.db.models.inventory_lot import InvoiceItemLineLotAllocation
+
+        lot_rows = (
+            db.query(InvoiceItemLineLotAllocation)
+            .filter(InvoiceItemLineLotAllocation.invoice_item_line_id == int(it.id))
+            .all()
+        )
+        if lot_rows:
+            line_extra["lot_allocations"] = invoice_lot_allocations_payload(lot_rows, db)
         row_dict: Dict[str, Any] = {
             "id": it.id,
             "product_id": it.product_id,
@@ -8297,7 +10761,7 @@ def invoice_document_to_dict(
             "product_tax_unit_id": getattr(product, "tax_unit_id", None) if product else None,
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,
-            "extra_info": it.extra_info,
+            "extra_info": line_extra,
         }
         for _key in ("unit_price", "line_total", "line_discount", "tax_amount"):
             if line_extra.get(_key) is not None:
@@ -8315,6 +10779,23 @@ def invoice_document_to_dict(
             row_dict["ledger_recognized_at"] = it.ledger_recognized_at.isoformat()
         if getattr(it, "ledger_recognition_event", None):
             row_dict["ledger_recognition_event"] = it.ledger_recognition_event
+        if getattr(it, "purchase_price_snapshot_unit_cost_base", None) is not None:
+            row_dict["purchase_price_snapshot"] = {
+                "unit_cost_base": float(it.purchase_price_snapshot_unit_cost_base),
+                "currency_id": it.purchase_price_snapshot_currency_id,
+                "unit": it.purchase_price_snapshot_unit,
+                "unit_conversion_factor": (
+                    float(it.purchase_price_snapshot_factor)
+                    if it.purchase_price_snapshot_factor is not None
+                    else None
+                ),
+                "source": it.purchase_price_snapshot_source,
+                "captured_at": (
+                    it.purchase_price_snapshot_at.isoformat()
+                    if it.purchase_price_snapshot_at is not None
+                    else None
+                ),
+            }
         product_lines.append(row_dict)
 
     # سطرهای حسابداری از document_lines خوانده می‌شوند
@@ -8435,6 +10916,8 @@ def invoice_document_to_dict(
         result["total_cost"] = profit_data.get("total_cost", 0.0)
         result["total_sales"] = profit_data.get("total_sales", 0.0)
         result["line_profits"] = profit_data.get("line_profits", [])
+        result["profit_currency_id"] = profit_data.get("profit_currency_id")
+        result["document_to_base_rate"] = profit_data.get("document_to_base_rate")
         # پس‌زمینه: gross_profit / line_profits = محاسبه تحلیلی زنده (تنظیمات جاری)
         result["profit_calculation_context"] = "analytical_live"
 
@@ -11059,6 +13542,42 @@ def _sum_receipt_doc_payments_for_invoice(doc: Document, invoice_id: int, *, via
     return _sum_receipt_doc_account_payments(doc)
 
 
+def _receipt_amount_for_invoice_balance(
+    receipt: Document, invoice: Document, *, via_person_line: bool,
+) -> Decimal:
+    """Prefer explicit receivable allocations in the invoice's currency."""
+    from app.services.receipt_invoice_allocation_service import exact_receipt_allocation
+
+    exact = exact_receipt_allocation(receipt, invoice)
+    if exact is not None:
+        return exact
+    extra = receipt.extra_info or {}
+    if (
+        invoice.document_type == INVOICE_SALES
+        and receipt.document_type == "receipt"
+        and invoice.currency_id is not None
+        and receipt.currency_id == invoice.currency_id
+        and not any(extra.get(key) for key in ("cross_currency", "fx_settlement", "settles_currency_id", "settlements"))
+    ):
+        person_id = _person_id_from_header({"extra_info": invoice.extra_info})
+        invoice_id = str(invoice.id)
+        allocations = [
+            line for line in receipt.lines
+            if person_id is not None
+            and line.person_id == person_id
+            and str((line.extra_info or {}).get("invoice_id", "")).strip() == invoice_id
+            and line.account is not None
+            and line.account.code == "10401"
+            and line.debit == 0
+            and line.credit > 0
+        ]
+        # Ordinary receipts store debit/credit in Document.currency_id.
+        # A converted receipt can instead store base amounts on person lines.
+        if allocations and not any((line.extra_info or {}).get("fx_settlement") for line in allocations):
+            return sum((line.credit for line in allocations), Decimal(0))
+    return _sum_receipt_doc_payments_for_invoice(receipt, invoice.id, via_person_line=via_person_line)
+
+
 def _get_receipt_payment_ids_linked_to_invoice(
     db: Session,
     business_id: int,
@@ -11154,8 +13673,10 @@ def _invoice_total_amount_for_document(
 def invoice_documents_to_list_dicts(
     db: Session,
     documents: List[Document],
+    *,
+    include_profit: bool = False,
 ) -> List[Dict[str, Any]]:
-    """سریال‌سازی سبک فاکتورها برای لیست (بدون بارگذاری خطوط و محاسبه سود)."""
+    """سریال‌سازی فاکتورها برای لیست؛ محاسبه سود در صورت درخواست اختیاری است."""
     if not documents:
         return []
 
@@ -11218,6 +13739,55 @@ def invoice_documents_to_list_dicts(
                 "updated_at": doc.updated_at.isoformat(),
             }
         )
+
+    if include_profit:
+        business_id = int(documents[0].business_id)
+        business = db.query(Business).filter(Business.id == business_id).first()
+        if business and business.invoice_profit_calculation_method != "disabled":
+            for document, item in zip(documents, results):
+                if document.document_type not in {
+                    "invoice_sales",
+                    "invoice_sales_return",
+                    "invoice_production",
+                }:
+                    continue
+                try:
+                    profit_data = _calculate_invoice_profit(
+                        db,
+                        business_id,
+                        int(document.id),
+                        business.invoice_profit_calculation_method or "automatic",
+                        business.invoice_profit_calculation_basis or "purchase_price",
+                        business.invoice_profit_include_overhead or False,
+                        business.invoice_profit_overhead_type or "none",
+                        Decimal(str(business.invoice_profit_overhead_percent or 0))
+                        if business.invoice_profit_overhead_percent
+                        else None,
+                        business.invoice_profit_calculation_type or "gross",
+                        fifo_shortage_mode=getattr(
+                            business, "invoice_profit_fifo_shortage_mode", None
+                        ),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Error calculating list profit for invoice %s: %s",
+                        document.id,
+                        e,
+                    )
+                    continue
+
+                if "gross_profit" in profit_data:
+                    item["gross_profit"] = profit_data["gross_profit"]
+                    item["gross_profit_percent"] = profit_data["gross_profit_percent"]
+                if "net_profit" in profit_data:
+                    item["net_profit"] = profit_data["net_profit"]
+                    item["net_profit_percent"] = profit_data["net_profit_percent"]
+                if "total_profit" in profit_data:
+                    item["total_profit"] = profit_data["total_profit"]
+                    item["total_profit_percent"] = profit_data["total_profit_percent"]
+                item["profit_currency_id"] = profit_data.get("profit_currency_id")
+                item["document_to_base_rate"] = profit_data.get("document_to_base_rate")
+
     return results
 
 
@@ -11352,7 +13922,7 @@ def batch_calculate_invoices_remaining(
     if all_rp_doc_ids:
         rp_docs = (
             db.query(Document)
-            .options(selectinload(Document.lines))
+            .options(selectinload(Document.lines).joinedload(DocumentLine.account))
             .filter(
                 Document.id.in_(list(all_rp_doc_ids)),
                 Document.business_id == business_id,
@@ -11376,11 +13946,13 @@ def batch_calculate_invoices_remaining(
                 doc_id_int = int(doc_id)
             except (ValueError, TypeError):
                 continue
+            if doc_id_int in processed_doc_ids:
+                continue
             rp_doc = rp_docs_by_id.get(doc_id_int)
             if not rp_doc:
                 continue
             processed_doc_ids.add(doc_id_int)
-            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=False)
+            total_paid += _receipt_amount_for_invoice_balance(rp_doc, doc, via_person_line=False)
 
         for doc_id_int in invoice_to_person_rp.get(inv_id, set()):
             if doc_id_int in processed_doc_ids:
@@ -11392,8 +13964,8 @@ def batch_calculate_invoices_remaining(
             if (rp_doc.extra_info or {}).get("source") == "quick_sale_change":
                 total_paid -= _quick_sale_change_document_amount(rp_doc)
             else:
-                total_paid += _sum_receipt_doc_payments_for_invoice(
-                    rp_doc, inv_id, via_person_line=True
+                total_paid += _receipt_amount_for_invoice_balance(
+                    rp_doc, doc, via_person_line=True
                 )
 
         change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
@@ -11486,8 +14058,10 @@ def calculate_invoice_remaining(
         for doc_id in receipt_payment_ids:
             try:
                 doc_id_int = int(doc_id)
+                if doc_id_int in processed_doc_ids:
+                    continue
                 doc = db.query(Document).options(
-                    selectinload(Document.lines)
+                    selectinload(Document.lines).joinedload(DocumentLine.account)
                 ).filter(
                     Document.id == doc_id_int,
                     Document.business_id == business_id,
@@ -11498,7 +14072,7 @@ def calculate_invoice_remaining(
                     continue
                 
                 processed_doc_ids.add(doc_id_int)
-                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=False)
+                total_paid += _receipt_amount_for_invoice_balance(doc, invoice, via_person_line=False)
             except (ValueError, TypeError) as e:
                 logger.warning("receipt_payment_id parse error %s: %s", doc_id, e)
                 continue
@@ -11524,7 +14098,7 @@ def calculate_invoice_remaining(
         if person_doc_ids:
             receipt_payment_docs = (
                 db.query(Document)
-                .options(selectinload(Document.lines))
+                .options(selectinload(Document.lines).joinedload(DocumentLine.account))
                 .filter(
                     Document.id.in_(person_doc_ids),
                     Document.business_id == business_id,
@@ -11538,8 +14112,8 @@ def calculate_invoice_remaining(
                 if (doc.extra_info or {}).get("source") == "quick_sale_change":
                     total_paid -= _quick_sale_change_document_amount(doc)
                 else:
-                    total_paid += _sum_receipt_doc_payments_for_invoice(
-                        doc, invoice_id, via_person_line=True
+                    total_paid += _receipt_amount_for_invoice_balance(
+                        doc, invoice, via_person_line=True
                     )
 
         change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)

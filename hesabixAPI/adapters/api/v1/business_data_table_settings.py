@@ -21,6 +21,7 @@ router = APIRouter(prefix="/business", tags=["business-data-table"])
 @router.get(
 	"/{business_id}/data-tables/column-settings",
 	summary="دریافت تنظیمات ستون جدول ذخیره‌شده",
+	description="تنظیم ستون برای همین کاربر و کسب‌وکار. ابزار MCP: get_data_table_column_settings.",
 	response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -45,6 +46,7 @@ def get_data_table_column_settings(
 @router.put(
 	"/{business_id}/data-tables/column-settings",
 	summary="ذخیره تنظیمات ستون جدول",
+	description="table_id و settings الزامی است. ابزار MCP: save_data_table_column_settings.",
 	response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -79,6 +81,7 @@ def put_data_table_column_settings(
 @router.delete(
 	"/{business_id}/data-tables/column-settings",
 	summary="حذف تنظیمات ستون جدول (بازگشت به پیش‌فرض)",
+	description="تنظیم شخصی ستون را پاک می‌کند. ابزار MCP: delete_data_table_column_settings.",
 	response_model=SuccessResponse,
 )
 @require_business_access("business_id")

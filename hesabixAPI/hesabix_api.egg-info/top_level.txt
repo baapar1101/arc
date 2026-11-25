@@ -1,4 +1,0 @@
-adapters
-app
-migrations
-tests

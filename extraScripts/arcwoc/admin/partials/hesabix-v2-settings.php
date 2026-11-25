@@ -369,6 +369,26 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('همگام‌سازی محصول متغیر', 'hesabix-v2'); ?></th>
+				<td>
+					<?php
+					$variation_mode = isset($sync_settings['product_variation_mode'])
+						? (string) $sync_settings['product_variation_mode']
+						: 'legacy';
+					?>
+					<select name="product_variation_mode" id="hesabix_v2_product_variation_mode" class="regular-text">
+						<option value="legacy" <?php selected($variation_mode, 'legacy'); ?>>
+							<?php esc_html_e('Legacy (هر واریانت ووکامرس = یک کالا در حسابیکس)', 'hesabix-v2'); ?>
+						</option>
+						<option value="native" <?php selected($variation_mode, 'native'); ?>>
+							<?php esc_html_e('Native (یک کالا با تفکیک موجودی ویژگی — حداکثر دو بُعد)', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php esc_html_e('پیش‌فرض Legacy است و کالاهای قبلاً همگام‌شده به‌صورت واریانت-کالا تبدیل نمی‌شوند. Native فقط برای محصول متغیر جدید (یا قبلاً Native) با یک یا دو ویژگی واریانت، والد را به یک کالای حسابیکس با ترکیب‌ها می‌فرستد. برای Native باید انبار پیش‌فرض تنظیم شده باشد.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('سیاست به‌روزرسانی محصول از ووکامرس', 'hesabix-v2'); ?></th>
 				<td>
 					<?php
@@ -588,6 +608,37 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php endforeach; ?>
 					</fieldset>
 					<p class="description"><?php _e('هر وضعیتی که علامت بزنید، با رسیدن سفارش به همان وضعیت فاکتور در حسابیکس به‌روز می‌شود (در صورت وجود مپینگ، به‌روزرسانی).', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><?php _e('برگشت از فروش: با وضعیت سفارش', 'hesabix-v2'); ?></th>
+				<td>
+					<input type="hidden" name="hesabix_v2_sales_return_fields" value="1" />
+					<fieldset style="max-height:220px;overflow:auto;border:1px solid #ccd0d4;padding:8px;">
+						<?php
+						$sr_sel = isset($sync_settings['sales_return_on_statuses']) && is_array($sync_settings['sales_return_on_statuses'])
+							? $sync_settings['sales_return_on_statuses']
+							: array('cancelled', 'refunded');
+						foreach ($wc_status_choices as $slug => $label) :
+							if (in_array($slug, array('trash', 'auto-draft', 'checkout-draft', 'draft'), true)) {
+								continue;
+							}
+							?>
+							<label style="display:block;margin:4px 0;">
+								<input type="checkbox" name="sales_return_on_statuses[]" value="<?php echo esc_attr($slug); ?>"
+									<?php checked(in_array($slug, $sr_sel, true)); ?>>
+								<?php echo esc_html($label); ?>
+								<code style="font-size:11px;">(<?php echo esc_html($slug); ?>)</code>
+							</label>
+						<?php endforeach; ?>
+					</fieldset>
+					<p class="description"><?php _e('با رسیدن سفارش همگام‌شده به این وضعیت‌ها، فاکتور فروش قطعی حذف نمی‌شود و برگشت از فروش در حسابیکس ثبت می‌شود. پیش‌فرض: لغو شده و مسترد شده. زباله‌دان رویداد مالی نیست.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('وضعیت‌هایی که برای صدور فاکتور فروش انتخاب کرده‌اید اینجا علامت نزنید.', 'hesabix-v2'); ?></p>
+					<label style="display:block;margin-top:8px;">
+						<input type="checkbox" name="sales_return_on_wc_refund" value="1" <?php checked(!empty($sync_settings['sales_return_on_wc_refund'])); ?>>
+						<?php _e('با ثبت بازپرداخت در ووکامرس (حتی اگر وضعیت سفارش عوض نشود) هم برگشت از فروش ساخته شود', 'hesabix-v2'); ?>
+					</label>
 				</td>
 			</tr>
 
@@ -1611,6 +1662,9 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<li data-key="currency" class="<?php echo !empty($ob_chk['currency']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('ارز سند (از تب فاکتور / حسابیکس) قابل تشخیص است', 'hesabix-v2'); ?></li>
 					</ul>
 				</div>
+				<input type="hidden" name="ob_inv_prefs_present" value="1">
+				<input type="hidden" name="ob_inv_inventory_account_id" id="ob_inv_inventory_account_id_hidden" value="<?php echo esc_attr((string) (int) $ob_inv_prefs['inventory_account_id']); ?>">
+				<input type="hidden" name="ob_inv_equity_account_id" id="ob_inv_equity_account_id_hidden" value="<?php echo esc_attr((string) (int) $ob_inv_prefs['equity_account_id']); ?>">
 				<div id="hesabix-v2-obinv-initial" hidden
 					data-inventory-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['inventory_account_id']); ?>"
 					data-equity-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['equity_account_id']); ?>"></div>
@@ -1655,7 +1709,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<tr class="hesabix-v2-obinv-equity-row">
 						<th scope="row"><?php esc_html_e('حساب حقوق صاحبان سهام', 'hesabix-v2'); ?></th>
 						<td>
-							<select name="ob_inv_equity_account_id" id="ob_inv_equity_account_id" class="regular-text hesabix-v2-obinv-accounts">
+							<select id="ob_inv_equity_account_id" class="regular-text hesabix-v2-obinv-accounts">
 								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
 							</select>
 						</td>
@@ -1663,7 +1717,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<tr>
 						<th scope="row"><?php esc_html_e('حساب موجودی کالا', 'hesabix-v2'); ?></th>
 						<td>
-							<select name="ob_inv_inventory_account_id" id="ob_inv_inventory_account_id" class="regular-text hesabix-v2-obinv-accounts">
+							<select id="ob_inv_inventory_account_id" class="regular-text hesabix-v2-obinv-accounts">
 								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
 							</select>
 							<button type="button" class="button" id="hesabix_v2_obinv_load_accounts"><?php esc_html_e('بارگذاری حساب‌ها از حسابیکس', 'hesabix-v2'); ?></button>

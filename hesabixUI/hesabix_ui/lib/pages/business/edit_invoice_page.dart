@@ -39,6 +39,7 @@ import '../../services/account_service.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/task/entity_linked_tasks_card.dart';
+import '../../widgets/barcode_label/label_print_from_invoice.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -84,8 +85,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
   final TextEditingController _invoiceTitleController = TextEditingController();
+  final TextEditingController _loyaltyPointsController = TextEditingController();
+  final TextEditingController _clubVoucherCodeController = TextEditingController();
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   bool _persistedIsProforma = false;
+  List<Map<String, dynamic>> _crmDeals = [];
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
@@ -415,6 +419,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     _tabController.dispose();
     _globalDiscountValueController.dispose();
     _invoiceTitleController.dispose();
+    _loyaltyPointsController.dispose();
+    _clubVoucherCodeController.dispose();
     super.dispose();
   }
 
@@ -466,9 +472,18 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         _selectedTagIds = [];
       }
       _invoiceTitle = item['description']?.toString();
+      final crmDeals = item['crm_deals'];
+      _crmDeals = crmDeals is List
+          ? crmDeals.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList()
+          : <Map<String, dynamic>>[];
 
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
+      final clubInfo = _originalExtraInfo['customer_club'];
+      if (clubInfo is Map) {
+        _loyaltyPointsController.text = (clubInfo['redeem_points_requested'] ?? '').toString();
+        _clubVoucherCodeController.text = (clubInfo['voucher_code'] ?? '').toString();
+      }
       _manualFxRateId = null;
       final fxx0 = _originalExtraInfo['fx'];
       if (fxx0 is Map && fxx0['mode']?.toString() == 'selected') {
@@ -805,6 +820,19 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         title: Text(t.editInvoiceTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
+          if (_selectedInvoiceType == InvoiceType.purchase)
+            IconButton(
+              tooltip: t.barcodeLabelPrintFromInvoice,
+              onPressed: (_loading || _isSaving)
+                  ? null
+                  : () => showBarcodePrintFromInvoiceLines(
+                      context: context,
+                      businessId: widget.businessId,
+                      authStore: widget.authStore,
+                      lines: _lineItems,
+                    ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
           IconButton(
             tooltip: t.saveChangesTooltip,
             onPressed: (_loading || _isSaving) ? null : _saveChanges,
@@ -857,6 +885,44 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     _buildSettingsTab(),
                   ],
                 ),
+    );
+  }
+
+  Widget _buildCrmDealLinks() {
+    if (_crmDeals.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('فرصت فروش', style: Theme.of(context).textTheme.labelLarge),
+              for (final deal in _crmDeals)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: const Icon(Icons.trending_up),
+                  title: Text(
+                    [
+                      deal['code']?.toString() ?? '',
+                      deal['title']?.toString() ?? '',
+                    ].where((part) => part.isNotEmpty).join(' — '),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: (deal['id'] as num?) == null
+                      ? null
+                      : () => context.go('/business/${widget.businessId}/crm/deals/${(deal['id'] as num).toInt()}'),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -929,7 +995,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               InvoiceInfoForm(
-            header: _buildTaxConstraintBanner(),
+            header: Column(children: [_buildTaxConstraintBanner(), if (_crmDeals.isNotEmpty) _buildCrmDealLinks()]),
             businessId: widget.businessId,
             authStore: widget.authStore,
             calendarController: widget.calendarController,
@@ -998,6 +1064,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 _invoiceTitle = value.trim().isEmpty ? null : value.trim();
               });
             },
+            loyaltyPointsController: _loyaltyPointsController,
+            voucherCodeController: _clubVoucherCodeController,
               ),
               const SizedBox(height: 12),
               EntityLinkedTasksCard(
@@ -1533,6 +1601,25 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     } else if (isPurchaseOrReturn && _selectedSupplier != null) {
       mergedExtra['person_id'] = _selectedSupplier!.id;
     }
+	final clubInfo = Map<String, dynamic>.from(mergedExtra['customer_club'] is Map ? mergedExtra['customer_club'] as Map : const {});
+	if (_loyaltyPointsController.text.trim().isEmpty) {
+		clubInfo.remove('redeem_points_requested');
+		clubInfo.remove('redeem_discount_amount');
+	} else {
+		clubInfo['redeem_points_requested'] = double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0;
+	}
+	if (_clubVoucherCodeController.text.trim().isEmpty) {
+		clubInfo.remove('voucher_code');
+		clubInfo.remove('voucher_id');
+		clubInfo.remove('voucher_discount_amount');
+	} else {
+		clubInfo['voucher_code'] = _clubVoucherCodeController.text.trim().toUpperCase();
+	}
+	if (clubInfo.isEmpty) {
+		mergedExtra.remove('customer_club');
+	} else {
+		mergedExtra['customer_club'] = clubInfo;
+	}
 
     if (_invoiceTypeSupportsAdjustments) {
       final adjPayload = buildAdjustmentsPayloadList(_adjustmentRows);
@@ -1559,6 +1646,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'tag_ids': _selectedTagIds,
       if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+      if (_loyaltyPointsController.text.trim().isNotEmpty)
+        'loyalty_redemption_points': double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0,
+      if (_clubVoucherCodeController.text.trim().isNotEmpty)
+        'customer_club_voucher_code': _clubVoucherCodeController.text.trim().toUpperCase(),
     };
     
     // تراکنش‌های پرداخت برای فاکتور قطعی؛ همیشه آرایه بفرست تا حذف همهٔ تراکنش‌ها در سرور اعمال شود
@@ -1620,12 +1711,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
     if (e.selectedInstanceIds != null && e.selectedInstanceIds!.isNotEmpty) {
       extraInfoMap['selected_instance_ids'] = e.selectedInstanceIds;
+    } else if (_selectedInvoiceType == InvoiceType.salesReturn) {
+      final returned = extraInfoMap['returned_from_instance_ids'];
+      if (returned is List && returned.isNotEmpty) {
+        extraInfoMap['selected_instance_ids'] = returned;
+      }
     }
 
+    final allocations = extraInfoMap['allocations'];
+    final lotAllocations = extraInfoMap['lot_allocations'];
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
+      if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
+      if (lotAllocations is List && lotAllocations.isNotEmpty) 'lot_allocations': lotAllocations,
       'extra_info': extraInfoMap,
     };
   }

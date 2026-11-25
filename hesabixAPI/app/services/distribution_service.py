@@ -5,17 +5,21 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import false as sql_false
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
 	DistributionBusinessSettings,
+	DistributionCustomerProfile,
+	DistributionDailyPlanLock,
 	DistributionFieldVisit,
 	DistributionReturnRequest,
 	DistributionRoute,
 	DistributionRouteAssignment,
 	DistributionRouteStop,
 	DistributionTerritory,
+	DistributionUserPreference,
 )
 from adapters.db.models.document import Document
 from adapters.db.models.person import Person
@@ -37,29 +41,36 @@ def _ensure_plugin(db: Session, business_id: int) -> None:
 		)
 
 
-def _scope_visit_user_id(ctx: AuthContext, business_id: int) -> Optional[int]:
-	"""فیلتر بازدیدها: None = همهٔ تیم، وگرنه فقط ویزیت‌های خود کاربر."""
+def _can_see_full_distribution_catalog(ctx: AuthContext, business_id: int) -> bool:
+	"""کاتالوگ کامل کسب‌وکار: سوپرادمین، مالک، یا distribution.manage — نه ناظر منطقه‌ای."""
 	if ctx.is_superadmin():
-		return None
+		return True
 	if ctx.db and ctx.is_business_owner(business_id):
-		return None
-	if ctx.has_business_permission("distribution", "manage"):
-		return None
+		return True
+	return bool(ctx.has_business_permission("distribution", "manage"))
+
+
+def _can_see_team_distribution(ctx: AuthContext, business_id: int) -> bool:
+	"""نقشه/گزارش تیم: مدیر یا ناظر منطقه‌ای."""
+	if _can_see_full_distribution_catalog(ctx, business_id):
+		return True
+	return bool(ctx.has_business_permission("distribution", "reports_team"))
+
+
+def workspace_for_ctx(ctx: AuthContext, business_id: int) -> str:
+	if _can_manage_distribution(ctx, business_id):
+		return "office"
 	if ctx.has_business_permission("distribution", "reports_team"):
+		return "supervisor"
+	return "field"
+
+
+def _scope_visit_user_id(ctx: AuthContext, business_id: int) -> Optional[int]:
+	"""فیلتر تک‌کاربرهٔ قدیمی. None = بدون محدودیت تک‌آیدی (مدیر). ناظر را محدود به خود می‌کند مگر
+	برای تیم ناظر از scoped_user_ids_for_ctx / apply_user_id_scope استفاده کنید."""
+	if _can_see_full_distribution_catalog(ctx, business_id):
 		return None
 	return ctx.get_user_id()
-
-
-def _can_see_full_distribution_catalog(ctx: AuthContext, business_id: int) -> bool:
-	if ctx.is_superadmin():
-		return True
-	if ctx.db and ctx.is_business_owner(business_id):
-		return True
-	if ctx.has_business_permission("distribution", "manage"):
-		return True
-	if ctx.has_business_permission("distribution", "reports_team"):
-		return True
-	return False
 
 
 def get_distribution_settings_row(db: Session, business_id: int) -> Optional[DistributionBusinessSettings]:
@@ -78,6 +89,13 @@ def get_or_create_distribution_settings(db: Session, business_id: int) -> Distri
 		business_id=business_id,
 		shared_routing_catalog=False,
 		require_visit_in_daily_plan=False,
+		share_live_location=False,
+		exclusive_assignments=True,
+		exclusive_territories=False,
+		exclusive_customer_ownership=True,
+		require_location_consent=True,
+		lock_published_plans=False,
+		require_published_plan=False,
 		created_at=datetime.utcnow(),
 		updated_at=datetime.utcnow(),
 	)
@@ -88,26 +106,131 @@ def get_or_create_distribution_settings(db: Session, business_id: int) -> Distri
 
 
 def settings_for_read(db: Session, business_id: int) -> Dict[str, Any]:
-	"""خواندن تنظیمات بدون ایجاد رکورد در دیتابیس."""
+	"""خواندن تنظیمات بدون ایجاد رکورد در دیتابیس. کلید نقشه حذف می‌شود."""
 	row = get_distribution_settings_row(db, business_id)
 	if not row:
 		from app.services.distribution_phase3_service import extend_settings_dict
 
-		return extend_settings_dict(None)
-	return settings_to_dict(row)
+		d = extend_settings_dict(None)
+		return _redact_settings_secrets(d, include_secrets=False)
+	return settings_to_dict(row, include_secrets=False)
 
 
-def settings_to_dict(s: DistributionBusinessSettings) -> Dict[str, Any]:
+def settings_to_dict(s: DistributionBusinessSettings, *, include_secrets: bool = False) -> Dict[str, Any]:
 	from app.services.distribution_phase3_service import extend_settings_dict
 
-	return extend_settings_dict(s)
+	return _redact_settings_secrets(extend_settings_dict(s), include_secrets=include_secrets)
+
+
+def _redact_settings_secrets(data: Dict[str, Any], *, include_secrets: bool) -> Dict[str, Any]:
+	out = dict(data)
+	key = out.get("memaps_api_key")
+	out["has_memaps_api_key"] = bool(str(key).strip()) if key else False
+	if not include_secrets:
+		out["memaps_api_key"] = None
+	return out
+
+
+def settings_for_client(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, Any]:
+	"""تنظیمات برای API؛ کلید نقشه فقط برای مدیر برمی‌گردد."""
+	row = get_distribution_settings_row(db, business_id)
+	include = _can_manage_distribution(ctx, business_id)
+	if not row:
+		from app.services.distribution_phase3_service import extend_settings_dict
+
+		return _redact_settings_secrets(extend_settings_dict(None), include_secrets=include)
+	return settings_to_dict(row, include_secrets=include)
 
 
 def _use_strict_catalog_for_field_user(db: Session, business_id: int, ctx: AuthContext) -> bool:
 	if _can_see_full_distribution_catalog(ctx, business_id):
 		return False
+	if ctx.has_business_permission("distribution", "reports_team"):
+		return False
 	s = get_or_create_distribution_settings(db, business_id)
 	return not bool(s.shared_routing_catalog)
+
+
+def _can_manage_distribution(ctx: AuthContext, business_id: int) -> bool:
+	"""تغییر منابع دیگران: سوپرادمین، مالک کسب‌وکار، یا distribution.manage."""
+	if ctx.is_superadmin():
+		return True
+	if ctx.db and ctx.is_business_owner(business_id):
+		return True
+	return bool(ctx.has_business_permission("distribution", "manage"))
+
+
+def _assert_owner_or_access(
+	ctx: AuthContext,
+	business_id: int,
+	owner_user_id: Optional[int],
+	*,
+	write: bool = False,
+	message: str = "Forbidden",
+	db: Optional[Session] = None,
+) -> None:
+	"""مالک منبع، یا برای خواندن کاتالوگ کامل/تیم ناظر، یا برای نوشتن فقط manage."""
+	uid = ctx.get_user_id()
+	if owner_user_id is not None and uid is not None and int(owner_user_id) == int(uid):
+		return
+	if write:
+		if _can_manage_distribution(ctx, business_id):
+			return
+		raise ApiError("FORBIDDEN", message, http_status=403)
+	if _can_see_full_distribution_catalog(ctx, business_id):
+		return
+	if ctx.has_business_permission("distribution", "reports_team") and owner_user_id is not None:
+		session = db if db is not None else getattr(ctx, "db", None)
+		if session is not None and hasattr(session, "query"):
+			allowed = scoped_user_ids_for_ctx(session, business_id, ctx)
+			if allowed is None or int(owner_user_id) in allowed:
+				return
+		elif session is None:
+			# بدون سشن نمی‌توان قلمرو ناظر را سنجید؛ دسترسی همتا رد می‌شود.
+			pass
+	raise ApiError("FORBIDDEN", message, http_status=403)
+
+
+def allowed_person_ids_for_ctx(db: Session, business_id: int, ctx: AuthContext) -> Optional[set]:
+	"""None = بدون محدودیت. مجموعه خالی یعنی هیچ مشتری‌ای."""
+	user_ids = scoped_user_ids_for_ctx(db, business_id, ctx)
+	if user_ids is None:
+		return None
+	if not user_ids:
+		return set()
+	ids: set = set()
+	assigned = _assigned_route_ids_for_users(db, business_id, user_ids)
+	if assigned:
+		rows = (
+			db.query(DistributionRouteStop.person_id)
+			.filter(DistributionRouteStop.route_id.in_(assigned))
+			.distinct()
+			.all()
+		)
+		ids.update(int(r[0]) for r in rows if r[0])
+	own_visits = (
+		db.query(DistributionFieldVisit.person_id)
+		.filter(
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.user_id.in_(user_ids),
+		)
+		.distinct()
+		.all()
+	)
+	ids.update(int(r[0]) for r in own_visits if r[0])
+	return ids
+
+
+def assert_person_visible_for_ctx(db: Session, business_id: int, ctx: AuthContext, person_id: int) -> None:
+	allowed = allowed_person_ids_for_ctx(db, business_id, ctx)
+	if allowed is None:
+		return
+	if int(person_id) not in allowed:
+		raise ApiError(
+			"FORBIDDEN",
+			"این مشتری در مسیر یا برنامهٔ تخصیص‌یافتهٔ شما نیست.",
+			http_status=403,
+		)
 
 
 def _assigned_route_ids_for_user(
@@ -127,6 +250,450 @@ def _assigned_route_ids_for_user(
 		)
 	rows = q.distinct().all()
 	return [int(r[0]) for r in rows]
+
+
+def _assigned_route_ids_for_users(db: Session, business_id: int, user_ids: set, on_date: Optional[date] = None) -> List[int]:
+	if not user_ids:
+		return []
+	q = db.query(DistributionRouteAssignment.route_id).filter(
+		DistributionRouteAssignment.business_id == business_id,
+		DistributionRouteAssignment.user_id.in_(user_ids),
+	)
+	if on_date is not None:
+		q = q.filter(
+			DistributionRouteAssignment.valid_from <= on_date,
+			or_(DistributionRouteAssignment.valid_to.is_(None), DistributionRouteAssignment.valid_to >= on_date),
+		)
+	rows = q.distinct().all()
+	return [int(r[0]) for r in rows]
+
+
+def date_ranges_overlap(a_from: date, a_to: Optional[date], b_from: date, b_to: Optional[date]) -> bool:
+	a_end = a_to or date.max
+	b_end = b_to or date.max
+	return a_from <= b_end and b_from <= a_end
+
+
+def merge_date_ranges(
+	a_from: date, a_to: Optional[date], b_from: date, b_to: Optional[date]
+) -> tuple:
+	start = a_from if a_from <= b_from else b_from
+	if a_to is None or b_to is None:
+		return start, None
+	end = a_to if a_to >= b_to else b_to
+	return start, end
+
+
+def _business_has_territory_supervisors(db: Session, business_id: int) -> bool:
+	row = (
+		db.query(DistributionTerritory.id)
+		.filter(
+			DistributionTerritory.business_id == business_id,
+			DistributionTerritory.supervisor_user_id.isnot(None),
+		)
+		.first()
+	)
+	return row is not None
+
+
+def supervised_territory_ids(db: Session, business_id: int, user_id: int) -> set:
+	direct = (
+		db.query(DistributionTerritory.id)
+		.filter(
+			DistributionTerritory.business_id == business_id,
+			DistributionTerritory.supervisor_user_id == int(user_id),
+		)
+		.all()
+	)
+	ids = {int(r[0]) for r in direct if r[0]}
+	if not ids:
+		return set()
+	for _ in range(20):
+		children = (
+			db.query(DistributionTerritory.id)
+			.filter(
+				DistributionTerritory.business_id == business_id,
+				DistributionTerritory.parent_id.in_(ids),
+			)
+			.all()
+		)
+		added = False
+		for (cid,) in children:
+			if cid is None:
+				continue
+			cid_i = int(cid)
+			if cid_i not in ids:
+				ids.add(cid_i)
+				added = True
+		if not added:
+			break
+	return ids
+
+
+def _supervised_user_ids(db: Session, business_id: int, supervisor_user_id: int) -> set:
+	uids = {int(supervisor_user_id)}
+	tids = supervised_territory_ids(db, business_id, supervisor_user_id)
+	if not tids:
+		return uids
+	route_ids = (
+		db.query(DistributionRoute.id)
+		.filter(
+			DistributionRoute.business_id == business_id,
+			DistributionRoute.territory_id.in_(tids),
+		)
+		.all()
+	)
+	rids = [int(r[0]) for r in route_ids if r[0]]
+	if not rids:
+		return uids
+	rows = (
+		db.query(DistributionRouteAssignment.user_id)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.route_id.in_(rids),
+		)
+		.distinct()
+		.all()
+	)
+	uids.update(int(r[0]) for r in rows if r[0])
+	return uids
+
+
+def scoped_user_ids_for_ctx(db: Session, business_id: int, ctx: AuthContext) -> Optional[set]:
+	"""None = بدون محدودیت. مجموعه = فقط همین کاربران (شامل خود کاربر)."""
+	if _can_see_full_distribution_catalog(ctx, business_id):
+		return None
+	uid = ctx.get_user_id()
+	if uid is None:
+		return set()
+	if ctx.has_business_permission("distribution", "reports_team"):
+		if not _business_has_territory_supervisors(db, business_id):
+			return None
+		return _supervised_user_ids(db, business_id, int(uid))
+	return {int(uid)}
+
+
+def apply_user_id_scope(q, user_id_column, db: Session, business_id: int, ctx: AuthContext):
+	ids = scoped_user_ids_for_ctx(db, business_id, ctx)
+	if ids is None:
+		return q
+	if not ids:
+		return q.filter(sql_false())
+	return q.filter(user_id_column.in_(ids))
+
+
+def assert_user_visible_for_ctx(
+	db: Session,
+	business_id: int,
+	ctx: AuthContext,
+	target_user_id: int,
+	*,
+	write: bool = False,
+	message: str = "این ویزیتور در قلمرو نظارتی شما نیست.",
+) -> None:
+	if write:
+		uid = ctx.get_user_id()
+		if uid is not None and int(target_user_id) == int(uid):
+			return
+		if _can_manage_distribution(ctx, business_id):
+			return
+		raise ApiError("FORBIDDEN", message, http_status=403)
+	ids = scoped_user_ids_for_ctx(db, business_id, ctx)
+	if ids is None:
+		return
+	if int(target_user_id) in ids:
+		return
+	raise ApiError("FORBIDDEN", message, http_status=403)
+
+
+def allowed_territory_ids_for_ctx(db: Session, business_id: int, ctx: AuthContext) -> Optional[set]:
+	if _can_see_full_distribution_catalog(ctx, business_id):
+		return None
+	uid = ctx.get_user_id()
+	if uid is None:
+		return set()
+	if ctx.has_business_permission("distribution", "reports_team"):
+		if not _business_has_territory_supervisors(db, business_id):
+			return None
+		return supervised_territory_ids(db, business_id, int(uid))
+	route_ids = _assigned_route_ids_for_user(db, business_id, int(uid), on_date=business_today(business_id))
+	if not route_ids:
+		return set()
+	tids = (
+		db.query(DistributionRoute.territory_id)
+		.filter(DistributionRoute.business_id == business_id, DistributionRoute.id.in_(route_ids))
+		.distinct()
+		.all()
+	)
+	return {int(x[0]) for x in tids if x[0] is not None}
+
+
+def get_user_preference(db: Session, business_id: int, user_id: int) -> Optional[DistributionUserPreference]:
+	return (
+		db.query(DistributionUserPreference)
+		.filter(
+			DistributionUserPreference.business_id == business_id,
+			DistributionUserPreference.user_id == int(user_id),
+		)
+		.first()
+	)
+
+
+def user_has_location_consent(db: Session, business_id: int, user_id: int) -> bool:
+	row = get_user_preference(db, business_id, user_id)
+	return bool(row and row.location_consent)
+
+
+def live_tracking_allowed(db: Session, business_id: int, user_id: int) -> bool:
+	settings = get_or_create_distribution_settings(db, business_id)
+	if not bool(getattr(settings, "share_live_location", False)):
+		return False
+	if bool(getattr(settings, "require_location_consent", True)):
+		return user_has_location_consent(db, business_id, user_id)
+	return True
+
+
+def upsert_user_preference(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	payload: Dict[str, Any],
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	row = get_user_preference(db, business_id, user_id)
+	if not row:
+		row = DistributionUserPreference(business_id=business_id, user_id=int(user_id))
+		db.add(row)
+	if "location_consent" in payload:
+		consent = bool(payload["location_consent"])
+		row.location_consent = consent
+		row.location_consent_at = datetime.utcnow() if consent else None
+		if not consent:
+			from app.services.distribution_commercial_service import clear_live_location_for_user
+
+			clear_live_location_for_user(db, business_id, user_id, commit=False)
+	row.updated_at = datetime.utcnow()
+	if not row.created_at:
+		row.created_at = datetime.utcnow()
+	db.commit()
+	db.refresh(row)
+	return preference_to_dict(row)
+
+
+def preference_to_dict(row: DistributionUserPreference) -> Dict[str, Any]:
+	return {
+		"user_id": row.user_id,
+		"location_consent": bool(row.location_consent),
+		"location_consent_at": row.location_consent_at.isoformat() + "Z" if row.location_consent_at else None,
+	}
+
+
+def get_plan_lock(
+	db: Session, business_id: int, user_id: int, plan_date: date
+) -> Optional[DistributionDailyPlanLock]:
+	return (
+		db.query(DistributionDailyPlanLock)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.user_id == int(user_id),
+			DistributionDailyPlanLock.plan_date == plan_date,
+		)
+		.first()
+	)
+
+
+def plan_lock_to_dict(row: Optional[DistributionDailyPlanLock]) -> Dict[str, Any]:
+	if not row:
+		return {"published": False, "locked": False, "published_at": None, "published_by_user_id": None}
+	return {
+		"published": True,
+		"locked": bool(row.is_locked),
+		"published_at": row.published_at.isoformat() + "Z" if row.published_at else None,
+		"published_by_user_id": row.published_by_user_id,
+		"notes": row.notes,
+	}
+
+
+def _upsert_plan_lock_row(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	target_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = True,
+	notes: Optional[str] = None,
+) -> DistributionDailyPlanLock:
+	row = get_plan_lock(db, business_id, target_user_id, plan_date)
+	now = datetime.utcnow()
+	if not row:
+		row = DistributionDailyPlanLock(
+			business_id=business_id,
+			user_id=int(target_user_id),
+			plan_date=plan_date,
+			is_locked=bool(locked),
+			published_by_user_id=int(actor_user_id),
+			published_at=now,
+			notes=notes,
+			created_at=now,
+			updated_at=now,
+		)
+		db.add(row)
+	else:
+		row.is_locked = bool(locked)
+		row.published_by_user_id = int(actor_user_id)
+		row.published_at = now
+		if notes is not None:
+			row.notes = notes
+		row.updated_at = now
+	return row
+
+
+def publish_daily_plan(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	target_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = True,
+	notes: Optional[str] = None,
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	if ctx is not None:
+		assert_user_visible_for_ctx(
+			db,
+			business_id,
+			ctx,
+			int(target_user_id),
+			write=True,
+			message="نشر برنامه این ویزیتور برای شما مجاز نیست.",
+		)
+	row = _upsert_plan_lock_row(
+		db, business_id, actor_user_id, target_user_id, plan_date, locked=locked, notes=notes,
+	)
+	db.commit()
+	db.refresh(row)
+	return plan_lock_to_dict(row)
+
+
+def assigned_user_ids_for_date(db: Session, business_id: int, on_date: date) -> set:
+	rows = (
+		db.query(DistributionRouteAssignment.user_id)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.valid_from <= on_date,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= on_date,
+			),
+		)
+		.distinct()
+		.all()
+	)
+	return {int(r[0]) for r in rows if r[0]}
+
+
+def publish_daily_plans_for_date(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = True,
+	notes: Optional[str] = None,
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
+	"""نشر برنامه برای همهٔ ویزیتورهای تخصیص‌یافته در آن روز (محدود به قلمرو ناظر)."""
+	_ensure_plugin(db, business_id)
+	ids = assigned_user_ids_for_date(db, business_id, plan_date)
+	if ctx is not None:
+		scoped = scoped_user_ids_for_ctx(db, business_id, ctx)
+		if scoped is not None:
+			ids = {uid for uid in ids if uid in scoped}
+	items: List[Dict[str, Any]] = []
+	rows: List[DistributionDailyPlanLock] = []
+	for uid in sorted(ids):
+		rows.append(
+			_upsert_plan_lock_row(
+				db, business_id, actor_user_id, uid, plan_date, locked=locked, notes=notes,
+			)
+		)
+	db.commit()
+	for row in rows:
+		db.refresh(row)
+		item = plan_lock_to_dict(row)
+		item["user_id"] = row.user_id
+		items.append(item)
+	return {
+		"plan_date": plan_date.isoformat(),
+		"published_count": len(items),
+		"items": items,
+	}
+
+
+def unpublish_daily_plan(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+	ctx: Optional[AuthContext] = None,
+) -> None:
+	_ensure_plugin(db, business_id)
+	if ctx is not None:
+		assert_user_visible_for_ctx(
+			db,
+			business_id,
+			ctx,
+			int(target_user_id),
+			write=True,
+			message="لغو نشر برنامه این ویزیتور برای شما مجاز نیست.",
+		)
+	row = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if not row:
+		return
+	db.delete(row)
+	db.commit()
+
+
+def assert_plan_unlocked_for_route(db: Session, business_id: int, route_id: int, plan_date: date) -> None:
+	settings = get_or_create_distribution_settings(db, business_id)
+	if not bool(getattr(settings, "lock_published_plans", False)):
+		return
+	assigns = (
+		db.query(DistributionRouteAssignment.user_id)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.route_id == int(route_id),
+			DistributionRouteAssignment.valid_from <= plan_date,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= plan_date,
+			),
+		)
+		.distinct()
+		.all()
+	)
+	uids = [int(r[0]) for r in assigns if r[0]]
+	if not uids:
+		return
+	locked = (
+		db.query(DistributionDailyPlanLock)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.user_id.in_(uids),
+			DistributionDailyPlanLock.plan_date == plan_date,
+			DistributionDailyPlanLock.is_locked.is_(True),
+		)
+		.first()
+	)
+	if locked:
+		raise ApiError(
+			"CONFLICT",
+			"برنامهٔ این روز منتشر و قفل شده است؛ برای تغییر ترتیب ابتدا قفل را بردارید.",
+			http_status=409,
+		)
 
 
 def _validate_document_for_business(db: Session, business_id: int, document_id: int, person_id: Optional[int] = None) -> None:
@@ -218,16 +785,64 @@ def _ensure_route_allowed_for_strict(db: Session, business_id: int, ctx: AuthCon
 
 
 
-def territory_to_dict(t: DistributionTerritory) -> Dict[str, Any]:
+def territory_to_dict(t: DistributionTerritory, db: Optional[Session] = None) -> Dict[str, Any]:
+	supervisor_name = None
+	if db is not None and getattr(t, "supervisor_user_id", None):
+		from app.services.distribution_documents import user_label
+
+		supervisor_name = user_label(db, t.supervisor_user_id)
 	return {
 		"id": t.id,
 		"code": t.code,
 		"name": t.name,
 		"description": t.description,
 		"is_active": t.is_active,
+		"parent_id": getattr(t, "parent_id", None),
+		"supervisor_user_id": getattr(t, "supervisor_user_id", None),
+		"supervisor_name": supervisor_name,
 		"created_at": t.created_at.isoformat() if t.created_at else None,
 		"updated_at": t.updated_at.isoformat() if t.updated_at else None,
 	}
+
+
+def _coerce_optional_int(value: Any) -> Optional[int]:
+	if value is None or value == "":
+		return None
+	try:
+		n = int(value)
+	except (TypeError, ValueError):
+		return None
+	return n if n > 0 else None
+
+
+def _assert_territory_parent_ok(db: Session, business_id: int, territory_id: Optional[int], parent_id: int) -> None:
+	if territory_id is not None and int(parent_id) == int(territory_id):
+		raise ApiError("VALIDATION_ERROR", "قلمرو نمی‌تواند والد خودش باشد.", http_status=400)
+	parent = (
+		db.query(DistributionTerritory)
+		.filter(DistributionTerritory.id == int(parent_id), DistributionTerritory.business_id == business_id)
+		.first()
+	)
+	if not parent:
+		raise ApiError("VALIDATION_ERROR", "قلمرو والد نامعتبر است.", http_status=400)
+	walk = parent
+	seen = {int(parent_id)}
+	for _ in range(20):
+		pid = getattr(walk, "parent_id", None)
+		if pid is None:
+			return
+		if territory_id is not None and int(pid) == int(territory_id):
+			raise ApiError("VALIDATION_ERROR", "سلسله‌مراتب قلمرو حلقه تشکیل می‌دهد.", http_status=400)
+		if int(pid) in seen:
+			raise ApiError("VALIDATION_ERROR", "سلسله‌مراتب قلمرو حلقه تشکیل می‌دهد.", http_status=400)
+		seen.add(int(pid))
+		walk = (
+			db.query(DistributionTerritory)
+			.filter(DistributionTerritory.id == int(pid), DistributionTerritory.business_id == business_id)
+			.first()
+		)
+		if not walk:
+			return
 
 
 def route_to_dict(r: DistributionRoute, territory_name: Optional[str] = None) -> Dict[str, Any]:
@@ -244,7 +859,30 @@ def route_to_dict(r: DistributionRoute, territory_name: Optional[str] = None) ->
 	}
 
 
-def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) -> Dict[str, Any]:
+def _visible_deal_id(db: Session, business_id: int, user_id: int, deal_id: Optional[int]) -> Optional[int]:
+	"""شناسه فرصت را فقط وقتی برگردان که بیننده همان رکورد را ببیند."""
+	if not deal_id:
+		return None
+	from adapters.db.models.crm import Deal
+	from app.services.crm_enterprise_service import acl_actor, assert_can_view_record
+
+	deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
+	if deal is None:
+		return None
+	try:
+		assert_can_view_record(db, business_id, acl_actor(db, int(user_id)), "deal", deal, write=False)
+	except ApiError:
+		return None
+	return int(deal.id)
+
+
+def visit_to_dict(
+	v: DistributionFieldVisit,
+	person_name: Optional[str] = None,
+	*,
+	db: Optional[Session] = None,
+	viewer_user_id: Optional[int] = None,
+) -> Dict[str, Any]:
 	def _num(val: Any) -> Any:
 		if val is None:
 			return None
@@ -266,7 +904,11 @@ def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) 
 		"outcome": v.outcome,
 		"no_order_reason": v.no_order_reason,
 		"document_id": v.document_id,
-		"deal_id": v.deal_id,
+		"deal_id": (
+			_visible_deal_id(db, int(v.business_id), int(viewer_user_id), v.deal_id)
+			if db is not None and viewer_user_id is not None
+			else v.deal_id
+		),
 		"crm_activity_id": v.crm_activity_id,
 		"notes": v.notes,
 		"extra_info": v.extra_info,
@@ -290,11 +932,9 @@ def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) 
 
 def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	scope_uid = _scope_visit_user_id(ctx, business_id)
 
 	vq = db.query(DistributionFieldVisit).filter(DistributionFieldVisit.business_id == business_id)
-	if scope_uid is not None:
-		vq = vq.filter(DistributionFieldVisit.user_id == scope_uid)
+	vq = apply_user_id_scope(vq, DistributionFieldVisit.user_id, db, business_id, ctx)
 
 	today = business_today(business_id)
 	start_today = datetime.combine(today, datetime.min.time())
@@ -310,20 +950,12 @@ def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, An
 		DistributionFieldVisit.status == "completed",
 	).count()
 
-	pending_returns = db.query(func.count(DistributionReturnRequest.id)).filter(
+	prq = db.query(func.count(DistributionReturnRequest.id)).filter(
 		DistributionReturnRequest.business_id == business_id,
 		DistributionReturnRequest.status == "pending",
-	).scalar()
-	if scope_uid is not None:
-		pending_returns = (
-			db.query(func.count(DistributionReturnRequest.id))
-			.filter(
-				DistributionReturnRequest.business_id == business_id,
-				DistributionReturnRequest.status == "pending",
-				DistributionReturnRequest.created_by_user_id == scope_uid,
-			)
-			.scalar()
-		)
+	)
+	prq = apply_user_id_scope(prq, DistributionReturnRequest.created_by_user_id, db, business_id, ctx)
+	pending_returns = prq.scalar()
 
 	strict_cat = _use_strict_catalog_for_field_user(db, business_id, ctx)
 	uid_summary = ctx.get_user_id()
@@ -348,36 +980,74 @@ def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, An
 			.scalar()
 		)
 
+	settings_out = settings_for_client(db, business_id, ctx)
+	uid_pref = ctx.get_user_id()
+	location_consent = False
+	if uid_pref is not None:
+		location_consent = user_has_location_consent(db, business_id, int(uid_pref))
 	return {
 		"visits_today": visits_today,
 		"completed_visits_today": completed_today,
 		"pending_return_requests": int(pending_returns or 0),
 		"active_routes": int(routes_active or 0),
-		"distribution_settings": settings_for_read(db, business_id),
+		"distribution_settings": settings_out,
+		"workspace": workspace_for_ctx(ctx, business_id),
+		"location_consent": location_consent,
+		"team_scope_restricted": bool(
+			ctx.has_business_permission("distribution", "reports_team")
+			and not _can_see_full_distribution_catalog(ctx, business_id)
+			and _business_has_territory_supervisors(db, business_id)
+		),
 	}
+
+
+def list_team_members(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
+	"""ویزیتورهای قابل مشاهده برای انتخابگر ناظر/مدیر."""
+	_ensure_plugin(db, business_id)
+	from app.services.distribution_documents import user_label
+
+	ids = scoped_user_ids_for_ctx(db, business_id, ctx)
+	if ids is None:
+		today = business_today(business_id)
+		rows = (
+			db.query(DistributionRouteAssignment.user_id)
+			.filter(
+				DistributionRouteAssignment.business_id == business_id,
+				DistributionRouteAssignment.valid_from <= today,
+				or_(
+					DistributionRouteAssignment.valid_to.is_(None),
+					DistributionRouteAssignment.valid_to >= today,
+				),
+			)
+			.distinct()
+			.all()
+		)
+		ids = {int(r[0]) for r in rows if r[0]}
+		sup = (
+			db.query(DistributionTerritory.supervisor_user_id)
+			.filter(
+				DistributionTerritory.business_id == business_id,
+				DistributionTerritory.supervisor_user_id.isnot(None),
+			)
+			.distinct()
+			.all()
+		)
+		ids.update(int(r[0]) for r in sup if r[0])
+	return [
+		{"user_id": uid, "user_name": user_label(db, uid)}
+		for uid in sorted(ids)
+	]
 
 
 def list_territories(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
 	q = db.query(DistributionTerritory).filter(DistributionTerritory.business_id == business_id)
-	if _use_strict_catalog_for_field_user(db, business_id, ctx):
-		uid = ctx.get_user_id()
-		if uid is None:
+	allowed_tids = allowed_territory_ids_for_ctx(db, business_id, ctx)
+	if allowed_tids is not None:
+		if not allowed_tids:
 			return []
-		route_ids = _assigned_route_ids_for_user(db, business_id, uid, on_date=business_today(business_id))
-		if not route_ids:
-			return []
-		tids = (
-			db.query(DistributionRoute.territory_id)
-			.filter(DistributionRoute.business_id == business_id, DistributionRoute.id.in_(route_ids))
-			.distinct()
-			.all()
-		)
-		tid_list = [int(x[0]) for x in tids if x[0] is not None]
-		if not tid_list:
-			return []
-		q = q.filter(DistributionTerritory.id.in_(tid_list))
-	return [territory_to_dict(t) for t in q.order_by(DistributionTerritory.code.asc()).all()]
+		q = q.filter(DistributionTerritory.id.in_(allowed_tids))
+	return [territory_to_dict(t, db) for t in q.order_by(DistributionTerritory.code.asc()).all()]
 
 
 def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -393,17 +1063,23 @@ def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 	)
 	if exists:
 		raise ApiError("DUPLICATE", "Territory code already exists", http_status=400)
+	parent_id = _coerce_optional_int(payload.get("parent_id"))
+	supervisor_user_id = _coerce_optional_int(payload.get("supervisor_user_id"))
+	if parent_id is not None:
+		_assert_territory_parent_ok(db, business_id, None, parent_id)
 	row = DistributionTerritory(
 		business_id=business_id,
 		code=code[:50],
 		name=name[:255],
 		description=(payload.get("description") or None),
 		is_active=bool(payload.get("is_active", True)),
+		parent_id=parent_id,
+		supervisor_user_id=supervisor_user_id,
 	)
 	db.add(row)
 	db.commit()
 	db.refresh(row)
-	return territory_to_dict(row)
+	return territory_to_dict(row, db)
 
 
 def update_territory(db: Session, business_id: int, territory_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -423,10 +1099,17 @@ def update_territory(db: Session, business_id: int, territory_id: int, payload: 
 		row.description = payload.get("description")
 	if "is_active" in payload:
 		row.is_active = bool(payload["is_active"])
+	if "parent_id" in payload:
+		parent_id = _coerce_optional_int(payload.get("parent_id"))
+		if parent_id is not None:
+			_assert_territory_parent_ok(db, business_id, row.id, parent_id)
+		row.parent_id = parent_id
+	if "supervisor_user_id" in payload:
+		row.supervisor_user_id = _coerce_optional_int(payload.get("supervisor_user_id"))
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
-	return territory_to_dict(row)
+	return territory_to_dict(row, db)
 
 
 def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
@@ -460,6 +1143,12 @@ def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[st
 		if not route_ids:
 			return []
 		q = q.filter(DistributionRoute.id.in_(route_ids))
+	elif ctx.has_business_permission("distribution", "reports_team"):
+		allowed_tids = allowed_territory_ids_for_ctx(db, business_id, ctx)
+		if allowed_tids is not None:
+			if not allowed_tids:
+				return []
+			q = q.filter(DistributionRoute.territory_id.in_(allowed_tids))
 	rows = q.order_by(DistributionRoute.code.asc()).all()
 	out = []
 	for r in rows:
@@ -682,6 +1371,8 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 		if uid is None:
 			return []
 		q = q.filter(DistributionRouteAssignment.user_id == uid)
+	else:
+		q = apply_user_id_scope(q, DistributionRouteAssignment.user_id, db, business_id, ctx)
 	rows = q.order_by(DistributionRouteAssignment.valid_from.desc()).all()
 	from app.services.distribution_documents import user_label
 
@@ -701,6 +1392,134 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 	return out
 
 
+def _person_ids_on_route(db: Session, route_id: int) -> List[int]:
+	rows = db.query(DistributionRouteStop.person_id).filter(DistributionRouteStop.route_id == int(route_id)).all()
+	return [int(r[0]) for r in rows if r[0]]
+
+
+def _claim_customer_owner(
+	db: Session,
+	business_id: int,
+	person_id: int,
+	user_id: int,
+	*,
+	transfer: bool = False,
+) -> Optional[int]:
+	"""مالک را اگر خالی باشد می‌گذارد. با transfer مالک قبلی را هم عوض می‌کند. مالک قبلی یا None برمی‌گردد."""
+	row = (
+		db.query(DistributionCustomerProfile)
+		.filter(
+			DistributionCustomerProfile.business_id == business_id,
+			DistributionCustomerProfile.person_id == int(person_id),
+		)
+		.first()
+	)
+	if not row:
+		row = DistributionCustomerProfile(business_id=business_id, person_id=int(person_id), owner_user_id=int(user_id))
+		db.add(row)
+		return None
+	prev = getattr(row, "owner_user_id", None)
+	if prev is None or (transfer and int(prev) != int(user_id)):
+		row.owner_user_id = int(user_id)
+		row.updated_at = datetime.utcnow()
+		return int(prev) if prev is not None else None
+	return int(prev) if prev is not None else None
+
+
+def assert_assignment_exclusive(
+	db: Session,
+	business_id: int,
+	route: DistributionRoute,
+	user_id: int,
+	valid_from: date,
+	valid_to: Optional[date],
+	*,
+	ignore_id: Optional[int] = None,
+) -> None:
+	settings = get_or_create_distribution_settings(db, business_id)
+	q = db.query(DistributionRouteAssignment).filter(
+		DistributionRouteAssignment.business_id == business_id,
+		DistributionRouteAssignment.route_id == int(route.id),
+	)
+	if ignore_id is not None:
+		q = q.filter(DistributionRouteAssignment.id != int(ignore_id))
+	if bool(getattr(settings, "exclusive_assignments", True)):
+		for other in q.all():
+			if int(other.user_id) == int(user_id):
+				continue
+			if date_ranges_overlap(valid_from, valid_to, other.valid_from, other.valid_to):
+				raise ApiError(
+					"CONFLICT",
+					"این مسیر در این بازه به ویزیتور دیگری تخصیص داده شده است.",
+					http_status=409,
+					details={"assignment_id": other.id, "user_id": other.user_id},
+				)
+	if bool(getattr(settings, "exclusive_territories", False)) and route.territory_id:
+		route_ids = (
+			db.query(DistributionRoute.id)
+			.filter(
+				DistributionRoute.business_id == business_id,
+				DistributionRoute.territory_id == int(route.territory_id),
+			)
+			.all()
+		)
+		rids = [int(r[0]) for r in route_ids if r[0]]
+		others = (
+			db.query(DistributionRouteAssignment)
+			.filter(
+				DistributionRouteAssignment.business_id == business_id,
+				DistributionRouteAssignment.route_id.in_(rids),
+				DistributionRouteAssignment.user_id != int(user_id),
+			)
+			.all()
+		)
+		for other in others:
+			if date_ranges_overlap(valid_from, valid_to, other.valid_from, other.valid_to):
+				raise ApiError(
+					"CONFLICT",
+					"این قلمرو در این بازه به ویزیتور دیگری اختصاص دارد.",
+					http_status=409,
+					details={"assignment_id": other.id, "user_id": other.user_id, "route_id": other.route_id},
+				)
+
+
+def assert_customer_owner_allows_visit(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	person_id: int,
+	ctx: Optional[AuthContext] = None,
+) -> None:
+	settings = get_or_create_distribution_settings(db, business_id)
+	if not bool(getattr(settings, "exclusive_customer_ownership", True)):
+		return
+	prof = (
+		db.query(DistributionCustomerProfile)
+		.filter(
+			DistributionCustomerProfile.business_id == business_id,
+			DistributionCustomerProfile.person_id == int(person_id),
+		)
+		.first()
+	)
+	owner = getattr(prof, "owner_user_id", None) if prof else None
+	if owner is None:
+		return
+	if int(owner) == int(user_id):
+		return
+	if ctx is not None and _can_manage_distribution(ctx, business_id):
+		return
+	if ctx is not None and ctx.has_business_permission("distribution", "reports_team"):
+		allowed = scoped_user_ids_for_ctx(db, business_id, ctx)
+		if allowed is None or int(owner) in allowed:
+			return
+	raise ApiError(
+		"FORBIDDEN",
+		"این مشتری در مالکیت ویزیتور دیگری است.",
+		http_status=403,
+		details={"owner_user_id": int(owner)},
+	)
+
+
 def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	route_id = int(payload.get("route_id") or 0)
@@ -717,14 +1536,49 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 	valid_to = None
 	if payload.get("valid_to"):
 		valid_to = date.fromisoformat(str(payload["valid_to"])[:10])
-	row = DistributionRouteAssignment(
-		business_id=business_id,
-		route_id=route_id,
-		user_id=user_id,
-		valid_from=valid_from,
-		valid_to=valid_to,
+	existing_same = (
+		db.query(DistributionRouteAssignment)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.route_id == route_id,
+			DistributionRouteAssignment.user_id == user_id,
+		)
+		.all()
 	)
-	db.add(row)
+	merged_row = None
+	for other in existing_same:
+		if date_ranges_overlap(valid_from, valid_to, other.valid_from, other.valid_to):
+			merged_row = other
+			break
+	if merged_row is not None:
+		valid_from, valid_to = merge_date_ranges(
+			merged_row.valid_from, merged_row.valid_to, valid_from, valid_to,
+		)
+		assert_assignment_exclusive(
+			db, business_id, rt, user_id, valid_from, valid_to, ignore_id=int(merged_row.id),
+		)
+		merged_row.valid_from = valid_from
+		merged_row.valid_to = valid_to
+		row = merged_row
+	else:
+		assert_assignment_exclusive(db, business_id, rt, user_id, valid_from, valid_to)
+		row = DistributionRouteAssignment(
+			business_id=business_id,
+			route_id=route_id,
+			user_id=user_id,
+			valid_from=valid_from,
+			valid_to=valid_to,
+		)
+		db.add(row)
+	transferred: List[int] = []
+	settings = get_or_create_distribution_settings(db, business_id)
+	if bool(getattr(settings, "exclusive_customer_ownership", True)) and bool(
+		getattr(settings, "exclusive_assignments", True)
+	):
+		for pid in _person_ids_on_route(db, route_id):
+			prev = _claim_customer_owner(db, business_id, pid, user_id, transfer=True)
+			if prev is not None and int(prev) != int(user_id):
+				transferred.append(int(pid))
 	db.commit()
 	db.refresh(row)
 	return {
@@ -733,6 +1587,8 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 		"user_id": row.user_id,
 		"valid_from": row.valid_from.isoformat(),
 		"valid_to": row.valid_to.isoformat() if row.valid_to else None,
+		"merged": merged_row is not None,
+		"ownership_transferred_person_ids": transferred,
 	}
 
 
@@ -820,7 +1676,9 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	items.sort(key=lambda x: (x["route_code"], x["sort_order"], x["person_id"]))
 	from app.services.distribution_field_ops_service import enrich_daily_plan
 
-	return enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
+	result = enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
+	result.update(plan_lock_to_dict(get_plan_lock(db, business_id, target_user_id, plan_date)))
+	return result
 
 
 def _active_visit(db: Session, business_id: int, user_id: int) -> Optional[DistributionFieldVisit]:
@@ -852,8 +1710,19 @@ def start_visit(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if ctx is not None:
+		assert_person_visible_for_ctx(db, business_id, ctx, person_id)
+	assert_customer_owner_allows_visit(db, business_id, user_id, person_id, ctx=ctx)
 	today = business_today(business_id)
 	settings_sv = get_or_create_distribution_settings(db, business_id)
+	if bool(getattr(settings_sv, "require_published_plan", False)):
+		lock = get_plan_lock(db, business_id, user_id, today)
+		if not lock:
+			raise ApiError(
+				"VALIDATION_ERROR",
+				"برنامهٔ امروز هنوز به‌صورت رسمی منتشر نشده است.",
+				http_status=400,
+			)
 	if settings_sv.require_visit_in_daily_plan:
 		_plan = get_daily_plan(db, business_id, user_id, today)
 		_allowed_pids = {int(it["person_id"]) for it in _plan["items"]}
@@ -928,6 +1797,9 @@ def start_visit(
 		_extra["geofence_override"] = True
 		_extra["geofence_override_reason"] = str(payload.get("geofence_override_reason") or "").strip()
 		_extra["geofence_override_by"] = user_id
+	supervisor_id = None
+	if payload.get("supervisor_user_id") and ctx is not None and _can_manage_distribution(ctx, business_id):
+		supervisor_id = int(payload["supervisor_user_id"])
 	v = DistributionFieldVisit(
 		business_id=business_id,
 		person_id=person_id,
@@ -940,14 +1812,24 @@ def start_visit(
 		start_latitude=_slat,
 		start_longitude=_slng,
 		extra_info=_extra or None,
-		supervisor_user_id=int(payload["supervisor_user_id"]) if payload.get("supervisor_user_id") else None,
+		supervisor_user_id=supervisor_id,
 		is_carried_over=bool(payload.get("is_carried_over")),
 	)
+	if v.supervisor_user_id is None and v.route_id:
+		rt_sup = db.query(DistributionRoute).filter(DistributionRoute.id == int(v.route_id)).first()
+		if rt_sup and rt_sup.territory_id:
+			terr = db.query(DistributionTerritory).filter(DistributionTerritory.id == rt_sup.territory_id).first()
+			if terr and getattr(terr, "supervisor_user_id", None):
+				v.supervisor_user_id = int(terr.supervisor_user_id)
 	db.add(v)
+	if bool(getattr(settings_sv, "exclusive_customer_ownership", True)) and v.route_id:
+		assigned_today = _assigned_route_ids_for_user(db, business_id, user_id, on_date=today)
+		if int(v.route_id) in assigned_today:
+			_claim_customer_owner(db, business_id, person_id, user_id)
 	db.commit()
 	db.refresh(v)
 	pname = (person.alias_name or "").strip()
-	return visit_to_dict(v, pname)
+	return visit_to_dict(v, pname, db=db, viewer_user_id=user_id)
 
 
 def heartbeat_visit(
@@ -974,6 +1856,12 @@ def heartbeat_visit(
 		raise ApiError("FORBIDDEN", "Only the assigned visitor can update location", http_status=403)
 	if v.status != "in_progress":
 		raise ApiError("VALIDATION_ERROR", "Visit is not in progress", http_status=400)
+	if not live_tracking_allowed(db, business_id, user_id):
+		return {
+			"visit_id": v.id,
+			"skipped": True,
+			"reason": "consent_or_share_disabled",
+		}
 	_base = dict(v.extra_info or {})
 	_base["live_location"] = {
 		"latitude": float(latitude),
@@ -981,17 +1869,11 @@ def heartbeat_visit(
 		"updated_at": datetime.utcnow().isoformat() + "Z",
 	}
 	v.extra_info = _base
-	# برای سازگاری با خواننده‌های قدیمی، start را هم به‌روز نگه می‌داریم به‌عنوان آخرین نقطه
-	v.start_latitude = float(latitude)
-	v.start_longitude = float(longitude)
 	v.updated_at = datetime.utcnow()
 	try:
 		from app.services.distribution_commercial_service import upsert_live_location
-		from app.services.distribution_phase3_service import extend_settings_dict
 
-		settings = get_or_create_distribution_settings(db, business_id)
-		if bool(extend_settings_dict(settings).get("share_live_location", True)):
-			upsert_live_location(db, business_id, user_id, latitude, longitude, visit_id=visit_id, commit=False)
+		upsert_live_location(db, business_id, user_id, latitude, longitude, visit_id=visit_id, commit=False)
 	except Exception:
 		pass
 	db.commit()
@@ -1000,6 +1882,7 @@ def heartbeat_visit(
 		"visit_id": v.id,
 		"latitude": float(latitude),
 		"longitude": float(longitude),
+		"skipped": False,
 		"updated_at": _base["live_location"]["updated_at"],
 	}
 
@@ -1088,6 +1971,9 @@ def complete_visit(
 		deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
 		if not deal:
 			raise ApiError("VALIDATION_ERROR", "deal_id not found in this business", http_status=400)
+		from app.services.crm_enterprise_service import acl_actor, assert_can_view_record
+
+		assert_can_view_record(db, business_id, acl_actor(db, int(user_id)), "deal", deal, write=True)
 		v.deal_id = deal_id
 	if payload.get("notes"):
 		v.notes = str(payload["notes"])
@@ -1149,7 +2035,12 @@ def complete_visit(
 			from app.services.distribution_documents import create_distribution_invoice
 			from app.services.invoice_service import INVOICE_SALES
 			from app.services.distribution_commercial_service import apply_promotions_to_lines
-			from app.services.distribution_field_ops_service import apply_auto_promotions_if_needed, consume_van_lots_fefo
+			from app.services.distribution_field_ops_service import (
+				apply_auto_promotions_if_needed,
+				consume_van_lots_fefo,
+				plan_van_lots_fefo,
+			)
+			from app.services.inventory_lot_service import is_expiry_tracked_product
 
 			promo_ids = None
 			ex = payload.get("extra_info") if isinstance(payload.get("extra_info"), dict) else {}
@@ -1169,6 +2060,25 @@ def complete_visit(
 				raise ApiError("VALIDATION_ERROR", "No van assigned for van sale", http_status=400)
 			if not v.document_id:
 				# Fail-closed: بدون فاکتور موفق، ویزیت کامل نمی‌شود (بدون حوالهٔ خام انبار)
+				today = business_today(business_id)
+				for ln in van_lines:
+					if not isinstance(ln, dict) or ln.get("is_foc"):
+						continue
+					pid = int(ln.get("product_id") or 0)
+					product = db.query(Product).filter(Product.id == pid, Product.business_id == business_id).first()
+					if product is None or not is_expiry_tracked_product(product):
+						continue
+					if str(product.inventory_mode or "bulk") == "unique":
+						continue
+					extra = dict(ln.get("extra_info") or {})
+					if extra.get("lot_allocations") or ln.get("lot_allocations"):
+						continue
+					planned = plan_van_lots_fefo(
+						db, int(van.id), pid, float(ln.get("quantity") or 0), skip_expired=True, as_of=today
+					)
+					extra["lot_allocations"] = planned
+					ln["extra_info"] = extra
+					ln["lot_allocations"] = planned
 				inv = create_distribution_invoice(
 					db,
 					business_id,
@@ -1188,8 +2098,18 @@ def complete_visit(
 				for ln in van_lines:
 					if ln.get("is_foc"):
 						continue
+					extra = ln.get("extra_info") if isinstance(ln.get("extra_info"), dict) else {}
+					allocs = ln.get("lot_allocations") or extra.get("lot_allocations")
 					lots_used.extend(
-						consume_van_lots_fefo(db, int(van.id), int(ln["product_id"]), float(ln["quantity"]))
+						consume_van_lots_fefo(
+							db,
+							int(van.id),
+							int(ln["product_id"]),
+							float(ln["quantity"]),
+							skip_expired=True,
+							as_of=today,
+							allocations=allocs if isinstance(allocs, list) else None,
+						)
 					)
 				if lots_used:
 					_base["van_lots_consumed"] = lots_used
@@ -1219,7 +2139,7 @@ def complete_visit(
 
 	person = db.query(Person).filter(Person.id == v.person_id).first()
 	pname = (person.alias_name or "").strip() if person else None
-	return visit_to_dict(v, pname)
+	return visit_to_dict(v, pname, db=db, viewer_user_id=user_id)
 
 
 def _create_visit_crm_activity(db: Session, business_id: int, visit: DistributionFieldVisit, user_id: int, summary: str) -> Optional[int]:
@@ -1279,7 +2199,7 @@ def cancel_visit(
 	db.refresh(v)
 	person = db.query(Person).filter(Person.id == v.person_id).first()
 	pname = (person.alias_name or "").strip() if person else None
-	return visit_to_dict(v, pname)
+	return visit_to_dict(v, pname, db=db, viewer_user_id=user_id)
 
 
 def list_visits(
@@ -1293,9 +2213,7 @@ def list_visits(
 ) -> Tuple[List[Dict[str, Any]], int]:
 	_ensure_plugin(db, business_id)
 	q = db.query(DistributionFieldVisit).filter(DistributionFieldVisit.business_id == business_id)
-	uid = _scope_visit_user_id(ctx, business_id)
-	if uid is not None:
-		q = q.filter(DistributionFieldVisit.user_id == uid)
+	q = apply_user_id_scope(q, DistributionFieldVisit.user_id, db, business_id, ctx)
 	if from_date:
 		q = q.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
 	if to_date:
@@ -1307,10 +2225,17 @@ def list_visits(
 	if pids:
 		for p in db.query(Person).filter(Person.id.in_(pids)).all():
 			pmap[p.id] = (p.alias_name or "").strip()
-	return [visit_to_dict(r, pmap.get(r.person_id)) for r in rows], total
+	viewer_id = int(ctx.get_user_id())
+	return [visit_to_dict(r, pmap.get(r.person_id), db=db, viewer_user_id=viewer_id) for r in rows], total
 
 
-def create_return_request(db: Session, business_id: int, user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_return_request(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	payload: Dict[str, Any],
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	person_id = int(payload.get("person_id") or 0)
 	if person_id <= 0:
@@ -1318,6 +2243,9 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if ctx is not None:
+		assert_person_visible_for_ctx(db, business_id, ctx, person_id)
+	assert_customer_owner_allows_visit(db, business_id, user_id, person_id, ctx=ctx)
 	raw_lines = payload.get("lines") or []
 	if not isinstance(raw_lines, list) or not raw_lines:
 		raise ApiError("VALIDATION_ERROR", "lines must be a non-empty list", http_status=400)
@@ -1359,9 +2287,7 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 def list_return_requests(db: Session, business_id: int, ctx: AuthContext, status: Optional[str]) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
 	q = db.query(DistributionReturnRequest).filter(DistributionReturnRequest.business_id == business_id)
-	uid = _scope_visit_user_id(ctx, business_id)
-	if uid is not None:
-		q = q.filter(DistributionReturnRequest.created_by_user_id == uid)
+	q = apply_user_id_scope(q, DistributionReturnRequest.created_by_user_id, db, business_id, ctx)
 	if status:
 		q = q.filter(DistributionReturnRequest.status == status)
 	rows = q.order_by(DistributionReturnRequest.created_at.desc()).limit(500).all()
@@ -1552,10 +2478,22 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 		row.enable_perfect_store = bool(payload["enable_perfect_store"])
 	if "near_expiry_days" in payload:
 		row.near_expiry_days = max(1, min(90, int(payload.get("near_expiry_days") or 14)))
+	if "exclusive_assignments" in payload:
+		row.exclusive_assignments = bool(payload["exclusive_assignments"])
+	if "exclusive_territories" in payload:
+		row.exclusive_territories = bool(payload["exclusive_territories"])
+	if "exclusive_customer_ownership" in payload:
+		row.exclusive_customer_ownership = bool(payload["exclusive_customer_ownership"])
+	if "require_location_consent" in payload:
+		row.require_location_consent = bool(payload["require_location_consent"])
+	if "lock_published_plans" in payload:
+		row.lock_published_plans = bool(payload["lock_published_plans"])
+	if "require_published_plan" in payload:
+		row.require_published_plan = bool(payload["require_published_plan"])
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
-	return settings_to_dict(row)
+	return settings_to_dict(row, include_secrets=True)
 
 
 def get_distribution_reports_dashboard(
@@ -1567,16 +2505,15 @@ def get_distribution_reports_dashboard(
 	target_user_id: Optional[int],
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	if target_user_id is not None and not _can_see_full_distribution_catalog(ctx, business_id):
-		raise ApiError("FORBIDDEN", "Only managers can filter by visitor user", http_status=403)
+	if target_user_id is not None:
+		assert_user_visible_for_ctx(db, business_id, ctx, int(target_user_id))
 	vq = db.query(DistributionFieldVisit).filter(DistributionFieldVisit.business_id == business_id)
 	vq = vq.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
 	vq = vq.filter(func.date(DistributionFieldVisit.started_at) <= to_date)
-	scope_uid = _scope_visit_user_id(ctx, business_id)
 	if target_user_id is not None:
 		vq = vq.filter(DistributionFieldVisit.user_id == int(target_user_id))
-	elif scope_uid is not None:
-		vq = vq.filter(DistributionFieldVisit.user_id == scope_uid)
+	else:
+		vq = apply_user_id_scope(vq, DistributionFieldVisit.user_id, db, business_id, ctx)
 
 	total_visits = vq.count()
 	completed = vq.filter(DistributionFieldVisit.status == "completed").count()
@@ -1591,8 +2528,8 @@ def get_distribution_reports_dashboard(
 	)
 	if target_user_id is not None:
 		out_rows = out_rows.filter(DistributionFieldVisit.user_id == int(target_user_id))
-	elif scope_uid is not None:
-		out_rows = out_rows.filter(DistributionFieldVisit.user_id == scope_uid)
+	else:
+		out_rows = apply_user_id_scope(out_rows, DistributionFieldVisit.user_id, db, business_id, ctx)
 	out_rows = out_rows.group_by(DistributionFieldVisit.outcome).all()
 	by_outcome: Dict[str, int] = {}
 	for oc, cnt in out_rows:
@@ -1613,8 +2550,8 @@ def get_distribution_reports_dashboard(
 	)
 	if target_user_id is not None:
 		completed_q = completed_q.filter(DistributionFieldVisit.user_id == int(target_user_id))
-	elif scope_uid is not None:
-		completed_q = completed_q.filter(DistributionFieldVisit.user_id == scope_uid)
+	else:
+		completed_q = apply_user_id_scope(completed_q, DistributionFieldVisit.user_id, db, business_id, ctx)
 	completed_list = completed_q.all()
 	for visit in completed_list:
 		if visit.document_id:
@@ -1625,22 +2562,28 @@ def get_distribution_reports_dashboard(
 
 	plan_stops = 0
 	visited_persons: set[int] = {int(v.person_id) for v in completed_list}
-	if target_user_id is not None or scope_uid is not None:
-		uid_cov = int(target_user_id) if target_user_id is not None else int(scope_uid)  # type: ignore[arg-type]
+	scope_ids = scoped_user_ids_for_ctx(db, business_id, ctx)
+	if target_user_id is not None:
+		cover_users = [int(target_user_id)]
+	elif scope_ids is not None:
+		cover_users = [int(u) for u in scope_ids]
+	else:
+		cover_users = []
+	if len(cover_users) == 1:
 		from datetime import timedelta
 
 		span_days = (to_date - from_date).days
 		if span_days <= 62:
 			d = from_date
 			while d <= to_date:
-				plan = get_daily_plan(db, business_id, uid_cov, d)
+				plan = get_daily_plan(db, business_id, cover_users[0], d)
 				plan_stops += len(plan.get("items") or [])
 				d = d + timedelta(days=1)
 	coverage_pct = None
 	if plan_stops > 0:
 		coverage_pct = round(100.0 * min(len(visited_persons), plan_stops) / float(plan_stops), 1)
 
-	if _can_see_full_distribution_catalog(ctx, business_id):
+	if _can_see_team_distribution(ctx, business_id):
 		uq = (
 			db.query(DistributionFieldVisit.user_id, func.count(DistributionFieldVisit.id))
 			.filter(DistributionFieldVisit.business_id == business_id)
@@ -1649,6 +2592,8 @@ def get_distribution_reports_dashboard(
 		)
 		if target_user_id is not None:
 			uq = uq.filter(DistributionFieldVisit.user_id == int(target_user_id))
+		else:
+			uq = apply_user_id_scope(uq, DistributionFieldVisit.user_id, db, business_id, ctx)
 		uq = uq.group_by(DistributionFieldVisit.user_id).all()
 		by_user = [
 			{"user_id": int(uid), "user_name": user_label(db, int(uid)), "visit_count": int(c)}
@@ -1660,8 +2605,8 @@ def get_distribution_reports_dashboard(
 	rq = rq.filter(func.date(DistributionReturnRequest.created_at) <= to_date)
 	if target_user_id is not None:
 		rq = rq.filter(DistributionReturnRequest.created_by_user_id == int(target_user_id))
-	elif scope_uid is not None:
-		rq = rq.filter(DistributionReturnRequest.created_by_user_id == scope_uid)
+	else:
+		rq = apply_user_id_scope(rq, DistributionReturnRequest.created_by_user_id, db, business_id, ctx)
 
 	def _cnt(st: str) -> int:
 		return int(rq.filter(DistributionReturnRequest.status == st).count())
@@ -1674,8 +2619,8 @@ def get_distribution_reports_dashboard(
 	sq = sq.filter(DistributionDailySettlement.settlement_date <= to_date)
 	if target_user_id is not None:
 		sq = sq.filter(DistributionDailySettlement.user_id == int(target_user_id))
-	elif scope_uid is not None:
-		sq = sq.filter(DistributionDailySettlement.user_id == scope_uid)
+	else:
+		sq = apply_user_id_scope(sq, DistributionDailySettlement.user_id, db, business_id, ctx)
 	settlements = sq.all()
 	sett_confirmed = [s for s in settlements if s.status == "confirmed"]
 	sett_draft = [s for s in settlements if s.status == "draft"]

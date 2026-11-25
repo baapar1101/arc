@@ -152,8 +152,11 @@ class BusinessApiService {
   }
 
   // دریافت جزئیات یک کسب و کار
-  static Future<BusinessResponse> getBusiness(int businessId) async {
-    final response = await _apiClient.get('$_basePath/$businessId');
+  static Future<BusinessResponse> getBusiness(
+    int businessId, {
+    ApiClient? apiClient,
+  }) async {
+    final response = await (apiClient ?? _apiClient).get('$_basePath/$businessId');
 
     if (response.data['success'] == true) {
       return BusinessResponse.fromJson(response.data['data']);
@@ -422,9 +425,11 @@ class BusinessApiService {
     required double amount,
     String? description,
     String? reason,
+    required String confirmation,
   }) async {
     final payload = <String, dynamic>{
       'amount': amount,
+      'confirmation': confirmation,
     };
     if (description != null && description.isNotEmpty) {
       payload['description'] = description;

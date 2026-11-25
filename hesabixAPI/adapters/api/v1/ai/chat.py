@@ -420,7 +420,7 @@ class MessageFeedbackRequest(BaseModel):
     comment: Optional[str] = None
 
 
-@router.post("/check-availability", summary="بررسی امکان استفاده از AI")
+@router.post("/check-availability", summary="بررسی امکان استفاده از AI", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def check_ai_availability(
     request: Request,
     params: CheckAvailabilityRequest = Body(...),
@@ -447,7 +447,7 @@ async def check_ai_availability(
     return success_response(availability, request)
 
 
-@router.get("/insights", summary="بینش لحظه‌ای کسب‌وکار برای AI")
+@router.get("/insights", summary="بینش لحظه‌ای کسب‌وکار برای AI", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_business_insights(
     request: Request,
     business_id: Optional[int] = None,
@@ -466,7 +466,7 @@ async def get_business_insights(
     return success_response(data, request)
 
 
-@router.get("/suggestions", summary="پیشنهادهای پویا برای شروع گفتگو")
+@router.get("/suggestions", summary="پیشنهادهای پویا برای شروع گفتگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_chat_suggestions(
     request: Request,
     business_id: Optional[int] = None,
@@ -495,7 +495,7 @@ async def get_chat_suggestions(
     return success_response(items[:8], request)
 
 
-@router.get("/alerts", summary="هشدارهای پیشگیرانه کسب‌وکار")
+@router.get("/alerts", summary="هشدارهای پیشگیرانه کسب‌وکار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_proactive_alerts(
     request: Request,
     business_id: Optional[int] = None,
@@ -517,7 +517,7 @@ async def get_proactive_alerts(
     return success_response({"alerts": alerts}, request)
 
 
-@router.get("/feedback/analytics", summary="تحلیل بازخورد پیام‌های دستیار")
+@router.get("/feedback/analytics", summary="تحلیل بازخورد پیام‌های دستیار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_feedback_analytics(
     request: Request,
     business_id: Optional[int] = None,
@@ -537,7 +537,7 @@ async def get_feedback_analytics(
     return success_response(data, request)
 
 
-@router.get("/memory", summary="حافظه دستیار برای کسب‌وکار")
+@router.get("/memory", summary="حافظه دستیار برای کسب‌وکار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_ai_memory(
     request: Request,
     business_id: Optional[int] = None,
@@ -558,7 +558,7 @@ async def get_ai_memory(
     )
 
 
-@router.delete("/memory", summary="پاک کردن حافظه دستیار")
+@router.delete("/memory", summary="پاک کردن حافظه دستیار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def delete_ai_memory(
     request: Request,
     business_id: Optional[int] = None,
@@ -581,7 +581,7 @@ async def delete_ai_memory(
     )
 
 
-@router.put("/memory", summary="ذخیره دستورات همیشگی دستیار")
+@router.put("/memory", summary="ذخیره دستورات همیشگی دستیار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def update_ai_memory(
     request: Request,
     params: AIMemoryUpdateRequest = Body(...),
@@ -610,7 +610,7 @@ async def update_ai_memory(
     )
 
 
-@router.get("/memory/digest", summary="خلاصهٔ خواندنی حافظه دستیار")
+@router.get("/memory/digest", summary="خلاصهٔ خواندنی حافظه دستیار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_ai_memory_digest(
     request: Request,
     business_id: Optional[int] = None,
@@ -629,7 +629,7 @@ async def get_ai_memory_digest(
     return success_response(digest, request)
 
 
-@router.put("/memory/items/{item_id}", summary="ویرایش یک حقیقت یادگرفته‌شده")
+@router.put("/memory/items/{item_id}", summary="ویرایش یک حقیقت یادگرفته‌شده", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def update_ai_memory_item(
     request: Request,
     item_id: int,
@@ -660,7 +660,7 @@ async def update_ai_memory_item(
     return success_response(memory_item_to_dict(row), request, "آیتم به‌روز شد")
 
 
-@router.delete("/memory/items/{item_id}", summary="حذف یک حقیقت یادگرفته‌شده")
+@router.delete("/memory/items/{item_id}", summary="حذف یک حقیقت یادگرفته‌شده", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def delete_ai_memory_item(
     request: Request,
     item_id: int,
@@ -687,7 +687,7 @@ async def delete_ai_memory_item(
     return success_response({"deleted": True, "id": item_id}, request, "آیتم حذف شد")
 
 
-@router.post("/memory/entries", summary="افزودن صریح یک مورد به حافظه")
+@router.post("/memory/entries", summary="افزودن صریح یک مورد به حافظه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def pin_ai_memory_entry(
     request: Request,
     params: AIMemoryPinRequest = Body(...),
@@ -714,7 +714,7 @@ async def pin_ai_memory_entry(
     return success_response(item, request, "به حافظه اضافه شد")
 
 
-@router.get("/knowledge", summary="لیست اسناد دانشنامه کسب‌وکار")
+@router.get("/knowledge", summary="لیست اسناد دانشنامه کسب‌وکار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def list_knowledge_documents(
     request: Request,
     business_id: Optional[int] = None,
@@ -737,7 +737,7 @@ async def list_knowledge_documents(
     )
 
 
-@router.post("/knowledge", summary="افزودن سند به دانشنامه")
+@router.post("/knowledge", summary="افزودن سند به دانشنامه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def create_knowledge_document(
     request: Request,
     params: AIKnowledgeCreateRequest = Body(...),
@@ -769,7 +769,7 @@ async def create_knowledge_document(
     )
 
 
-@router.post("/knowledge/upload", summary="آپلود فایل به دانشنامه")
+@router.post("/knowledge/upload", summary="آپلود فایل به دانشنامه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def upload_knowledge_document(
     request: Request,
     business_id: Optional[int] = None,
@@ -806,7 +806,7 @@ async def upload_knowledge_document(
     )
 
 
-@router.delete("/knowledge/{document_id}", summary="حذف سند دانشنامه")
+@router.delete("/knowledge/{document_id}", summary="حذف سند دانشنامه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def delete_knowledge_document(
     document_id: int = Path(...),
     request: Request = None,
@@ -827,7 +827,7 @@ async def delete_knowledge_document(
     return success_response({"id": document_id}, request, "سند حذف شد")
 
 
-@router.post("/knowledge/reindex", summary="بازسازی embedding دانشنامه")
+@router.post("/knowledge/reindex", summary="بازسازی embedding دانشنامه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def reindex_knowledge(
     request: Request,
     business_id: Optional[int] = None,
@@ -846,7 +846,7 @@ async def reindex_knowledge(
     return success_response(stats, request, "دانشنامه بازنمایه‌سازی شد")
 
 
-@router.get("/connectors", summary="لیست کانکتورهای HTTP کسب‌وکار")
+@router.get("/connectors", summary="لیست کانکتورهای HTTP کسب‌وکار", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def list_connectors(
     request: Request,
     business_id: Optional[int] = None,
@@ -865,7 +865,7 @@ async def list_connectors(
     return success_response([connector_to_dict(r) for r in rows], request)
 
 
-@router.post("/connectors", summary="افزودن کانکتور HTTP")
+@router.post("/connectors", summary="افزودن کانکتور HTTP", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def create_connector(
     request: Request,
     params: AIConnectorCreateRequest = Body(...),
@@ -889,7 +889,7 @@ async def create_connector(
     return success_response(connector_to_dict(row), request, "کانکتور ایجاد شد")
 
 
-@router.delete("/connectors/{connector_id}", summary="حذف کانکتور")
+@router.delete("/connectors/{connector_id}", summary="حذف کانکتور", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def delete_connector_endpoint(
     connector_id: int = Path(...),
     request: Request = None,
@@ -913,6 +913,7 @@ async def delete_connector_endpoint(
 @router.post(
     "/sessions/{session_id}/messages/{message_id}/feedback",
     summary="ثبت بازخورد روی پیام",
+    description="محصول چت است و ابزار جداگانه MCP نیست.",
 )
 async def post_message_feedback(
     session_id: int = Path(...),
@@ -949,7 +950,7 @@ async def post_message_feedback(
     return success_response(payload, request, "بازخورد ثبت شد")
 
 
-@router.get("/sessions/{session_id}/attachments", summary="لیست پیوست‌های گفت‌وگو")
+@router.get("/sessions/{session_id}/attachments", summary="لیست پیوست‌های گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def list_session_attachments(
     session_id: int = Path(...),
     request: Request = None,
@@ -970,7 +971,7 @@ async def list_session_attachments(
     return success_response([attachment_to_dict(r) for r in rows], request)
 
 
-@router.post("/sessions/{session_id}/attachments", summary="آپلود پیوست متنی")
+@router.post("/sessions/{session_id}/attachments", summary="آپلود پیوست متنی", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def upload_session_attachment(
     session_id: int = Path(...),
     request: Request = None,
@@ -997,7 +998,7 @@ async def upload_session_attachment(
     return success_response(attachment_to_dict(row), request, "پیوست با موفقیت اضافه شد")
 
 
-@router.delete("/sessions/{session_id}/attachments/{attachment_id}", summary="حذف پیوست")
+@router.delete("/sessions/{session_id}/attachments/{attachment_id}", summary="حذف پیوست", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def delete_session_attachment(
     session_id: int = Path(...),
     attachment_id: int = Path(...),
@@ -1017,7 +1018,7 @@ async def delete_session_attachment(
     return success_response({"id": attachment_id}, request, "پیوست حذف شد")
 
 
-@router.get("/sessions/{session_id}/messages/search", summary="جستجو در پیام‌های گفت‌وگو")
+@router.get("/sessions/{session_id}/messages/search", summary="جستجو در پیام‌های گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def search_session_messages(
     session_id: int = Path(...),
     q: str = Query(..., min_length=1, max_length=200),
@@ -1048,7 +1049,7 @@ async def search_session_messages(
     return success_response(hits, request)
 
 
-@router.get("/sessions", summary="لیست گفت‌وگوها")
+@router.get("/sessions", summary="لیست گفت‌وگوها", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_chat_sessions(
     request: Request,
     business_id: Optional[int] = None,
@@ -1080,7 +1081,7 @@ async def get_chat_sessions(
     return success_response(result, request)
 
 
-@router.post("/sessions", summary="ایجاد گفت‌وگوی جدید")
+@router.post("/sessions", summary="ایجاد گفت‌وگوی جدید", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def create_chat_session(
     request: Request,
     title: Optional[str] = Body(None, embed=True),
@@ -1108,7 +1109,7 @@ async def create_chat_session(
     return success_response(_session_response_dict(session), request, "جلسه چت با موفقیت ایجاد شد")
 
 
-@router.get("/sessions/{session_id}", summary="دریافت یک گفت‌وگو")
+@router.get("/sessions/{session_id}", summary="دریافت یک گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_chat_session(
     session_id: int = Path(...),
     request: Request = None,
@@ -1122,7 +1123,7 @@ async def get_chat_session(
     return success_response(_session_response_dict(session), request)
 
 
-@router.get("/sessions/{session_id}/active-run", summary="اجرای ناتمام یا زندهٔ جلسه")
+@router.get("/sessions/{session_id}/active-run", summary="اجرای ناتمام یا زندهٔ جلسه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_active_agent_run(
     session_id: int = Path(...),
     request: Request = None,
@@ -1173,7 +1174,7 @@ async def get_active_agent_run(
     )
 
 
-@router.patch("/sessions/{session_id}", summary="به‌روزرسانی گفت‌وگو")
+@router.patch("/sessions/{session_id}", summary="به‌روزرسانی گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def update_chat_session(
     session_id: int = Path(...),
     request: Request = None,
@@ -1199,6 +1200,7 @@ async def update_chat_session(
 @router.patch(
     "/sessions/{session_id}/todos/{todo_id}",
     summary="رد یا تأیید آیتم برنامهٔ کاری جلسه",
+    description="محصول چت است و ابزار جداگانه MCP نیست.",
 )
 async def update_session_todo_item(
     session_id: int = Path(...),
@@ -1229,7 +1231,7 @@ async def update_session_todo_item(
     )
 
 
-@router.get("/sessions/{session_id}/messages", summary="دریافت پیام‌های جلسه")
+@router.get("/sessions/{session_id}/messages", summary="دریافت پیام‌های جلسه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_session_messages(
     session_id: int = Path(...),
     limit: int = 100,
@@ -1281,7 +1283,7 @@ async def get_session_messages(
     return success_response(result, request)
 
 
-@router.post("/sessions/{session_id}/messages", summary="ارسال پیام به AI")
+@router.post("/sessions/{session_id}/messages", summary="ارسال پیام به AI", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def send_message(
     session_id: int = Path(...),
     request: Request = None,
@@ -2528,6 +2530,7 @@ async def _produce_agent_stream(
 @router.post(
     "/sessions/{session_id}/runs/{run_id}/continue",
     summary="ادامهٔ اجرای ناقص agent",
+    description="محصول چت است و ابزار جداگانه MCP نیست.",
 )
 async def continue_agent_run(
     session_id: int = Path(...),
@@ -2664,6 +2667,7 @@ async def continue_agent_run(
 @router.post(
     "/sessions/{session_id}/runs/{run_id}/events",
     summary="اشتراک مجدد به رویدادهای یک اجرای زنده",
+    description="محصول چت است و ابزار جداگانه MCP نیست.",
 )
 async def subscribe_agent_run_events(
     session_id: int = Path(...),
@@ -2716,6 +2720,7 @@ async def subscribe_agent_run_events(
 @router.post(
     "/sessions/{session_id}/runs/{run_id}/cancel",
     summary="توقف صریح اجرای زنده",
+    description="محصول چت است و ابزار جداگانه MCP نیست.",
 )
 async def cancel_agent_run(
     session_id: int = Path(...),
@@ -2758,7 +2763,7 @@ async def cancel_agent_run(
     )
 
 
-@router.post("/sessions/{session_id}/regenerate", summary="تولید مجدد آخرین پاسخ AI")
+@router.post("/sessions/{session_id}/regenerate", summary="تولید مجدد آخرین پاسخ AI", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def regenerate_last_response(
     session_id: int = Path(...),
     request: Request = None,
@@ -2997,7 +3002,7 @@ def _prepare_edit_or_regenerate_context(
     return session, remaining, llm_messages, user_text, True
 
 
-@router.post("/sessions/{session_id}/messages/{message_id}/edit", summary="ویرایش پیام و تولید پاسخ جدید")
+@router.post("/sessions/{session_id}/messages/{message_id}/edit", summary="ویرایش پیام و تولید پاسخ جدید", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def edit_user_message(
     session_id: int = Path(...),
     message_id: int = Path(...),
@@ -3157,7 +3162,7 @@ async def edit_user_message(
     )
 
 
-@router.get("/sessions/{session_id}/subagents", summary="لیست زیر-ایجنت‌های جلسه")
+@router.get("/sessions/{session_id}/subagents", summary="لیست زیر-ایجنت‌های جلسه", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def list_chat_subagents(
     session_id: int = Path(...),
     request: Request = None,
@@ -3176,6 +3181,7 @@ async def list_chat_subagents(
 @router.post(
     "/sessions/{session_id}/subagents/{subagent_id}/cancel",
     summary="قطع زیر-ایجنت",
+    description="محصول چت است و ابزار جداگانه MCP نیست.",
 )
 async def cancel_chat_subagent(
     session_id: int = Path(...),
@@ -3199,7 +3205,7 @@ async def cancel_chat_subagent(
     return success_response(result, request)
 
 
-@router.post("/sessions/{session_id}/fork", summary="شاخه‌سازی گفت‌وگو")
+@router.post("/sessions/{session_id}/fork", summary="شاخه‌سازی گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def fork_chat_session(
     session_id: int = Path(...),
     request: Request = None,
@@ -3271,7 +3277,7 @@ async def fork_chat_session(
     )
 
 
-@router.get("/sessions/{session_id}/export", summary="خروجی Markdown گفت‌وگو")
+@router.get("/sessions/{session_id}/export", summary="خروجی Markdown گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def export_chat_session(
     session_id: int = Path(...),
     request: Request = None,
@@ -3303,7 +3309,7 @@ async def export_chat_session(
     )
 
 
-@router.delete("/sessions/{session_id}", summary="حذف گفت‌وگو")
+@router.delete("/sessions/{session_id}", summary="حذف گفت‌وگو", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def delete_chat_session(
     session_id: int = Path(...),
     request: Request = None,
@@ -3329,7 +3335,7 @@ async def delete_chat_session(
 
 # ---- Scheduled Tasks ----
 
-@router.get("/scheduled-tasks", summary="لیست task های زمان‌بندی‌شده")
+@router.get("/scheduled-tasks", summary="لیست task های زمان‌بندی‌شده", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def list_scheduled_tasks(
     request: Request = None,
     db: Session = Depends(get_db),
@@ -3341,7 +3347,7 @@ async def list_scheduled_tasks(
     return success_response({"tasks": tasks}, request)
 
 
-@router.post("/scheduled-tasks/{task_id}/run", summary="اجرای فوری یک scheduled task")
+@router.post("/scheduled-tasks/{task_id}/run", summary="اجرای فوری یک scheduled task", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def run_scheduled_task_now(
     task_id: str = Path(...),
     request: Request = None,
@@ -3368,7 +3374,7 @@ async def run_scheduled_task_now(
     return success_response(result, request)
 
 
-@router.get("/cache-stats", summary="آمار کش ابزار (debug)")
+@router.get("/cache-stats", summary="آمار کش ابزار (debug)", description="محصول چت است و ابزار جداگانه MCP نیست.")
 async def get_tool_cache_stats(
     request: Request = None,
     db: Session = Depends(get_db),

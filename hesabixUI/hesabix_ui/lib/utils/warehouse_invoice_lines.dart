@@ -68,6 +68,12 @@ List<Map<String, dynamic>> extractWarehouseLinesFromInvoice(
     if (invoiceQty <= 0) continue;
 
     final extra = Map<String, dynamic>.from(map['extra_info'] ?? const {});
+    final capitalFlag = extra['fixed_asset'];
+    final isCapital = capitalFlag == true ||
+        capitalFlag == 1 ||
+        (capitalFlag is String &&
+            (capitalFlag.toLowerCase() == 'true' || capitalFlag == '1'));
+    if (isCapital) continue;
     final warehouseId = _toInt(map['warehouse_id'] ?? extra['warehouse_id']);
     final movement = (extra['movement'] ?? movementFallback).toString();
 

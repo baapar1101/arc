@@ -44,7 +44,7 @@ def require_media_edge_process() -> None:
 		return
 	raise ApiError(
 		"SOFTPHONE_MEDIA_EDGE_REQUIRED",
-		"درخواست Softphone باید به Media Edge برسد. مسیر nginx برای /softphone و /ws/telephony را بررسی کنید.",
+		"SOFTPHONE_MEDIA_EDGE_REQUIRED",
 		http_status=503,
 	)
 

@@ -129,11 +129,11 @@ def list_sales_targets(
 ) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
 	q = db.query(DistributionSalesTarget).filter(DistributionSalesTarget.business_id == business_id)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None:
-		q = q.filter(DistributionSalesTarget.user_id == scope)
-	elif user_id:
+	if user_id:
+		dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(user_id))
 		q = q.filter(DistributionSalesTarget.user_id == int(user_id))
+	else:
+		q = dist_svc.apply_user_id_scope(q, DistributionSalesTarget.user_id, db, business_id, ctx)
 	if period_type:
 		q = q.filter(DistributionSalesTarget.period_type == period_type.strip().lower())
 	rows = q.order_by(DistributionSalesTarget.period_start.desc(), DistributionSalesTarget.user_id.asc()).limit(200).all()
@@ -316,9 +316,7 @@ def preview_settlement(
 	settlement_date: date,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None and int(scope) != int(user_id):
-		raise ApiError("FORBIDDEN", "Cannot preview another visitor settlement", http_status=403)
+	dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(user_id))
 	snapshot, expected = build_day_visit_snapshot(db, business_id, user_id, settlement_date)
 	existing = (
 		db.query(DistributionDailySettlement)
@@ -362,9 +360,9 @@ def upsert_settlement(
 	uid = int(payload.get("user_id") or actor_user_id or 0)
 	if uid <= 0:
 		raise ApiError("VALIDATION_ERROR", "user_id required", http_status=400)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None and int(scope) != uid:
-		raise ApiError("FORBIDDEN", "Cannot settle for another visitor", http_status=403)
+	dist_svc.assert_user_visible_for_ctx(
+		db, business_id, ctx, uid, write=True, message="Cannot settle for another visitor",
+	)
 	sd_raw = payload.get("settlement_date")
 	settlement_date = date.fromisoformat(str(sd_raw)[:10]) if sd_raw else business_today(business_id)
 
@@ -439,11 +437,11 @@ def list_settlements(
 ) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
 	q = db.query(DistributionDailySettlement).filter(DistributionDailySettlement.business_id == business_id)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None:
-		q = q.filter(DistributionDailySettlement.user_id == scope)
-	elif user_id:
+	if user_id:
+		dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(user_id))
 		q = q.filter(DistributionDailySettlement.user_id == int(user_id))
+	else:
+		q = dist_svc.apply_user_id_scope(q, DistributionDailySettlement.user_id, db, business_id, ctx)
 	if from_date:
 		q = q.filter(DistributionDailySettlement.settlement_date >= from_date)
 	if to_date:
@@ -472,13 +470,12 @@ def confirm_settlement(
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Settlement not found", http_status=404)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	can_manage = dist_svc._can_see_full_distribution_catalog(ctx, business_id) or ctx.has_business_permission(
-		"distribution", "manage"
-	)
+	can_manage = dist_svc._can_manage_distribution(ctx, business_id)
 	can_settle = can_manage or ctx.has_business_permission("distribution", "settle")
-	if scope is not None and int(row.user_id) != int(scope) and not can_manage:
-		raise ApiError("FORBIDDEN", "Cannot confirm this settlement", http_status=403)
+	if not can_manage:
+		dist_svc.assert_user_visible_for_ctx(
+			db, business_id, ctx, int(row.user_id), write=True, message="Cannot confirm this settlement",
+		)
 	if row.status == "confirmed":
 		return settlement_to_dict(row, db)
 
@@ -907,6 +904,7 @@ def export_van_loading_list_pdf(
 	request: Request,
 	business_id: int,
 	van_id: int,
+	ctx: Optional[AuthContext] = None,
 ) -> Response:
 	from app.services.distribution_phase3_service import get_van_stock
 
@@ -914,7 +912,7 @@ def export_van_loading_list_pdf(
 	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
 	if not van:
 		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
-	stock = get_van_stock(db, business_id, van_id)
+	stock = get_van_stock(db, business_id, van_id, ctx=ctx)
 	items = []
 	for it in stock.get("items") or []:
 		items.append(
@@ -958,6 +956,7 @@ def export_settlement_pdf(
 	request: Request,
 	business_id: int,
 	settlement_id: int,
+	ctx: Optional[AuthContext] = None,
 ) -> Response:
 	dist_svc._ensure_plugin(db, business_id)
 	row = (
@@ -970,6 +969,15 @@ def export_settlement_pdf(
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Settlement not found", http_status=404)
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			row.user_id,
+			write=False,
+			message="PDF تسویه همکار در دسترس شما نیست.",
+			db=db,
+		)
 	is_fa = _is_fa(request)
 	items = []
 	for it in row.visit_snapshot or []:

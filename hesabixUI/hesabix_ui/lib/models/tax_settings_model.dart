@@ -16,6 +16,10 @@ class TaxSettingsModel {
   final bool fanavaAvailable;
   final Map<String, dynamic>? fanavaAccount;
   final Map<String, dynamic> enrollmentPrefill;
+  final bool motamedAsaAvailable;
+  final Map<String, dynamic>? motamedAsaAccount;
+  /// The sign-up link on Motamed ASA; only in the answer that issued it.
+  final Map<String, dynamic>? motamedAsaOnboarding;
 
   const TaxSettingsModel({
     required this.businessId,
@@ -35,7 +39,15 @@ class TaxSettingsModel {
     this.fanavaAvailable = false,
     this.fanavaAccount,
     this.enrollmentPrefill = const {},
+    this.motamedAsaAvailable = false,
+    this.motamedAsaAccount,
+    this.motamedAsaOnboarding,
   });
+
+  String? get motamedAsaOnboardingUrl {
+    final url = motamedAsaOnboarding?['url']?.toString();
+    return url == null || url.isEmpty ? null : url;
+  }
 
   factory TaxSettingsModel.fromJson(Map<String, dynamic> json) {
     return TaxSettingsModel(
@@ -66,6 +78,13 @@ class TaxSettingsModel {
       enrollmentPrefill: json['enrollment_prefill'] is Map
           ? Map<String, dynamic>.from(json['enrollment_prefill'] as Map)
           : const {},
+      motamedAsaAvailable: json['motamed_asa_available'] == true,
+      motamedAsaAccount: json['motamed_asa_account'] is Map
+          ? Map<String, dynamic>.from(json['motamed_asa_account'] as Map)
+          : null,
+      motamedAsaOnboarding: json['motamed_asa_onboarding'] is Map
+          ? Map<String, dynamic>.from(json['motamed_asa_onboarding'] as Map)
+          : null,
     );
   }
 
@@ -106,6 +125,8 @@ class TaxSettingsModel {
     bool? fanavaAvailable,
     Map<String, dynamic>? fanavaAccount,
     Map<String, dynamic>? enrollmentPrefill,
+    bool? motamedAsaAvailable,
+    Map<String, dynamic>? motamedAsaAccount,
   }) {
     return TaxSettingsModel(
       businessId: businessId,
@@ -125,6 +146,8 @@ class TaxSettingsModel {
       fanavaAvailable: fanavaAvailable ?? this.fanavaAvailable,
       fanavaAccount: fanavaAccount ?? this.fanavaAccount,
       enrollmentPrefill: enrollmentPrefill ?? this.enrollmentPrefill,
+      motamedAsaAvailable: motamedAsaAvailable ?? this.motamedAsaAvailable,
+      motamedAsaAccount: motamedAsaAccount ?? this.motamedAsaAccount,
     );
   }
 }

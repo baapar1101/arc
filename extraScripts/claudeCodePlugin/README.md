@@ -42,7 +42,7 @@ The configured MCP URL is `https://hsxn.hesabix.ir/api/v1/ai/mcp`. Use this cano
 
 The server uses OAuth authorization code with PKCE and Dynamic Client Registration. Its current OAuth metadata advertises public clients (`token_endpoint_auth_methods_supported: ["none"]`), PKCE `S256`, and the Hesabix scopes. The authenticated connection is pinned to the business selected during consent; the model cannot choose another tenant by passing an argument.
 
-Read access is the normal starting point. Hesabix write operations require the separate `ai:tools:write` grant and owner consent in Hesabix. Claude's tool approval prompt is an additional client-side confirmation; it does not grant Hesabix write scope. A prompt from the model or a tool argument cannot elevate permissions.
+Read access is the normal starting point. Hesabix write operations require the separate `ai:tools:write` grant and explicit selection of write tools during Hesabix consent. Hesabix enforces the grant, selected-tool allowlist, current membership, and business permissions. For a direct MCP write call, the server does not independently verify transaction-specific human confirmation; Claude Code must show the exact action and material arguments and wait for the user's approval before sending the call. Its tool approval prompt does not grant Hesabix write scope. A prompt from the model or a tool argument cannot elevate permissions or count as user confirmation.
 
 For least privilege, approve read access unless a workflow truly needs a write action. If write access is granted, inspect the proposed action and its arguments in Claude Code before approving it. Revoke the Hesabix connection from Hesabix if access should end.
 

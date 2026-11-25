@@ -12,6 +12,7 @@ from adapters.db.models.price_list import PriceItem, PriceList
 from adapters.db.models.product import Product, ProductItemType
 from app.core.responses import ApiError
 from app.services.currency_quant import get_currency_quant_and_round
+from app.services.invoice_unit_conversion_service import price_main_to_line
 
 # انواع فاکتوری که قیمت‌گذاری از کالا/لیست قیمت قابل کنترل است (نه تولید/ضایعات/مصرف مستقیم)
 _INVOICE_TYPES_UNIT_PRICE_LOCK = frozenset(
@@ -41,21 +42,11 @@ def _convert_main_unit_price_to_line_unit(
     selected_unit: Optional[str],
     quant: Decimal,
 ) -> Decimal:
-    """هم‌تراز با منطق Flutter: قیمت روی واحد اصلی → قیمت روی واحد انتخاب‌شده."""
-    main_u = (product.main_unit or "").strip() or None
-    sec_u = (product.secondary_unit or "").strip() or None
-    factor = _dec(product.unit_conversion_factor)
-    if factor <= 0:
-        factor = Decimal(1)
-    sel = (selected_unit or "").strip() or None
-    if not sel:
-        sel = main_u
-    is_main = main_u is None or sel is None or sel == main_u
-    if is_main:
-        return _quantize_money(price_on_main, quant)
-    if sec_u and sel == sec_u:
-        return _quantize_money(price_on_main * factor, quant)
-    return _quantize_money(price_on_main, quant)
+    """قیمت واحد اصلی → قیمت واحد انتخابی، با قرارداد ۱ اصلی = factor فرعی."""
+    return _quantize_money(
+        price_main_to_line(price_on_main, product, selected_unit),
+        quant,
+    )
 
 
 def _base_price_on_main_for_invoice(product: Product, invoice_type: str) -> Decimal:

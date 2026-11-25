@@ -228,6 +228,29 @@ class ReportTemplateService:
 		return validate_v2_design(module_key, subtype, design)
 
 	@staticmethod
+	def _validate_v4_assets_before_write(
+		module_key: str,
+		subtype: Optional[str],
+		assets: Any,
+	) -> None:
+		if not isinstance(assets, dict):
+			return
+		design = assets.get("template_design") or assets.get("design")
+		if not isinstance(design, dict) or not is_v4_design(design):
+			return
+		validation = validate_v4_design(module_key, subtype, design)
+		if validation.get("errors"):
+			raise ApiError(
+				"VALIDATION_ERROR",
+				"Invalid template design v4: " + "; ".join(validation["errors"]),
+				http_status=400,
+				details={
+					"errors": validation["errors"],
+					"warnings": validation.get("warnings") or [],
+				},
+			)
+
+	@staticmethod
 	def validate_template_payload(data: Dict[str, Any], *, is_update: bool) -> None:
 		"""اعتبارسنجی ورودی ایجاد/ویرایش قالب (واردات JSON و فرم)."""
 		present = set(data.keys())
@@ -350,6 +373,11 @@ class ReportTemplateService:
 			str(data.get("module_key") or ""),
 			(data.get("subtype") or None),
 		)
+		ReportTemplateService._validate_v4_assets_before_write(
+			str(data.get("module_key") or ""),
+			(data.get("subtype") or None),
+			data.get("assets"),
+		)
 		entity = ReportTemplate(
 			business_id=int(data["business_id"]),
 			module_key=str(data["module_key"]),
@@ -386,6 +414,12 @@ class ReportTemplateService:
 		next_module_key = str(data.get("module_key") if "module_key" in data else entity.module_key)
 		next_subtype = (data.get("subtype") if "subtype" in data else entity.subtype) or None
 		ReportTemplateService._validate_known_scope(next_module_key, next_subtype)
+		if "assets" in data or "module_key" in data or "subtype" in data:
+			ReportTemplateService._validate_v4_assets_before_write(
+				next_module_key,
+				next_subtype,
+				data.get("assets") if "assets" in data else entity.assets,
+			)
 		for field in [
 			"module_key", "subtype", "name", "description", "engine", "status",
 			"content_html", "content_css", "header_html", "footer_html",

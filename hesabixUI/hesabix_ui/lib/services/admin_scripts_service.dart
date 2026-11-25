@@ -14,12 +14,14 @@ class AdminScriptsService {
     required String scriptKey,
     required bool dryRun,
     required Map<String, dynamic> params,
+    String? confirmation,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/admin/scripts/$scriptKey/runs',
       data: {
         'dry_run': dryRun,
         'params': params,
+        if (confirmation != null && confirmation.isNotEmpty) 'confirmation': confirmation,
       },
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});

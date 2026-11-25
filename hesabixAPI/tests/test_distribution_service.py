@@ -58,7 +58,7 @@ def test_extend_settings_defaults():
 	assert d["visit_checklist_template"] == []
 	assert d["map_tile_source"] == "osm"
 	assert d["memaps_api_key"] is None
-	assert d["share_live_location"] is True
+	assert d["share_live_location"] is False
 
 
 def test_business_day_utc_bounds_covers_local_noon():

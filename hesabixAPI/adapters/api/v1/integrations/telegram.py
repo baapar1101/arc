@@ -37,7 +37,7 @@ def _is_link_token_expired(expires_at: date | datetime, *, now: datetime | None 
 	return expires_naive < now
 
 
-@router.post("/link", summary="ایجاد لینک اتصال تلگرام")
+@router.post("/link", summary="ایجاد لینک اتصال تلگرام", description="توکن اتصال حساب شخصی است و در MCP ثبت نشده. فهرست کسب‌وکار: `list_telegram_connected_users`.")
 def create_link(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -70,7 +70,7 @@ def create_link(
 	)
 
 
-@router.get("/status", summary="وضعیت اتصال تلگرام")
+@router.get("/status", summary="وضعیت اتصال تلگرام", description="وضعیت حساب شخصی است و در MCP کسب‌وکار ثبت نشده. فهرست: `list_telegram_connected_users`.")
 def link_status(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -87,7 +87,7 @@ def link_status(
 	return success_response(data, request)
 
 
-@router.delete("/unlink", summary="قطع اتصال تلگرام")
+@router.delete("/unlink", summary="قطع اتصال تلگرام", description="قطع اتصال حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 def unlink(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -104,7 +104,7 @@ def unlink(
 	return success_response({"unlinked": True}, request)
 
 
-@router.post("/webhook/{secret}", summary="وبهوک تلگرام", name="telegram_webhook")
+@router.post("/webhook/{secret}", summary="وبهوک تلگرام", name="telegram_webhook", description="وب‌هوک عمومی است و در MCP ثبت نشده.")
 def telegram_webhook(
 	secret: str,
 	payload: Dict[str, Any] = Body(...),

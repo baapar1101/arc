@@ -17,8 +17,10 @@ from adapters.db.models.crm import (
     CrmNoteAuditEvent,
     CrmNoteComment,
     CrmNoteType,
+    Deal,
     Lead,
 )
+from adapters.db.models.person import Person
 from adapters.db.models.user import User
 from app.core.auth_dependency import AuthContext
 from app.core.responses import ApiError
@@ -344,6 +346,28 @@ def delete_note_type(db: Session, business_id: int, type_id: int, translator) ->
     db.delete(row)
 
 
+def _validate_party(
+    db: Session,
+    business_id: int,
+    *,
+    person_id: int | None,
+    deal_id: int | None,
+    translator,
+) -> None:
+    person = None
+    if person_id is not None:
+        person = db.get(Person, person_id)
+        if person is None or int(person.business_id) != int(business_id):
+            raise ApiError("CRM_NOTE_PERSON_NOT_FOUND", "Person not found", http_status=404, translator=translator)
+    if deal_id is None:
+        return
+    deal = db.get(Deal, deal_id)
+    if deal is None or int(deal.business_id) != int(business_id):
+        raise ApiError("CRM_NOTE_DEAL_NOT_FOUND", "Deal not found", http_status=404, translator=translator)
+    if person is not None and int(deal.person_id) != int(person.id):
+        raise ApiError("CRM_NOTE_LINK_MISMATCH", "Deal does not belong to the person", translator=translator)
+
+
 def _validate_lead(db: Session, business_id: int, lead_id: int | None, translator) -> None:
     if lead_id is None:
         return
@@ -375,8 +399,10 @@ def create_note(
     starts_at: datetime | None,
     ends_at: datetime | None,
     lead_id: int | None,
-    shared_user_ids: List[int] | None,
-    translator,
+    person_id: int | None = None,
+    deal_id: int | None = None,
+    shared_user_ids: List[int] | None = None,
+    translator=None,
 ) -> CrmNote:
     ensure_default_note_types(db, business_id)
     uid = ctx.get_user_id()
@@ -408,6 +434,8 @@ def create_note(
         acl = _validate_shared_users(db, business_id, int(uid), shared_user_ids, translator)
 
     _validate_lead(db, business_id, lead_id, translator)
+    _validate_party(db, business_id, person_id=person_id, deal_id=deal_id, translator=translator)
+    _require_linked_record_access(db, ctx, business_id, lead_id, deal_id, write=True)
 
     now = datetime.utcnow()
     note = CrmNote(
@@ -420,6 +448,8 @@ def create_note(
         starts_at=st,
         ends_at=en,
         lead_id=lead_id,
+        person_id=person_id,
+        deal_id=deal_id,
         created_by_user_id=int(uid),
         status="active",
         deleted_at=None,
@@ -449,6 +479,8 @@ def create_note(
             "note_type_id": note_type_id,
             "occurs_on": occ.isoformat() if occ else None,
             "lead_id": lead_id,
+            "person_id": person_id,
+            "deal_id": deal_id,
             "shared_user_ids": acl,
         },
     )
@@ -470,9 +502,13 @@ def update_note(
     ends_at: datetime | None,
     lead_id: int | None,
     lead_field_set: bool = False,
-    status: str | None,
-    shared_user_ids: List[int] | None,
-    translator,
+    person_id: int | None = None,
+    person_field_set: bool = False,
+    deal_id: int | None = None,
+    deal_field_set: bool = False,
+    status: str | None = None,
+    shared_user_ids: List[int] | None = None,
+    translator=None,
 ) -> CrmNote:
     note = (
         db.query(CrmNote)
@@ -482,6 +518,12 @@ def update_note(
     )
     if not note:
         raise ApiError("CRM_NOTE_NOT_FOUND", "Not found", http_status=404, translator=translator)
+    try:
+        _require_linked_record_access(db, ctx, business_id, note.lead_id, note.deal_id, write=True)
+    except ApiError as exc:
+        if getattr(exc, "status_code", None) == 404:
+            raise ApiError("CRM_NOTE_NOT_FOUND", "Not found", http_status=404, translator=translator) from exc
+        raise
     if not can_edit_note(db, ctx, note):
         raise ApiError("CRM_NOTE_FORBIDDEN", "Forbidden", http_status=403, translator=translator)
 
@@ -522,6 +564,19 @@ def update_note(
             if note.lead_id != lead_id:
                 changes["lead_id"] = {"old": note.lead_id, "new": lead_id}
             note.lead_id = lead_id
+
+    if person_field_set:
+        if note.person_id != person_id:
+            changes["person_id"] = {"old": note.person_id, "new": person_id}
+        note.person_id = person_id
+    if deal_field_set:
+        if note.deal_id != deal_id:
+            changes["deal_id"] = {"old": note.deal_id, "new": deal_id}
+        note.deal_id = deal_id
+    if person_field_set or deal_field_set:
+        _validate_party(db, business_id, person_id=note.person_id, deal_id=note.deal_id, translator=translator)
+    if lead_field_set or deal_field_set:
+        _require_linked_record_access(db, ctx, business_id, note.lead_id, note.deal_id, write=True)
 
     if status is not None:
         if status not in ("active", "archived", "cancelled"):
@@ -612,6 +667,23 @@ def soft_delete_note(db: Session, ctx: AuthContext, business_id: int, note_id: i
     )
 
 
+def _require_linked_record_access(db: Session, ctx: AuthContext, business_id: int, lead_id: int | None, deal_id: int | None, *, write: bool = False) -> None:
+    from app.services.crm_enterprise_service import assert_can_view_record, record_acl_enforced
+
+    if not record_acl_enforced(db, business_id, ctx):
+        return
+    if lead_id:
+        lead = db.query(Lead).filter(Lead.id == lead_id, Lead.business_id == business_id).first()
+        if lead is None:
+            raise ApiError("NOT_FOUND", "رکورد یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, "lead", lead, write=write)
+    if deal_id:
+        deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
+        if deal is None:
+            raise ApiError("NOT_FOUND", "رکورد یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, "deal", deal, write=write)
+
+
 def list_notes(
     db: Session,
     ctx: AuthContext,
@@ -630,6 +702,8 @@ def list_notes(
             joinedload(CrmNote.note_type),
             joinedload(CrmNote.created_by),
             joinedload(CrmNote.lead),
+            joinedload(CrmNote.person),
+            joinedload(CrmNote.deal),
             selectinload(CrmNote.acl_users),
         )
         .filter(
@@ -639,8 +713,23 @@ def list_notes(
             CrmNote.occurs_on <= to_date,
             _note_visible_filter(int(uid)),
         )
-        .order_by(CrmNote.occurs_on, CrmNote.starts_at, CrmNote.id)
     )
+    from app.services.crm_enterprise_service import record_acl_enforced, restrict_visibility_query
+
+    if record_acl_enforced(db, business_id, ctx):
+        from sqlalchemy.orm import aliased
+
+        lead_alias = aliased(Lead)
+        deal_alias = aliased(Deal)
+        visible_leads = restrict_visibility_query(
+            db.query(lead_alias.id).filter(lead_alias.business_id == business_id), db, business_id, ctx, lead_alias, "lead"
+        )
+        visible_deals = restrict_visibility_query(
+            db.query(deal_alias.id).filter(deal_alias.business_id == business_id), db, business_id, ctx, deal_alias, "deal"
+        )
+        q = q.filter(or_(CrmNote.lead_id.is_(None), CrmNote.lead_id.in_(visible_leads)))
+        q = q.filter(or_(CrmNote.deal_id.is_(None), CrmNote.deal_id.in_(visible_deals)))
+    q = q.order_by(CrmNote.occurs_on, CrmNote.starts_at, CrmNote.id)
     rows = q.all()
     return [note_to_dict(n, lang) for n in rows]
 
@@ -652,12 +741,18 @@ def get_note(db: Session, ctx: AuthContext, business_id: int, note_id: int, lang
             joinedload(CrmNote.note_type),
             joinedload(CrmNote.created_by),
             joinedload(CrmNote.lead),
+            joinedload(CrmNote.person),
+            joinedload(CrmNote.deal),
             selectinload(CrmNote.acl_users),
         )
         .filter(CrmNote.id == note_id, CrmNote.business_id == business_id, CrmNote.deleted_at.is_(None))
         .first()
     )
     if not note or not can_view_note(db, ctx, note):
+        return None
+    try:
+        _require_linked_record_access(db, ctx, business_id, note.lead_id, note.deal_id)
+    except ApiError:
         return None
     return note_to_dict(note, lang, include_acl=True)
 
@@ -679,8 +774,14 @@ def note_to_dict(note: CrmNote, lang: str, *, include_acl: bool = False) -> dict
         "starts_at": note.starts_at,
         "ends_at": note.ends_at,
         "lead_id": note.lead_id,
+        "person_id": note.person_id,
+        "deal_id": note.deal_id,
         "lead_name": lead.name if lead else None,
         "lead_code": lead.code if lead else None,
+        "person_name": ((note.person.alias_name or "").strip() or None) if note.person else None,
+        "deal_title": note.deal.title if note.deal else None,
+        "deal_code": note.deal.code if note.deal else None,
+        "deal_person_id": note.deal.person_id if note.deal else None,
         "status": note.status,
         "created_by_user_id": note.created_by_user_id,
         "created_by_name": _user_display_name(note.created_by),

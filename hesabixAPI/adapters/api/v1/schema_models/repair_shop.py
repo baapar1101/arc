@@ -110,7 +110,10 @@ class RepairOrderCreate(BaseModel):
 
 class RepairOrderUpdate(BaseModel):
     """به‌روزرسانی سفارش تعمیر"""
+    product_id: Optional[int] = None
+    product_name: Optional[str] = Field(None, max_length=255)
     product_serial: Optional[str] = Field(None, max_length=100)
+    warranty_code_id: Optional[int] = None
     problem_description: Optional[str] = None
     customer_notes: Optional[str] = None
     technician_notes: Optional[str] = None
@@ -253,6 +256,14 @@ class CompleteRepairRequest(BaseModel):
 class DeliverRepairRequest(BaseModel):
     """تحویل کالا"""
     notes: Optional[str] = Field(None, description="یادداشت تحویل")
+
+
+class AddAttachmentRequest(BaseModel):
+    """افزودن ضمیمه"""
+    file_storage_id: str = Field(..., description="شناسه فایل در storage")
+    file_type: str = Field("image", description="image, video, document")
+    attachment_type: str = Field("during_repair", description="before_repair, during_repair, after_repair")
+    description: Optional[str] = None
 
 
 # ========== Reports ==========

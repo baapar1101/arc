@@ -24,6 +24,11 @@ Friend Module Program
         Thread.CurrentThread.CurrentUICulture = fa
 
         Dim args = Environment.GetCommandLineArgs().Skip(1).ToArray()
+        If args.Any(Function(a) String.Equals(a, "--auto-sync", StringComparison.OrdinalIgnoreCase)) Then
+            Dim code = AutoSyncRunner.Run(args)
+            Environment.Exit(code)
+            Return
+        End If
         If args.Any(Function(a) String.Equals(a, "--e2e-opening", StringComparison.OrdinalIgnoreCase)) Then
             Dim code = E2eOpeningRunner.Run(args)
             Environment.Exit(code)

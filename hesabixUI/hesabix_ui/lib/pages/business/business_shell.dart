@@ -22,6 +22,7 @@ import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/marketplace_service.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../core/api_client.dart';
 import '../../core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
@@ -64,6 +65,8 @@ import 'transfers_page.dart';
 import 'documents_page.dart';
 import 'loan_facilities_page.dart';
 import 'business_shell_side_nav_scope.dart';
+import 'pay_page_send_link_dialog.dart';
+import '../../services/business_pay_page_service.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -90,22 +93,19 @@ class BusinessShell extends StatefulWidget {
 class _BusinessShellState extends State<BusinessShell> {
   /// ارتفاع نوار ابزار آبی (لوگو، اکشن‌ها) — فشرده‌تر از [kToolbarHeight] پیش‌فرض.
   static const double _kBizAppBarToolbarHeight = 44;
-  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — کمی فشرده‌تر از قبل.
-  static const double _kUnifiedBizTabBarHeight = 44;
-  static const double _kBizTabStripVerticalPadding = 6;
+  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — نزدیک به نصف ارتفاع قبلی (۴۴).
+  static const double _kUnifiedBizTabBarHeight = 24;
+  static const double _kBizTabStripVerticalPadding = 2;
   /// ارتفاع ثابت بدنهٔ هر تب داخل نوار (نوار − پدینگ عمودی).
   static const double _kBizTabChipInnerHeight =
       _kUnifiedBizTabBarHeight - (_kBizTabStripVerticalPadding * 2);
-  static const double _kBizTabMinWidth = 100;
-  static const double _kBizTabMaxWidth = 188;
+  static const double _kBizTabMinWidth = 80;
+  static const double _kBizTabMaxWidth = 156;
+  static const double _kBizTabMetaGlyphSize = 12;
+  static const double _kBizTabOverflowSize = 20;
 
   int _hoverIndex = -1;
-  bool _isProductsAndServicesExpanded = false;
-  bool _isBankingExpanded = false;
-  bool _isAccountingMenuExpanded = false;
-  bool _isWarehouseManagementExpanded = false;
-  bool _isAIExpanded = false;
-  bool _isCrmExpanded = false;
+  final Map<String, bool> _expandedMenuByKey = {};
   final BusinessDashboardService _businessService = BusinessDashboardService(ApiClient());
   final MarketplaceService _marketplaceService = MarketplaceService();
   List<Map<String, dynamic>> _businessPlugins = [];
@@ -113,6 +113,8 @@ class _BusinessShellState extends State<BusinessShell> {
   int? _pluginsLoadedForBusinessId;
   String? _lastRouteLocation;
   int _lastPluginsRefreshNonce = 0;
+  bool _payPageEnabled = false;
+  int? _payPageLoadedForBusinessId;
   bool _isBusinessLoading = false;
   String? _businessLoadError;
   Timer? _dateTimeUpdateTimer;
@@ -129,6 +131,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (nonce != _lastPluginsRefreshNonce) {
       _lastPluginsRefreshNonce = nonce;
       _loadBusinessPlugins(force: true);
+      _loadPayPageEnabled(force: true);
     }
     setState(() {});
   }
@@ -225,33 +228,71 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'procurement':
+        return t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement';
+      case 'advanced-production':
+        return t.advancedProductionMenu;
+      case 'office-automation':
+        return t.oaCartable;
+      case 'office-automation/desk':
+        return t.oaMyDesk;
+      case 'office-automation/processes':
+        return t.oaProcesses;
+      case 'office-automation/documents':
+        return t.oaDocuments;
+      case 'office-automation/enterprise':
+        return t.oaEnterprise;
+      case 'office-automation/org':
+        return t.oaOrg;
+      case 'office-automation/external-orgs':
+        return t.oaExternalOrgs;
+      case 'office-automation/archive':
+        return t.oaArchiveTree;
+      case 'office-automation/reports':
+        return t.oaReports;
+      case 'settings/office-automation':
+        return t.oaSettings;
+      case 'fixed-assets':
+        return t.fixedAssetsMenu;
+      case 'settings/fixed-assets':
+        return t.fixedAssetsSettingsPageTitle;
       case 'telephony':
-        return 'مرکز تماس';
+        return t.telephonyMenu;
       case 'telephony/calls':
-        return 'تاریخچه تماس';
+        return t.telephonyCallHistoryShort;
       case 'telephony/live':
-        return 'داشبورد زنده تماس';
+        return t.telephonyLiveDashboardTitle;
       case 'telephony/reports':
-        return 'گزارش تماس‌ها';
+        return t.telephonyReportsTitle;
       case 'telephony/softphone':
-        return 'سافت‌فون';
+        return t.telephonySoftphoneTitle;
       case 'settings/telephony':
-        return 'تنظیمات مرکز تماس';
+        return t.telephonySettingsTitle;
+      case 'digipay':
+        return t.digipayMenuTitle;
+      case 'settings/digipay':
+        return t.settingsDigipayTitle;
       case 'distribution':
         return t.distributionMenu;
       case 'hscript':
-        return 'گزارش‌ساز اسکریپتی';
+        return t.reportsHscriptTitle;
       default:
         break;
     }
     if (pathTailBase.startsWith('telephony/')) {
-      return 'مرکز تماس';
+      return t.telephonyMenu;
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
     }
+    if (pathTailBase.startsWith('advanced-production')) {
+      return t.advancedProductionMenu;
+    }
+    if (pathTailBase.startsWith('office-automation')) {
+      return t.oaMenu;
+    }
     if (pathTailBase.startsWith('hscript')) {
-      return 'گزارش‌ساز اسکریپتی';
+      return t.reportsHscriptTitle;
     }
     if (RegExp(r'^price-lists/\d+/items$').hasMatch(pathTailBase)) {
       return t.businessPanelTabRoutePriceListItems;
@@ -513,7 +554,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ? cs.primary.withValues(alpha: active ? 0.95 : 0.82)
         : cs.outline.withValues(alpha: 0.55);
 
-    final BorderRadius chipRadius = BorderRadius.circular(11);
+    final BorderRadius chipRadius = BorderRadius.circular(6);
 
     final Color chipBg = active
         ? Color.alphaBlend(
@@ -529,16 +570,16 @@ class _BusinessShellState extends State<BusinessShell> {
             : cs.outline.withValues(alpha: isDarkStrip ? 0.38 : 0.22);
 
     return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 8),
+      padding: const EdgeInsetsDirectional.only(end: 4),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: _kBizTabMinWidth, maxWidth: _kBizTabMaxWidth),
         child: Material(
-          elevation: active ? (isDarkStrip ? 5 : 4) : (pinned ? 1 : 0),
-          shadowColor: cs.shadow.withValues(alpha: active ? (isDarkStrip ? 0.45 : 0.28) : 0.12),
+          elevation: active ? (isDarkStrip ? 2 : 1) : 0,
+          shadowColor: cs.shadow.withValues(alpha: active ? 0.18 : 0.08),
           color: chipBg,
           shape: RoundedRectangleBorder(
             borderRadius: chipRadius,
-            side: BorderSide(color: chipBorder, width: active ? 1.5 : 1),
+            side: BorderSide(color: chipBorder),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -550,22 +591,22 @@ class _BusinessShellState extends State<BusinessShell> {
             child: SizedBox(
               height: _kBizTabChipInnerHeight,
               child: Padding(
-                padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
+                padding: const EdgeInsetsDirectional.only(start: 7, end: 1),
                 child: Row(
                   children: [
                     if (pinned)
                       Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 5),
                         child: Transform.rotate(
                           angle: -0.6,
-                          child: Icon(Icons.push_pin_rounded, size: 13, color: chipPin),
+                          child: Icon(Icons.push_pin_rounded, size: 10, color: chipPin),
                         ),
                       )
                     else
                       Container(
-                        width: 5,
-                        height: 5,
-                        margin: const EdgeInsetsDirectional.only(end: 10),
+                        width: 4,
+                        height: 4,
+                        margin: const EdgeInsetsDirectional.only(end: 6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: active ? cs.primary : cs.outline.withValues(alpha: 0.55),
@@ -577,29 +618,30 @@ class _BusinessShellState extends State<BusinessShell> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              fontSize: 12.5,
-                              height: 1.15,
-                              letterSpacing: active ? 0.15 : 0.02,
+                              fontSize: 11,
+                              height: 1.0,
+                              letterSpacing: active ? 0.12 : 0.01,
                               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                               color: active ? chipFgStrong : chipFg,
                             ),
                       ),
                     ),
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        tooltip: pinned
-                            ? t.businessPanelTabClosePinnedTooltip
-                            : MaterialLocalizations.of(context).closeButtonTooltip,
-                        icon: Icon(
-                          Icons.close_rounded,
-                          size: 16.5,
-                          color: pinned ? cs.primary.withValues(alpha: 0.75) : chipClose,
+                    Tooltip(
+                      message: pinned
+                          ? t.businessPanelTabClosePinnedTooltip
+                          : MaterialLocalizations.of(context).closeButtonTooltip,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => _requestCloseTab(context, path, goLoc),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 12,
+                            color: pinned ? cs.primary.withValues(alpha: 0.75) : chipClose,
+                          ),
                         ),
-                        onPressed: () => _requestCloseTab(context, path, goLoc),
                       ),
                     ),
                   ],
@@ -612,7 +654,111 @@ class _BusinessShellState extends State<BusinessShell> {
     );
   }
 
-  /// یک خط: نام کسب‌وکار + آیکون • تب‌ها (کنار نام، با اسکرول) • زمان • منوی تب‌ها
+  Widget _denseStripMetaCapsule({
+    required ColorScheme cs,
+    required bool isDark,
+    required Widget child,
+    double maxW = 220,
+  }) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: maxW,
+        maxHeight: _kBizTabChipInnerHeight,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          color: cs.surface.withValues(alpha: isDark ? 0.52 : 0.94),
+          border: Border.all(color: cs.outline.withValues(alpha: isDark ? 0.38 : 0.22)),
+        ),
+        child: SizedBox(
+          height: _kBizTabChipInnerHeight,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: 7),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _denseBusinessIdentityRow({
+    required ThemeData theme,
+    required ColorScheme cs,
+    required bool isDark,
+    required String businessName,
+    required Color titleColor,
+    required bool expanded,
+    TextAlign textAlign = TextAlign.start,
+  }) {
+    return Row(
+      mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: cs.primary.withValues(alpha: isDark ? 0.35 : 0.18),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: BusinessShellStorefrontGlyph(
+              size: _kBizTabMetaGlyphSize,
+              color: cs.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            businessName,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+              height: 1.0,
+              letterSpacing: 0.08,
+              color: titleColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: textAlign,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _denseDateTimeRow({
+    required ThemeData theme,
+    required Color muted,
+    required String dateTimeStr,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.schedule_rounded, size: 12, color: muted.withValues(alpha: 0.95)),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            dateTimeStr,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: muted,
+              fontWeight: FontWeight.w600,
+              fontSize: 10.5,
+              height: 1.0,
+              letterSpacing: 0.01,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// یک خط فشرده: نام کسب‌وکار + آیکون • تب‌ها (کنار نام، با اسکرول) • زمان • منوی تب‌ها
   ///
   /// [menuRoot] باید **منوی کامل** ([allMenuItems]) باشد نه [menuItems] فیلترشده،
   /// تا عنوان تب‌ها از همان برچسب‌های محلی منو به‌دست آید (و به `products` خام نیفتد).
@@ -639,89 +785,30 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color stripFgTitle = cs.onSurface;
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    final BorderRadius pillRadius = BorderRadius.circular(12);
-
-    Widget metaCapsule({
-      required Widget child,
-      double maxW = 260,
-      EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    }) {
-      return ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxW),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: pillRadius,
-            color: cs.surface.withValues(alpha: isDark ? 0.52 : 0.94),
-            border: Border.all(color: cs.outline.withValues(alpha: isDark ? 0.42 : 0.26)),
-            boxShadow: [
-              BoxShadow(
-                color: cs.shadow.withValues(alpha: isDark ? 0.35 : 0.07),
-                blurRadius: isDark ? 14 : 10,
-                spreadRadius: -2,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
-      );
-    }
-
-    final Widget businessTitle = metaCapsule(
-      maxW: 248,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: isDark ? 0.35 : 0.18),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(7),
-              child: BusinessShellStorefrontGlyph(size: 18, color: cs.primary),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              businessName,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.12,
-                color: stripFgTitle,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-          ),
-        ],
+    final Widget businessTitle = _denseStripMetaCapsule(
+      cs: cs,
+      isDark: isDark,
+      maxW: 200,
+      child: _denseBusinessIdentityRow(
+        theme: theme,
+        cs: cs,
+        isDark: isDark,
+        businessName: businessName,
+        titleColor: stripFgTitle,
+        expanded: false,
+        textAlign: isRtl ? TextAlign.right : TextAlign.left,
       ),
     );
 
     final Widget dateWidget = !isMobile
-        ? metaCapsule(
-            maxW: 268,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.schedule_rounded, size: 17, color: stripFg.withValues(alpha: 0.95)),
-                const SizedBox(width: 9),
-                Flexible(
-                  child: Text(
-                    dateTimeStr,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: stripFg,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      letterSpacing: 0.02,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+        ? _denseStripMetaCapsule(
+            cs: cs,
+            isDark: isDark,
+            maxW: 220,
+            child: _denseDateTimeRow(
+              theme: theme,
+              muted: stripFg,
+              dateTimeStr: dateTimeStr,
             ),
           )
         : const SizedBox.shrink();
@@ -732,15 +819,18 @@ class _BusinessShellState extends State<BusinessShell> {
       child: Material(
         color: cs.surfaceContainerHighest.withValues(alpha: isDark ? 0.55 : 0.82),
         shape: const CircleBorder(),
-        elevation: isDark ? 2 : 1,
-        shadowColor: cs.shadow.withValues(alpha: 0.18),
+        elevation: 0,
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: () => _showAllTabsManagementDialog(context, menuRoot),
           child: SizedBox(
-            width: 34,
-            height: 34,
-            child: Icon(Icons.more_horiz_rounded, color: stripFgTitle.withValues(alpha: 0.85), size: 22),
+            width: _kBizTabOverflowSize,
+            height: _kBizTabOverflowSize,
+            child: Icon(
+              Icons.more_horiz_rounded,
+              color: stripFgTitle.withValues(alpha: 0.85),
+              size: 14,
+            ),
           ),
         ),
       ),
@@ -754,7 +844,7 @@ class _BusinessShellState extends State<BusinessShell> {
             scrollDirection: Axis.horizontal,
             reverse: isRtl,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsetsDirectional.only(start: 10, end: 12),
+            padding: const EdgeInsetsDirectional.only(start: 6, end: 8),
             child: Row(
               textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
               mainAxisSize: MainAxisSize.min,
@@ -771,21 +861,14 @@ class _BusinessShellState extends State<BusinessShell> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: barBg,
-        border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: isDark ? 0.25 : 0.06),
-            blurRadius: isDark ? 8 : 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: stripBottomBorder)),
       ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(
-            start: 14,
-            end: 14,
+            start: 10,
+            end: 8,
             top: _kBizTabStripVerticalPadding,
             bottom: _kBizTabStripVerticalPadding,
           ),
@@ -793,13 +876,13 @@ class _BusinessShellState extends State<BusinessShell> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               businessTitle,
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               tabRegion,
               if (!isMobile) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: 6),
                 dateWidget,
               ],
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               overflowBtn,
             ],
           ),
@@ -828,6 +911,7 @@ class _BusinessShellState extends State<BusinessShell> {
     // بارگذاری اطلاعات کسب و کار و دسترسی‌ها
     _loadBusinessInfo();
     _loadBusinessPlugins();
+    _loadPayPageEnabled();
     _loadMenuPreferences();
     // به‌روزرسانی خودکار ساعت در نوار بالا هر دقیقه
     _dateTimeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
@@ -848,8 +932,10 @@ class _BusinessShellState extends State<BusinessShell> {
     if (oldWidget.businessId != widget.businessId) {
       _pluginsLoaded = false;
       _pluginsLoadedForBusinessId = null;
+      _payPageLoadedForBusinessId = null;
       unawaited(FiscalYearController.load(widget.businessId));
       _loadBusinessPlugins(force: true);
+      _loadPayPageEnabled(force: true);
       _loadMenuPreferences();
     }
   }
@@ -1174,6 +1260,30 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  Future<void> _loadPayPageEnabled({bool force = false}) async {
+    if (!force && _payPageLoadedForBusinessId == widget.businessId) return;
+    try {
+      final on = await BusinessPayPageService().isFeatureEnabled(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _payPageEnabled = on;
+        _payPageLoadedForBusinessId = widget.businessId;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _payPageEnabled = false;
+        _payPageLoadedForBusinessId = widget.businessId;
+      });
+    }
+  }
+
+  bool _canShowMenuAddButton(_MenuItem item) {
+    if (item.key == 'pay-page') return _hasAccessToMenuItem(item);
+    final t = AppLocalizations.of(context);
+    return _canAddForSection(_sectionForMenuItem(item, t));
+  }
+
   Future<void> _loadBusinessPlugins({bool force = false}) async {
     if (!force &&
         _pluginsLoaded &&
@@ -1201,16 +1311,6 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
-  bool _jsonBool(dynamic value) {
-    if (value == true) return true;
-    if (value is num) return value != 0;
-    if (value is String) {
-      final v = value.trim().toLowerCase();
-      return v == 'true' || v == '1';
-    }
-    return false;
-  }
-
   bool _isBusinessOwner() {
     final current = widget.authStore.currentBusiness;
     return current != null && current.id == widget.businessId && current.isOwner;
@@ -1219,8 +1319,7 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isPluginCodeLicensed(String code) {
     for (final plug in _businessPlugins) {
       if (plug['plugin_code'] != code) continue;
-      if (_jsonBool(plug['is_active'])) return true;
-      if (_jsonBool(plug['is_trial']) && !_jsonBool(plug['is_expired'])) return true;
+      if (marketplacePluginLicenseActive(plug)) return true;
     }
     return false;
   }
@@ -1287,7 +1386,26 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isAdvancedAccountingMenuItem(_MenuItem item) {
+    if (kAdvancedAccountingMenuKeys.contains(item.key)) return true;
+    final path = item.path;
+    if (path == null) return false;
+    return path.contains('/year-end-closing') ||
+        path.contains('/currency-revaluation') ||
+        path.contains('/loan-facilities') ||
+        path.contains('/report-templates');
+  }
+
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
+
+  bool _isProcurementPluginActive() => _isPluginCodeLicensed('procurement');
+
+  bool _isAdvancedProductionPluginActive() =>
+      _isPluginCodeLicensed('advanced_production');
+
+  bool _isOfficeAutomationPluginActive() => _isPluginCodeLicensed('office_automation');
+
+  bool _isFixedAssetsPluginActive() => _isPluginCodeLicensed('fixed_assets');
 
   bool _isTelephonyPluginActive() => _isPluginCodeLicensed('asterisk_issabel_connector');
 
@@ -1302,6 +1420,8 @@ class _BusinessShellState extends State<BusinessShell> {
       return false;
     }
   }
+
+  bool _isDigipayPluginActive() => _isPluginCodeLicensed('digipay_credit');
 
   bool _isBasalamPluginActive() {
     try {
@@ -1454,8 +1574,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     _maybeRefreshPluginsAfterMarketplace(location);
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final workflowLabel = _workflowMenuLabel(t);
-    
+
     // ساختار متمرکز منو
     final allMenuItems = <_MenuItem>[
       _MenuItem(
@@ -1502,7 +1621,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'product-bundles',
-            label: 'باندل‌های کالا',
+            label: t.productBundlesMenu,
             icon: Icons.inventory_2_outlined,
             selectedIcon: Icons.inventory_2,
             path: _bu('product-bundles'),
@@ -1529,7 +1648,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'catalog-spec-fields',
-            label: 'قالب مشخصات تأمین',
+            label: t.catalogSpecFieldsMenu,
             icon: Icons.view_list_outlined,
             selectedIcon: Icons.view_list,
             path: _bu('catalog-spec-fields'),
@@ -1612,7 +1731,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'quick-sales',
-        label: 'فروش سریع',
+        label: t.quickSalesMenu,
         icon: Icons.point_of_sale,
         selectedIcon: Icons.point_of_sale,
         path: _bu('quick-sales'),
@@ -1634,6 +1753,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.account_balance_wallet,
         selectedIcon: Icons.account_balance_wallet,
         path: _bu('receipts-payments'),
+        type: _MenuItemType.simple,
+        hasAddButton: true,
+      ),
+      _MenuItem(
+        key: 'pay-page',
+        label: t.payPageMenu,
+        icon: Icons.link,
+        selectedIcon: Icons.link,
+        path: _bu('settings/pay-page'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -1765,17 +1893,17 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
-        key: 'plugin-marketplace',
-        label: t.pluginMarketplace,
-        icon: Icons.store,
-        selectedIcon: Icons.store,
-        path: _bu('plugin-marketplace'),
+        key: 'digipay',
+        label: t.digipayMenuTitle,
+        icon: Icons.credit_score_outlined,
+        selectedIcon: Icons.credit_score,
+        path: _bu('digipay'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
       _MenuItem(
         key: 'hscript',
-        label: 'گزارش‌ساز اسکریپتی',
+        label: t.reportsHscriptTitle,
         icon: Icons.code_outlined,
         selectedIcon: Icons.code,
         path: _bu('hscript'),
@@ -1801,7 +1929,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'warehouse-docs',
-            label: 'حواله‌های انبار',
+            label: t.warehouseDocsMenu,
             icon: Icons.description,
             selectedIcon: Icons.description,
             path: _bu('warehouse-docs'),
@@ -1810,7 +1938,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'stock-count',
-            label: 'انبار گردانی',
+            label: t.stockCountMenu,
             icon: Icons.inventory,
             selectedIcon: Icons.inventory,
             path: _bu('stock-count'),
@@ -1819,7 +1947,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'quick-sales-stock-discrepancies',
-            label: 'مغایرت‌های موجودی فروش سریع',
+            label: t.quickSalesStockDiscrepanciesMenu,
             icon: Icons.rule_folder_outlined,
             selectedIcon: Icons.rule_folder,
             path: _bu('quick-sales-stock-discrepancies'),
@@ -1828,12 +1956,21 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'goods-expense-income',
-            label: 'کالای هزینه/درآمد شده',
+            label: t.goodsExpenseIncomeMenu,
             icon: Icons.inventory_2_outlined,
             selectedIcon: Icons.inventory_2,
             path: _bu('goods-expense-income'),
             type: _MenuItemType.simple,
             hasAddButton: false,
+          ),
+          _MenuItem(
+            key: 'production-orders',
+            label: t.productionOrdersMenu,
+            icon: Icons.precision_manufacturing_outlined,
+            selectedIcon: Icons.precision_manufacturing,
+            path: _bu('production-orders'),
+            type: _MenuItemType.simple,
+            hasAddButton: true,
           ),
         ],
       ),
@@ -1857,7 +1994,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'group:ai',
-        label: 'هوش مصنوعی',
+        label: t.aiMenu,
         icon: Icons.smart_toy_outlined,
         selectedIcon: Icons.smart_toy,
         path: null, // برای منوی بازشونده
@@ -1865,7 +2002,7 @@ class _BusinessShellState extends State<BusinessShell> {
         children: [
           _MenuItem(
             key: 'ai/chat',
-            label: 'دستیار هوشمند',
+            label: t.aiAssistantMenu,
             icon: Icons.chat_bubble_outline,
             selectedIcon: Icons.chat_bubble,
             path: _bu('ai/chat'),
@@ -1873,8 +2010,17 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'ai/mcp-connections',
+            label: t.aiMcpConnectionsMenu,
+            icon: Icons.devices_other_outlined,
+            selectedIcon: Icons.devices_other,
+            path: _bu('ai/mcp-connections'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'ai/subscription',
-            label: 'اشتراک AI',
+            label: t.aiSubscriptionMenu,
             icon: Icons.subscriptions_outlined,
             selectedIcon: Icons.subscriptions,
             path: _bu('ai/subscription'),
@@ -1883,7 +2029,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/usage',
-            label: 'آمار استفاده',
+            label: t.aiUsageMenu,
             icon: Icons.bar_chart_outlined,
             selectedIcon: Icons.bar_chart,
             path: _bu('ai/usage'),
@@ -1892,7 +2038,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/skills/marketplace',
-            label: 'مارکت‌پلیس مهارت‌ها',
+            label: t.aiSkillsMarketplaceMenu,
             icon: Icons.storefront_outlined,
             selectedIcon: Icons.storefront,
             path: _bu('ai/skills/marketplace'),
@@ -1901,7 +2047,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/skills/publisher',
-            label: 'درآمد مهارت‌ها',
+            label: t.aiSkillsPublisherMenu,
             icon: Icons.payments_outlined,
             selectedIcon: Icons.payments,
             path: _bu('ai/skills/publisher'),
@@ -1930,7 +2076,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'workflows',
-        label: workflowLabel,
+        label: t.workflows,
         icon: Icons.hub_outlined,
         selectedIcon: Icons.hub,
         path: _bu('workflows'),
@@ -1939,7 +2085,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'group:crm',
-        label: 'CRM',
+        label: t.crmMenu,
         icon: Icons.handshake_outlined,
         selectedIcon: Icons.handshake,
         path: _bu('crm/dashboard'),
@@ -1948,7 +2094,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // کار روزانه
           _MenuItem(
             key: 'crm/tasks',
-            label: 'صف کار',
+            label: t.crmMenuTasks,
             icon: Icons.task_alt_outlined,
             selectedIcon: Icons.task_alt,
             path: _bu('crm/tasks'),
@@ -1957,7 +2103,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/web-chat',
-            label: 'چت وب',
+            label: t.crmMenuWebChat,
             icon: Icons.chat_bubble_outline,
             selectedIcon: Icons.chat_bubble,
             path: _bu('crm/web-chat'),
@@ -1976,7 +2122,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // قیف فروش
           _MenuItem(
             key: 'crm/leads',
-            label: 'سرنخ‌ها',
+            label: t.crmMenuLeads,
             icon: Icons.contact_phone_outlined,
             selectedIcon: Icons.contact_phone,
             path: _bu('crm/leads'),
@@ -1985,7 +2131,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/deals',
-            label: 'فرصت‌های فروش',
+            label: t.crmMenuDeals,
             icon: Icons.trending_up_outlined,
             selectedIcon: Icons.trending_up,
             path: _bu('crm/deals'),
@@ -1994,7 +2140,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/activities',
-            label: 'فعالیت‌ها',
+            label: t.crmMenuActivities,
             icon: Icons.history,
             selectedIcon: Icons.history,
             path: _bu('crm/activities'),
@@ -2003,7 +2149,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/customer-360',
-            label: 'نمای ۳۶۰ مشتری',
+            label: t.crmMenuCustomer360,
             icon: Icons.person_search_outlined,
             selectedIcon: Icons.person_search,
             path: _bu('crm/customer-360'),
@@ -2013,7 +2159,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // بینش
           _MenuItem(
             key: 'crm/dashboard',
-            label: 'داشبورد',
+            label: t.crmMenuDashboard,
             icon: Icons.dashboard_outlined,
             selectedIcon: Icons.dashboard,
             path: _bu('crm/dashboard'),
@@ -2022,7 +2168,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/reports',
-            label: 'گزارشات',
+            label: t.crmMenuReports,
             icon: Icons.assessment_outlined,
             selectedIcon: Icons.assessment,
             path: _bu('crm/reports'),
@@ -2032,7 +2178,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // پیکربندی
           _MenuItem(
             key: 'crm/process-definitions',
-            label: 'فرایندها و مراحل قیف',
+            label: t.crmMenuProcessDefinitions,
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
             path: _bu('crm/process-definitions'),
@@ -2040,8 +2186,17 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/enterprise',
+            label: t.crmMenuEnterprise,
+            icon: Icons.groups_outlined,
+            selectedIcon: Icons.groups,
+            path: _bu('crm/enterprise'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'crm/sequences',
-            label: 'توالی‌های خودکار',
+            label: t.crmMenuSequences,
             icon: Icons.timeline_outlined,
             selectedIcon: Icons.timeline,
             path: _bu('crm/sequences'),
@@ -2052,7 +2207,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'warranty',
-        label: t.warranty ?? 'گارانتی',
+        label: t.warranty,
         icon: Icons.verified_user,
         selectedIcon: Icons.verified_user,
         path: _bu('warranty'),
@@ -2061,7 +2216,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'repair-shop',
-        label: 'تعمیرگاه',
+        label: t.repairShopMenu,
         icon: Icons.build_circle_outlined,
         selectedIcon: Icons.build_circle,
         path: _bu('repair-shop'),
@@ -2087,8 +2242,117 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'advanced-production',
+        label: t.advancedProductionMenu,
+        icon: Icons.precision_manufacturing_outlined,
+        selectedIcon: Icons.precision_manufacturing,
+        path: _bu('advanced-production'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'procurement',
+        label: t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement',
+        icon: Icons.shopping_cart_outlined,
+        selectedIcon: Icons.shopping_cart,
+        path: _bu('procurement'),
+        type: _MenuItemType.simple,
+      ),
+      _MenuItem(
+        key: 'group:office-automation',
+        label: t.oaMenu,
+        icon: Icons.mark_email_unread_outlined,
+        selectedIcon: Icons.mark_email_unread,
+        path: null,
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            key: 'office-automation/enterprise',
+            label: t.oaEnterprise,
+            icon: Icons.apartment_outlined,
+            selectedIcon: Icons.apartment,
+            path: _bu('office-automation/enterprise'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/documents',
+            label: t.oaDocuments,
+            icon: Icons.folder_copy_outlined,
+            selectedIcon: Icons.folder_copy,
+            path: _bu('office-automation/documents'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/processes',
+            label: t.oaProcesses,
+            icon: Icons.account_tree_outlined,
+            selectedIcon: Icons.account_tree,
+            path: _bu('office-automation/processes'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/desk',
+            label: t.oaMyDesk,
+            icon: Icons.space_dashboard_outlined,
+            selectedIcon: Icons.space_dashboard,
+            path: _bu('office-automation/desk'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation',
+            label: t.oaCartable,
+            icon: Icons.inbox_outlined,
+            selectedIcon: Icons.inbox,
+            path: _bu('office-automation'),
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            key: 'office-automation/org',
+            label: t.oaOrg,
+            icon: Icons.account_tree_outlined,
+            selectedIcon: Icons.account_tree,
+            path: _bu('office-automation/org'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/external-orgs',
+            label: t.oaExternalOrgs,
+            icon: Icons.apartment_outlined,
+            selectedIcon: Icons.apartment,
+            path: _bu('office-automation/external-orgs'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/archive',
+            label: t.oaArchiveTree,
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            path: _bu('office-automation/archive'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/reports',
+            label: t.oaReports,
+            icon: Icons.bar_chart_outlined,
+            selectedIcon: Icons.bar_chart,
+            path: _bu('office-automation/reports'),
+            type: _MenuItemType.simple,
+          ),
+        ],
+      ),
+      _MenuItem(
+        key: 'fixed-assets',
+        label: t.fixedAssetsMenu,
+        icon: Icons.chair_alt_outlined,
+        selectedIcon: Icons.chair_alt,
+        path: _bu('fixed-assets'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
         key: 'telephony',
-        label: 'مرکز تماس',
+        label: t.telephonyMenu,
         icon: Icons.phone_in_talk_outlined,
         selectedIcon: Icons.phone_in_talk,
         path: _bu('telephony'),
@@ -2106,7 +2370,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'zohal/inquiries',
-        label: 'استعلامات',
+        label: t.inquiries,
         icon: Icons.search_outlined,
         selectedIcon: Icons.search,
         path: _bu('zohal/inquiries'),
@@ -2122,19 +2386,28 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
-        key: 'settings',
-        label: t.settings,
-        icon: Icons.settings,
-        selectedIcon: Icons.settings,
-        path: _bu('settings'),
-        type: _MenuItemType.simple,
-      ),
-      _MenuItem(
         key: 'report-templates',
         label: t.templates,
         icon: Icons.picture_as_pdf,
         selectedIcon: Icons.picture_as_pdf,
         path: _bu('report-templates'),
+        type: _MenuItemType.simple,
+      ),
+      _MenuItem(
+        key: 'plugin-marketplace',
+        label: t.pluginMarketplace,
+        icon: Icons.store,
+        selectedIcon: Icons.store,
+        path: _bu('plugin-marketplace'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'settings',
+        label: t.settings,
+        icon: Icons.settings,
+        selectedIcon: Icons.settings,
+        path: _bu('settings'),
         type: _MenuItemType.simple,
       ),
     ];
@@ -2157,13 +2430,7 @@ class _BusinessShellState extends State<BusinessShell> {
           if (child.path != null &&
               _businessMenuPathMatchesLocation(location, child.path!, widget.businessId)) {
             selectedIndex = i;
-            // تنظیم وضعیت باز بودن منو بر اساس برچسب آیتم
-            if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = true;
-            if (item.label == t.banking) _isBankingExpanded = true;
-            if (item.label == t.accountingMenu) _isAccountingMenuExpanded = true;
-            if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = true;
-            if (item.label == 'هوش مصنوعی') _isAIExpanded = true;
-            if (item.label == 'CRM') _isCrmExpanded = true;
+            _setExpandableMenuOpen(item, true);
             break;
           }
         }
@@ -2204,7 +2471,7 @@ class _BusinessShellState extends State<BusinessShell> {
           if (!context.mounted) return;
           final ctx = context;
           if (GoRouterState.of(ctx).uri.toString() != item.path!) {
-            if (item.label == t.categories) {
+            if (item.key == 'categories') {
               // باز کردن دیالوگ دسته‌بندی‌ها به جای ناوبری
               if (widget.authStore.canReadSection('categories')) {
                 if (!ctx.mounted) return;
@@ -2224,7 +2491,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
           if (!context.mounted) return;
           final ctx = context;
-            if (item.label == t.categories) {
+            if (item.key == 'categories') {
               if (widget.authStore.canReadSection('categories')) {
                 if (!ctx.mounted) return;
                 await showGlassDialog<bool>(
@@ -2240,15 +2507,7 @@ class _BusinessShellState extends State<BusinessShell> {
             }
         }
       } else if (item.type == _MenuItemType.expandable) {
-        // تغییر وضعیت باز/بسته بودن منو
-        setState(() {
-          if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
-          if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
-          if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
-          if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-          if (item.label == 'هوش مصنوعی') _isAIExpanded = !_isAIExpanded;
-          if (item.label == 'CRM') _isCrmExpanded = !_isCrmExpanded;
-        });
+        setState(() => _toggleExpandableMenu(item));
       }
     }
 
@@ -2256,7 +2515,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final parent = menuItems[parentIndex];
       if (parent.type == _MenuItemType.expandable && parent.children != null) {
         final child = parent.children![childIndex];
-        if (child.label == t.categories) {
+        if (child.key == 'categories') {
           if (widget.authStore.canReadSection('categories')) {
             await showGlassDialog<bool>(
               context: context,
@@ -2491,16 +2750,56 @@ class _BusinessShellState extends State<BusinessShell> {
     await _handleInvoiceWizardResult(result);
   }
 
-
-    bool isExpanded(_MenuItem item) {
-      if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
-      if (item.label == t.banking) return _isBankingExpanded;
-      if (item.label == t.accountingMenu) return _isAccountingMenuExpanded;
-      if (item.label == t.warehouseManagement) return _isWarehouseManagementExpanded;
-      if (item.label == 'هوش مصنوعی') return _isAIExpanded;
-      if (item.label == 'CRM') return _isCrmExpanded;
-      return false;
+    void openMenuAddAction(_MenuItem item) {
+      switch (item.key) {
+        case 'persons':
+          showAddPersonDialog();
+        case 'products':
+          showAddProductDialog();
+        case 'accounts':
+          showAddBankAccountDialog();
+        case 'petty-cash':
+          showAddPettyCashDialog();
+        case 'cash-box':
+          showAddCashBoxDialog();
+        case 'wallet':
+          showWalletTopUpDialog();
+        case 'checks':
+          showAddCheckDialog();
+        case 'invoice':
+          context.go(_bu('invoice/new'));
+        case 'receipts-payments':
+          showAddReceiptPaymentDialog();
+        case 'pay-page':
+          showPayPageSendLinkDialog(context: context, businessId: widget.businessId);
+        case 'expense-income':
+          showAddExpenseIncomeDialog();
+        case 'transfers':
+          showAddTransferDialog();
+        case 'documents':
+          showAddDocumentDialog();
+        case 'warehouses':
+          showAddWarehouseDialog();
+        case 'warehouse-docs':
+          showAddWarehouseDocumentDialog();
+        case 'goods-expense-income':
+          context.go(_bu('goods-expense-income'));
+        case 'production-orders':
+          context.go(_bu('production-orders'));
+        case 'crm/process-definitions':
+          context.go('${_bu('crm/process-definitions')}?openAdd=1');
+        case 'crm/leads':
+          context.go('${_bu('crm/leads')}?openAdd=1');
+        case 'crm/deals':
+          context.go('${_bu('crm/deals')}?openAdd=1');
+        case 'crm/activities':
+          context.go('${_bu('crm/activities')}?openAdd=1');
+        case 'loan-facilities':
+          showLoanFacilityCreateDialog();
+      }
     }
+
+    bool isExpanded(_MenuItem item) => _isExpandableMenuOpen(item);
 
     int getTotalMenuItemsCount() {
       int count = 0;
@@ -2533,6 +2832,7 @@ class _BusinessShellState extends State<BusinessShell> {
         );
 
     final appBar = AppBar(
+      primary: false,
       toolbarHeight: _kBizAppBarToolbarHeight,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -2619,6 +2919,12 @@ class _BusinessShellState extends State<BusinessShell> {
           authStore: widget.authStore,
           iconColor: appBarFg,
           denseToolbar: true,
+        ),
+        TelephonyPhoneBarHost(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          pluginActive: _isTelephonyPluginActive(),
+          iconColor: appBarFg,
         ),
         if (!isMobile) ...[
           _bizToolbarIconButton(
@@ -2715,21 +3021,14 @@ class _BusinessShellState extends State<BusinessShell> {
     final Widget businessTopBar = DecoratedBox(
       decoration: BoxDecoration(
         color: secondaryStripBg,
-        border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: isDark ? 0.25 : 0.06),
-            blurRadius: isDark ? 8 : 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: stripBottomBorder)),
       ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(
-            start: 14,
-            end: 14,
+            start: 10,
+            end: 8,
             top: _kBizTabStripVerticalPadding,
             bottom: _kBizTabStripVerticalPadding,
           ),
@@ -2737,71 +3036,24 @@ class _BusinessShellState extends State<BusinessShell> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: isDark ? 0.35 : 0.18),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(7),
-                        child: BusinessShellStorefrontGlyph(size: 18, color: scheme.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        businessName,
-                        style: shellStripTheme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.12,
-                          color: stripTitle,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ],
+                child: _denseBusinessIdentityRow(
+                  theme: shellStripTheme,
+                  cs: scheme,
+                  isDark: isDark,
+                  businessName: businessName,
+                  titleColor: stripTitle,
+                  expanded: true,
                 ),
               ),
               if (!isMobile)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: scheme.surface.withValues(alpha: isDark ? 0.52 : 0.94),
-                    border: Border.all(color: scheme.outline.withValues(alpha: isDark ? 0.42 : 0.26)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(alpha: isDark ? 0.35 : 0.07),
-                        blurRadius: isDark ? 14 : 10,
-                        spreadRadius: -2,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.schedule_rounded, size: 17, color: stripMuted.withValues(alpha: 0.95)),
-                        const SizedBox(width: 9),
-                        Flexible(
-                          child: Text(
-                            dateTimeStr,
-                            style: shellStripTheme.textTheme.bodySmall?.copyWith(
-                              color: stripMuted,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
+                _denseStripMetaCapsule(
+                  cs: scheme,
+                  isDark: isDark,
+                  maxW: 220,
+                  child: _denseDateTimeRow(
+                    theme: shellStripTheme,
+                    muted: stripMuted,
+                    dateTimeStr: dateTimeStr,
                   ),
                 ),
             ],
@@ -2814,45 +3066,48 @@ class _BusinessShellState extends State<BusinessShell> {
     final bool showBizTabs =
         useRail && uiStore.shouldShowTabStrip(widget.businessId, isDesktop: true);
     final Widget shellMainChild = widget.child;
+    final double topInset = MediaQuery.paddingOf(context).top;
     final double topStripHeight = isMobile ? 0 : _kUnifiedBizTabBarHeight;
 
     final PreferredSizeWidget preferredAppBar = PreferredSize(
-      preferredSize: Size.fromHeight(topStripHeight + _kBizAppBarToolbarHeight),
+      preferredSize: Size.fromHeight(topInset + _kBizAppBarToolbarHeight + topStripHeight),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
-          appBar,
-          if (showBizTabs)
-            _buildUnifiedDesktopTabStrip(
-              context: context,
-              menuRoot: allMenuItems,
-              barBg: secondaryStripBg,
-              stripBottomBorder: stripBottomBorder,
-              businessName: businessName,
-              dateTimeStr: dateTimeStr,
-              isMobile: isMobile,
-            )
-          else if (!isMobile)
-            businessTopBar,
+          if (topInset > 0) SizedBox(height: topInset),
+          SizedBox(
+            height: _kBizAppBarToolbarHeight,
+            child: appBar,
+          ),
+          if (!isMobile)
+            SizedBox(
+              height: _kUnifiedBizTabBarHeight,
+              child: showBizTabs
+                  ? _buildUnifiedDesktopTabStrip(
+                      context: context,
+                      menuRoot: allMenuItems,
+                      barBg: secondaryStripBg,
+                      stripBottomBorder: stripBottomBorder,
+                      businessName: businessName,
+                      dateTimeStr: dateTimeStr,
+                      isMobile: isMobile,
+                    )
+                  : businessTopBar,
+            ),
         ],
       ),
     );
 
-    final content = Container(
+    // Overlayهای تلفن وقتی غیرفعال‌اند SizedBox.shrink برمی‌گردانند (غیر Positioned).
+    // Stack با fit پیش‌فرض در قید شل، خودش را به همان صفر جمع می‌کند و ناوبری دیده نمی‌شود.
+    final content = ColoredBox(
       color: scheme.surface,
       child: SafeArea(
+        top: false,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            Column(
-              children: [
-                TelephonyPhoneBarHost(
-                  businessId: widget.businessId,
-                  authStore: widget.authStore,
-                  pluginActive: _isTelephonyPluginActive(),
-                ),
-                Expanded(child: shellMainChild),
-              ],
-            ),
+            SizedBox.expand(child: shellMainChild),
             TelephonyScreenPopLayer(
               businessId: widget.businessId,
               authStore: widget.authStore,
@@ -2869,6 +3124,8 @@ class _BusinessShellState extends State<BusinessShell> {
     );
 
     // Side colors and styles
+    final nav = context.shellNav;
+    final textTheme = Theme.of(context).textTheme;
     final Color sideBg = Theme.of(context).brightness == Brightness.dark
         ? scheme.surfaceContainerHighest
         : scheme.surfaceContainerLow;
@@ -2887,11 +3144,11 @@ class _BusinessShellState extends State<BusinessShell> {
           children: [
             if (_desktopRailVisible) ...[
             Container(
-              width: railExtended ? 240 : 72,
+              width: nav.widthFor(extended: railExtended),
               height: double.infinity,
               color: sideBg,
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: nav.listPadding,
                 itemCount: getTotalMenuItemsCount(),
                 itemBuilder: (ctx, index) {
                   // محاسبه ایندکس منو و تشخیص نوع آیتم
@@ -2926,9 +3183,9 @@ class _BusinessShellState extends State<BusinessShell> {
                   final bool isHovered = index == _hoverIndex;
                   final bool isSelected = menuIndex == selectedIndex;
                   final bool active = isSelected || isHovered;
-                  final BorderRadius br = (isSelected && useRail)
-                      ? BorderRadius.zero
-                      : (isHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                  final BorderRadius br = nav.itemBorderRadius(
+                    flush: isSelected || isHovered,
+                  );
                   final Color bgColor = active
                       ? (isHovered && !isSelected ? activeBg.withValues(alpha: 0.85) : activeBg)
                       : Colors.transparent;
@@ -2940,9 +3197,9 @@ class _BusinessShellState extends State<BusinessShell> {
                         _businessMenuPathMatchesLocation(location, child.path!, widget.businessId);
                     final bool isChildHovered = index == _hoverIndex;
                     final bool isChildActive = isChildSelected || isChildHovered;
-                    final BorderRadius childBr = isChildSelected
-                        ? BorderRadius.zero
-                        : (isChildHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                    final BorderRadius childBr = nav.itemBorderRadius(
+                      flush: isChildSelected || isChildHovered,
+                    );
                     final Color childBgColor = isChildActive
                         ? (isChildHovered && !isChildSelected 
                             ? (isDark ? activeBg.withValues(alpha: 0.5) : activeBg.withValues(alpha: 0.7))
@@ -2967,10 +3224,7 @@ class _BusinessShellState extends State<BusinessShell> {
                               : null,
                           child: Container(
                             margin: EdgeInsets.zero,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: railExtended ? 32 : 20,
-                              vertical: 10,
-                            ),
+                            padding: nav.childPaddingFor(extended: railExtended),
                             decoration: BoxDecoration(
                               color: childBgColor,
                               borderRadius: childBr,
@@ -2984,82 +3238,31 @@ class _BusinessShellState extends State<BusinessShell> {
                                   _buildSidebarMenuIcon(
                                     child,
                                     color: isChildActive ? activeFg : sideFg,
-                                    size: railExtended ? 20 : 22,
+                                    size: nav.iconSizeFor(extended: railExtended, child: true),
                                     active: isChildActive,
                                   ),
                                   if (railExtended) ...[
-                                    const SizedBox(width: 12),
+                                    SizedBox(width: nav.iconLabelGap),
                                     Expanded(
                                       child: Text(
                                         child.label,
-                                        style: TextStyle(
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: nav.childLabelStyle(
+                                          textTheme,
                                           color: isChildActive ? activeFg : sideFg,
-                                          fontWeight: isChildActive ? FontWeight.w600 : FontWeight.w400,
-                                          fontSize: 13,
+                                          active: isChildActive,
                                         ),
                                       ),
                                     ),
-                                    if (child.hasAddButton && _canAddForSection(_sectionForLabel(child.label, t)))
-                                      GestureDetector(
-                                        onTap: () {
-                                          // Navigate to add new item
-                                          if (child.label == t.personsList) {
-                                            showAddPersonDialog();
-                                          } else if (child.label == t.products) {
-                                            showAddProductDialog();
-                                          } else if (child.label == t.categories) {
-                                            // Navigate to add category
-                                          } else if (child.label == t.productAttributes) {
-                                            // Navigate to add product attribute
-                                          } else if (child.label == t.accounts) {
-                                            showAddBankAccountDialog();
-                                          } else if (child.label == t.pettyCash) {
-                                            showAddPettyCashDialog();
-                                          } else if (child.label == t.cashBox) {
-                                            showAddCashBoxDialog();
-                                          } else if (child.label == t.wallet) {
-                                            showWalletTopUpDialog();
-                                          } else if (child.label == t.checks) {
-                                            showAddCheckDialog();
-                                          } else if (child.label == t.invoice) {
-                                            context.go(_bu('invoice/new'));
-                                          } else if (child.label == t.receiptsAndPayments) {
-                                            showAddReceiptPaymentDialog();
-                                          } else if (child.label == t.expenseAndIncome) {
-                                            showAddExpenseIncomeDialog();
-                                          } else if (child.label == t.warehouses) {
-                                            showAddWarehouseDialog();
-                                          } else if (child.label == 'حواله‌های انبار') {
-                                            showAddWarehouseDocumentDialog();
-                                          } else if (child.label == 'کالای هزینه/درآمد شده') {
-                                            context.go(_bu('goods-expense-income'));
-                                          } else if (child.label == 'فرایندها و مراحل قیف') {
-                                            context.go('${_bu('crm/process-definitions')}?openAdd=1');
-                                          } else if (child.label == 'سرنخ‌ها') {
-                                            context.go('${_bu('crm/leads')}?openAdd=1');
-                                          } else if (child.label == 'فرصت‌های فروش') {
-                                            context.go('${_bu('crm/deals')}?openAdd=1');
-                                          } else if (child.label == 'فعالیت‌ها') {
-                                            context.go('${_bu('crm/activities')}?openAdd=1');
-                                          } else if (child.label == t.loanFacilities) {
-                                            showLoanFacilityCreateDialog();
-                                          }
-                                        },
-                                        child: Container(
-                                          width: 22,
-                                          height: 22,
-                                          decoration: BoxDecoration(
-                                            color: isChildActive 
-                                                ? activeFg.withValues(alpha: 0.15)
-                                                : sideFg.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Icon(
-                                            Icons.add,
-                                            size: 14,
-                                            color: isChildActive ? activeFg : sideFg,
-                                          ),
-                                        ),
+                                    if (child.hasAddButton && _canShowMenuAddButton(child))
+                                      _sidebarAddAffordance(
+                                        nav: nav,
+                                        foreground: isChildActive ? activeFg : sideFg,
+                                        background: isChildActive
+                                            ? activeFg.withValues(alpha: 0.15)
+                                            : sideFg.withValues(alpha: 0.1),
+                                        onTap: () => openMenuAddAction(child),
                                       ),
                                   ],
                                 ],
@@ -3074,10 +3277,7 @@ class _BusinessShellState extends State<BusinessShell> {
                     if (item.type == _MenuItemType.separator) {
                       // آیتم جداکننده
                       return Container(
-                        margin: EdgeInsets.symmetric(
-                          horizontal: railExtended ? 16 : 8,
-                          vertical: 12,
-                        ),
+                        margin: nav.separatorPaddingFor(extended: railExtended),
                         child: Row(
                           children: [
                             if (railExtended) ...[
@@ -3087,17 +3287,15 @@ class _BusinessShellState extends State<BusinessShell> {
                                   thickness: 1,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: nav.iconLabelGap),
                               Text(
                                 item.label,
-                                style: TextStyle(
+                                style: nav.separatorLabelStyle(
+                                  textTheme,
                                   color: sideFg.withValues(alpha: 0.7),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: nav.iconLabelGap),
                               Expanded(
                                 child: Divider(
                                   color: sideFg.withValues(alpha: 0.3),
@@ -3117,6 +3315,13 @@ class _BusinessShellState extends State<BusinessShell> {
                       );
                     } else {
                       // آیتم ساده یا آیتم بازشونده
+                      final chrome = _sidebarItemChrome(
+                        item,
+                        selected: isSelected,
+                        hovered: isHovered,
+                        fallbackFg: active ? activeFg : sideFg,
+                        fallbackBg: bgColor,
+                      );
                       Widget menuItemWidget = MouseRegion(
                         onEnter: (_) => setState(() => _hoverIndex = index),
                         onExit: (_) => setState(() => _hoverIndex = -1),
@@ -3124,15 +3329,7 @@ class _BusinessShellState extends State<BusinessShell> {
                           borderRadius: br,
                           onTap: () {
                             if (item.type == _MenuItemType.expandable) {
-                              // در همه حالت‌ها (Rail و Extended) expand/collapse می‌کنیم
-                              setState(() {
-                                if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
-                                if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
-                                if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
-                                if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-                                if (item.label == 'هوش مصنوعی') _isAIExpanded = !_isAIExpanded;
-                                if (item.label == 'CRM') _isCrmExpanded = !_isCrmExpanded;
-                              });
+                              setState(() => _toggleExpandableMenu(item));
                             } else {
                               onSelect(menuIndex, longPress: false);
                             }
@@ -3148,12 +3345,9 @@ class _BusinessShellState extends State<BusinessShell> {
                               : () => onSelect(menuIndex, longPress: true),
                           child: Container(
                             margin: EdgeInsets.zero,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: railExtended ? 16 : 0,
-                              vertical: 12,
-                            ),
+                            padding: nav.parentPaddingFor(extended: railExtended),
                             decoration: BoxDecoration(
-                              color: bgColor,
+                              color: chrome.bg,
                               borderRadius: br,
                             ),
                             child: Row(
@@ -3164,18 +3358,18 @@ class _BusinessShellState extends State<BusinessShell> {
                                   children: [
                                     _buildSidebarMenuIcon(
                                       item,
-                                      color: active ? activeFg : sideFg,
-                                      size: railExtended ? 24 : 28,
+                                      color: chrome.fg,
+                                      size: nav.iconSizeFor(extended: railExtended, child: false),
                                       active: active,
                                     ),
                                     // آیکون expand/collapse کوچک در گوشه برای حالت Rail
                                     if (!railExtended && item.type == _MenuItemType.expandable)
                                       Positioned(
-                                        right: -4,
-                                        bottom: -4,
+                                        right: -3,
+                                        bottom: -3,
                                         child: Container(
-                                          width: 14,
-                                          height: 14,
+                                          width: nav.expandBadgeSize,
+                                          height: nav.expandBadgeSize,
                                           decoration: BoxDecoration(
                                             color: sideBg,
                                             shape: BoxShape.circle,
@@ -3191,7 +3385,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                             child: Icon(
                                               Icons.expand_more,
                                               color: sideFg,
-                                              size: 10,
+                                              size: nav.expandBadgeSize - 2,
                                             ),
                                           ),
                                         ),
@@ -3199,14 +3393,17 @@ class _BusinessShellState extends State<BusinessShell> {
                                   ],
                                 ),
                                 if (railExtended) ...[
-                                  const SizedBox(width: 12),
+                                  SizedBox(width: nav.iconLabelGap),
                                   Expanded(
                                     child: Text(
                                       item.label,
-                                      style: TextStyle(
-                                        color: active ? activeFg : sideFg,
-                                        fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                                        fontSize: 14,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: nav.parentLabelStyle(
+                                        textTheme,
+                                        color: chrome.fg,
+                                        active: active ||
+                                            context.shellColors.sidebarFooterForeground(item.key) != null,
                                       ),
                                     ),
                                   ),
@@ -3218,49 +3415,18 @@ class _BusinessShellState extends State<BusinessShell> {
                                       child: Icon(
                                         Icons.expand_more,
                                         color: sideFg,
-                                        size: 20,
+                                        size: nav.expandIconSize,
                                       ),
                                     )
                                   else if (item.hasAddButton)
                                     Builder(builder: (ctx) {
-                                      final section = _sectionForLabel(item.label, t);
-                                      final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
+                                      final canAdd = _canShowMenuAddButton(item);
                                       if (!canAdd) return const SizedBox.shrink();
-                                      return GestureDetector(
-                                        onTap: () {
-                                          if (item.label == t.people) {
-                                            showAddPersonDialog();
-                                          } else if (item.label == t.accounts) {
-                                            showAddBankAccountDialog();
-                                          } else if (item.label == t.cashBox) {
-                                            showAddCashBoxDialog();
-                                          } else if (item.label == t.invoice) {
-                                            context.go(_bu('invoice/new'));
-                                          } else if (item.label == t.receiptsAndPayments) {
-                                            showAddReceiptPaymentDialog();
-                                          } else if (item.label == t.expenseAndIncome) {
-                                            showAddExpenseIncomeDialog();
-                                          } else if (item.label == t.transfers) {
-                                            showAddTransferDialog();
-                                          } else if (item.label == t.checks) {
-                                            showAddCheckDialog();
-                                          } else if (item.label == t.documents) {
-                                            showAddDocumentDialog();
-                                          }
-                                        },
-                                        child: Container(
-                                          width: 24,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            color: sideFg.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Icon(
-                                            Icons.add,
-                                            size: 16,
-                                            color: sideFg,
-                                          ),
-                                        ),
+                                      return _sidebarAddAffordance(
+                                        nav: nav,
+                                        foreground: sideFg,
+                                        background: sideFg.withValues(alpha: 0.1),
+                                        onTap: () => openMenuAddAction(item),
                                       );
                                     }),
                                 ],
@@ -3304,14 +3470,14 @@ class _BusinessShellState extends State<BusinessShell> {
         backgroundColor: sideBg,
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: nav.listPadding,
             children: [
               if (launcherHomePath != null) ...[
                 ListTile(
-                  leading: Icon(Icons.apps_rounded, color: sideFg),
+                  leading: Icon(Icons.apps_rounded, color: sideFg, size: nav.parentIconExtended),
                   title: Text(
                     t.businessShellBackToLauncher,
-                    style: TextStyle(color: sideFg, fontWeight: FontWeight.w600),
+                    style: nav.parentLabelStyle(textTheme, color: sideFg, active: true),
                   ),
                   onTap: () {
                     context.pop();
@@ -3329,7 +3495,7 @@ class _BusinessShellState extends State<BusinessShell> {
                   if (item.type == _MenuItemType.separator) {
                     // آیتم جداکننده در منوی موبایل
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: nav.separatorPaddingExtended,
                       child: Row(
                         children: [
                           Expanded(
@@ -3338,16 +3504,15 @@ class _BusinessShellState extends State<BusinessShell> {
                               thickness: 1,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: nav.iconLabelGap),
                           Text(
                             item.label,
-                            style: TextStyle(
+                            style: nav.separatorLabelStyle(
+                              textTheme,
                               color: sideFg.withValues(alpha: 0.7),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: nav.iconLabelGap),
                           Expanded(
                             child: Divider(
                               color: sideFg.withValues(alpha: 0.3),
@@ -3358,51 +3523,44 @@ class _BusinessShellState extends State<BusinessShell> {
                       ),
                     );
                   } else if (item.type == _MenuItemType.simple) {
-                    final section = _sectionForLabel(item.label, t);
-                    final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
+                    final canAdd = _canShowMenuAddButton(item);
+                    final chrome = _sidebarItemChrome(
+                      item,
+                      selected: active,
+                      hovered: false,
+                      fallbackFg: active ? activeFg : sideFg,
+                      fallbackBg: active ? activeBg : Colors.transparent,
+                    );
                     return ListTile(
                       leading: _buildSidebarMenuIcon(
                         item,
-                        color: active ? activeFg : sideFg,
-                        size: 24,
+                        color: chrome.fg,
+                        size: nav.iconSizeFor(extended: true, child: false),
                         active: active,
                       ),
-                      title: Text(item.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
+                      title: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: nav.parentLabelStyle(
+                          textTheme,
+                          color: chrome.fg,
+                          active: active ||
+                              context.shellColors.sidebarFooterForeground(item.key) != null,
+                        ),
+                      ),
                       selected: active,
-                      selectedTileColor: activeBg,
+                      tileColor: chrome.bg,
+                      selectedTileColor: chrome.bg,
                       trailing: (item.hasAddButton && canAdd)
-                          ? GestureDetector(
+                          ? _sidebarAddAffordance(
+                              nav: nav,
+                              foreground: sideFg,
+                              background: sideFg.withValues(alpha: 0.1),
                               onTap: () {
                                 context.pop();
-                                // در حال حاضر فقط اشخاص پشتیبانی می‌شود
-                                if (item.label == t.people) {
-                                  showAddPersonDialog();
-                                } else if (item.label == t.invoice) {
-                                  // Navigate to add invoice
-                                  context.go(_bu('invoice/new'));
-                                } else if (item.label == t.expenseAndIncome) {
-                                  // Show add expense/income dialog
-                                  showAddExpenseIncomeDialog();
-                                } else if (item.label == t.transfers) {
-                                  // Show add transfer dialog
-                                  showAddTransferDialog();
-                                } else if (item.label == t.checks) {
-                                  // Show add check dialog
-                                  showAddCheckDialog();
-                                } else if (item.label == t.documents) {
-                                  // Show add document dialog
-                                  showAddDocumentDialog();
-                                }
+                                openMenuAddAction(item);
                               },
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: sideFg.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Icon(Icons.add, size: 16, color: sideFg),
-                              ),
                             )
                           : null,
                       onTap: () {
@@ -3414,95 +3572,44 @@ class _BusinessShellState extends State<BusinessShell> {
                     // فیلتر کردن زیرآیتم‌ها بر اساس دسترسی
                     final visibleChildren = (item.children ?? []).where((child) => _hasAccessToMenuItem(child)).toList();
                     return ExpansionTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      tilePadding: nav.parentPaddingExtended,
+                      childrenPadding: EdgeInsetsDirectional.only(start: nav.iconLabelGap),
                       leading: _buildSidebarMenuIcon(
                         item,
                         color: sideFg,
-                        size: 24,
+                        size: nav.iconSizeFor(extended: true, child: false),
                         active: false,
                       ),
-                      title: Text(item.label, style: TextStyle(color: sideFg)),
+                      title: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: nav.parentLabelStyle(textTheme, color: sideFg, active: false),
+                      ),
                       initiallyExpanded: isExpanded(item),
                       onExpansionChanged: (expanded) {
-                        setState(() {
-                          if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = expanded;
-                          if (item.label == t.banking) _isBankingExpanded = expanded;
-                          if (item.label == t.accountingMenu) _isAccountingMenuExpanded = expanded;
-                          if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = expanded;
-                          if (item.label == 'هوش مصنوعی') _isAIExpanded = expanded;
-                          if (item.label == 'CRM') _isCrmExpanded = expanded;
-                        });
+                        setState(() => _setExpandableMenuOpen(item, expanded));
                       },
                       children: visibleChildren.map((child) {
-                        final childSection = _sectionForLabel(child.label, t);
-                        final childCanAdd = child.hasAddButton && _canAddForSection(childSection);
+                        final childCanAdd = child.hasAddButton && _canShowMenuAddButton(child);
                         return ListTile(
-                        leading: const SizedBox(width: 24),
-                        title: Text(child.label),
-                        trailing: childCanAdd ? GestureDetector(
+                        leading: SizedBox(width: nav.childIconExtended),
+                        title: Text(
+                          child.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: nav.childLabelStyle(textTheme, color: sideFg, active: false),
+                        ),
+                        trailing: childCanAdd ? _sidebarAddAffordance(
+                          nav: nav,
+                          foreground: sideFg,
+                          background: sideFg.withValues(alpha: 0.1),
                           onTap: () {
                             context.pop();
-                            // Navigate to add new item
-                            if (child.label == t.products) {
-                              // Show add product dialog
-                              showAddProductDialog();
-                            } else if (child.label == t.categories) {
-                              // Navigate to add category
-                            } else if (child.label == t.productAttributes) {
-                              // Navigate to add product attribute
-                            } else if (child.label == t.accounts) {
-                              // Open add bank account dialog
-                              showAddBankAccountDialog();
-                            } else if (child.label == t.pettyCash) {
-                              // Open add petty cash dialog
-                              showAddPettyCashDialog();
-                            } else if (child.label == t.cashBox) {
-                              // Open add cash register dialog
-                              showAddCashBoxDialog();
-                            } else if (child.label == t.wallet) {
-                              // Show wallet top-up dialog
-                              showWalletTopUpDialog();
-                            } else if (child.label == t.checks) {
-                              // Navigate to add check
-                            } else if (child.label == t.invoice) {
-                              // Navigate to add invoice
-                              context.go(_bu('invoice/new'));
-                            } else if (child.label == t.receiptsAndPayments) {
-                              // Show add receipt payment dialog
-                              showAddReceiptPaymentDialog();
-                            } else if (child.label == t.expenseAndIncome) {
-                              // Show add expense/income dialog
-                              showAddExpenseIncomeDialog();
-                            } else if (child.label == t.warehouses) {
-                              // Show add warehouse dialog
-                              showAddWarehouseDialog();
-                            } else if (child.label == 'حواله‌های انبار') {
-                              // Show add warehouse document dialog
-                              showAddWarehouseDocumentDialog();
-                            } else if (child.label == 'فرایندها و مراحل قیف') {
-                              context.go('${_bu('crm/process-definitions')}?openAdd=1');
-                            } else if (child.label == 'سرنخ‌ها') {
-                              context.go('${_bu('crm/leads')}?openAdd=1');
-                            } else if (child.label == 'فرصت‌های فروش') {
-                              context.go('${_bu('crm/deals')}?openAdd=1');
-                            } else if (child.label == 'فعالیت‌ها') {
-                              context.go('${_bu('crm/activities')}?openAdd=1');
-                            } else if (child.label == t.loanFacilities) {
-                              showLoanFacilityCreateDialog();
-                            }
+                            openMenuAddAction(child);
                           },
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: sideFg.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Icon(
-                              Icons.add,
-                              size: 16,
-                              color: sideFg,
-                            ),
-                          ),
                         ) : null,
                         onTap: () {
                           context.pop();
@@ -3614,6 +3721,46 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  String _expandableMenuKey(_MenuItem item) {
+    final key = item.key?.trim();
+    if (key != null && key.isNotEmpty) return key;
+    return item.label;
+  }
+
+  bool _isExpandableMenuOpen(_MenuItem item) =>
+      _expandedMenuByKey[_expandableMenuKey(item)] ?? false;
+
+  void _setExpandableMenuOpen(_MenuItem item, bool open) {
+    _expandedMenuByKey[_expandableMenuKey(item)] = open;
+  }
+
+  void _toggleExpandableMenu(_MenuItem item) {
+    final key = _expandableMenuKey(item);
+    _expandedMenuByKey[key] = !(_expandedMenuByKey[key] ?? false);
+  }
+
+  Widget _sidebarAddAffordance({
+    required AppShellNavMetrics nav,
+    required Color foreground,
+    required Color background,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(nav.addButtonRadius),
+        ),
+        child: SizedBox(
+          width: nav.addButtonSize,
+          height: nav.addButtonSize,
+          child: Icon(Icons.add, size: nav.addIconSize, color: foreground),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSidebarMenuIcon(
     _MenuItem item, {
     required Color color,
@@ -3689,7 +3836,7 @@ class _BusinessShellState extends State<BusinessShell> {
         .toList();
 
     final order = _menuPreferences.rootOrder;
-    if (order.isEmpty) return visibleRoot;
+    if (order.isEmpty) return _pinSidebarFooterItems(visibleRoot);
     final byKey = <String, _MenuItem>{for (final it in visibleRoot) _menuKey(it): it};
     final nonSepKeys =
         byKey.entries.where((e) => e.value.type != _MenuItemType.separator).map((e) => e.key).toSet();
@@ -3698,7 +3845,7 @@ class _BusinessShellState extends State<BusinessShell> {
         order.where(nonSepKeys.contains).length;
     final knownCount = knownNonSep;
     if (knownCount < 3 || knownCount * 3 < byKey.length) {
-      return visibleRoot;
+      return _pinSidebarFooterItems(visibleRoot);
     }
     final out = <_MenuItem>[];
     for (final key in order) {
@@ -3706,7 +3853,51 @@ class _BusinessShellState extends State<BusinessShell> {
       if (found != null) out.add(found);
     }
     out.addAll(byKey.values);
-    return out;
+    return _pinSidebarFooterItems(out);
+  }
+
+  /// بازار افزونه‌ها و تنظیمات همیشه انتهای منوی کناری می‌مانند.
+  List<_MenuItem> _pinSidebarFooterItems(List<_MenuItem> items) {
+    const footerKeys = ['plugin-marketplace', 'settings'];
+    final footer = <String, _MenuItem>{};
+    final rest = <_MenuItem>[];
+    for (final it in items) {
+      final key = it.key;
+      if (key != null && footerKeys.contains(key)) {
+        footer[key] = it;
+      } else {
+        rest.add(it);
+      }
+    }
+    for (final key in footerKeys) {
+      final found = footer[key];
+      if (found != null) rest.add(found);
+    }
+    return rest;
+  }
+
+  ({Color fg, Color bg}) _sidebarItemChrome(
+    _MenuItem item, {
+    required bool selected,
+    required bool hovered,
+    required Color fallbackFg,
+    required Color fallbackBg,
+  }) {
+    final shell = context.shellColors;
+    final fg = shell.sidebarFooterForeground(item.key);
+    final fill = shell.sidebarFooterFill(item.key);
+    if (fg == null || fill == null) {
+      return (fg: fallbackFg, bg: fallbackBg);
+    }
+    final Color bg;
+    if (selected) {
+      bg = Color.alphaBlend(fg.withValues(alpha: 0.22), fill);
+    } else if (hovered) {
+      bg = Color.alphaBlend(fg.withValues(alpha: 0.10), fill);
+    } else {
+      bg = fill;
+    }
+    return (fg: fg, bg: bg);
   }
 
   // فیلتر کردن منو بر اساس دسترسی‌ها
@@ -3735,6 +3926,12 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _hasAccessToMenuItem(_MenuItem item) {
     final t = AppLocalizations.of(context);
+    if (item.key == 'pay-page') {
+      if (!_payPageEnabled) return false;
+      if (_isBusinessOwner()) return true;
+      return widget.authStore.canReadSection('people_transactions') ||
+          widget.authStore.hasBusinessPermission('settings', 'join');
+    }
     final section = _sectionForMenuItem(item, t);
 
     if (item.path != null && item.path!.contains('/woocommerce')) {
@@ -3745,6 +3942,16 @@ class _BusinessShellState extends State<BusinessShell> {
         return true;
       }
       return widget.authStore.hasBusinessPermission('woocommerce', 'view');
+    }
+
+    if (item.path != null && item.path!.contains('/digipay')) {
+      if (!_isDigipayPluginActive()) {
+        return false;
+      }
+      if (widget.authStore.currentBusiness?.isOwner == true) {
+        return true;
+      }
+      return widget.authStore.hasBusinessPermission('digipay', 'view');
     }
 
     if (item.path != null && item.path!.contains('/crm/web-chat')) {
@@ -3794,6 +4001,30 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    if (section == 'procurement') {
+      if (!_showPluginGatedMenu(_isProcurementPluginActive())) {
+        return false;
+      }
+    }
+
+    if (section == 'advanced_production') {
+      if (!_showPluginGatedMenu(_isAdvancedProductionPluginActive())) {
+        return false;
+      }
+    }
+
+    if (section == 'office_automation') {
+      if (!_showPluginGatedMenu(_isOfficeAutomationPluginActive())) {
+        return false;
+      }
+    }
+
+    if (section == 'fixed_assets') {
+      if (!_showPluginGatedMenu(_isFixedAssetsPluginActive())) {
+        return false;
+      }
+    }
+
     // طراحی برچسب بارکد
     if (section == 'barcode_labels') {
       if (!_showPluginGatedMenu(_isPluginCodeLicensed('barcode_label_studio'))) {
@@ -3825,6 +4056,14 @@ class _BusinessShellState extends State<BusinessShell> {
         return false;
       }
     }
+
+    if (_isAdvancedAccountingMenuItem(item)) {
+      if (!_showPluginGatedMenu(
+        _isPluginCodeLicensed(kAdvancedAccountingPluginCode),
+      )) {
+        return false;
+      }
+    }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
@@ -3839,7 +4078,7 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // برای کاربران عضو، بررسی دسترسی
     // تنظیمات: نیازمند دسترسی join
-    if (section == 'settings' && item.label == AppLocalizations.of(context).settings) {
+    if (section == 'settings' && item.key == 'settings') {
       final hasJoin = widget.authStore.hasBusinessPermission('settings', 'join');
       final canManageDefaultShortcuts = widget.authStore.hasBusinessPermission(
         'quick_sales',
@@ -3849,7 +4088,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     
     // استعلامات: نیازمند دسترسی read برای settings
-    if (section == 'settings' && (item.label == 'استعلامات' || item.label == 'Inquiries')) {
+    if (section == 'settings' && item.key == 'zohal/inquiries') {
       final hasRead = widget.authStore.hasBusinessPermission('settings', 'read') || 
                       widget.authStore.hasBusinessPermission('settings', 'join');
       return hasRead;
@@ -3897,35 +4136,122 @@ class _BusinessShellState extends State<BusinessShell> {
 
   // تبدیل کلید/برچسب منو به کلید سکشن دسترسی
   String? _sectionForMenuItem(_MenuItem item, AppLocalizations t) {
-    switch (item.key) {
-      case 'hscript':
-        return 'reports';
-      case 'payroll':
-        return 'payroll';
-      case 'barcode-labels':
-        return 'barcode_labels';
-      case 'telephony':
-        return 'telephony';
-      case 'customer-club':
-        return 'customer_club';
-      case 'repair-shop':
-        return 'repair_shop';
-      case 'warranty':
-        return 'warranty';
-      case 'distribution':
-        return 'distribution';
-      case 'tax-workspace':
-        return 'moadian';
-      case 'plugin-marketplace':
-        return 'marketplace';
-      case 'sepidar-import':
-        return 'sepidar';
+    final key = item.key;
+    if (key != null) {
+      if (key.startsWith('crm/') || key == 'group:crm') return 'crm';
+      if (key.startsWith('ai/') || key == 'group:ai') return 'ai';
+      if (key.startsWith('office-automation') || key == 'group:office-automation') {
+        return 'office_automation';
+      }
+      switch (key) {
+        case 'persons':
+          return 'people';
+        case 'products':
+        case 'product-bundles':
+        case 'catalog-spec-fields':
+          return 'products';
+        case 'categories':
+          return 'categories';
+        case 'product-attributes':
+          return 'product_attributes';
+        case 'barcode-labels':
+          return 'barcode_labels';
+        case 'accounts':
+          return 'bank_accounts';
+        case 'petty-cash':
+          return 'petty_cash';
+        case 'cash-box':
+          return 'cash';
+        case 'wallet':
+          return 'wallet';
+        case 'loan-facilities':
+          return 'loan_facilities';
+        case 'quick-sales':
+        case 'invoice':
+          return 'invoices';
+        case 'receipts-payments':
+          return 'people_transactions';
+        case 'pay-page':
+          return 'people_transactions';
+        case 'expense-income':
+          return 'expenses_income';
+        case 'transfers':
+          return 'transfers';
+        case 'checks':
+          return 'checks';
+        case 'documents':
+          return 'accounting_documents';
+        case 'chart-of-accounts':
+          return 'chart_of_accounts';
+        case 'opening-balance':
+          return 'opening_balance';
+        case 'year-end-closing':
+          return 'fiscal_years';
+        case 'currency-revaluation':
+          return 'currency_revaluation';
+        case 'reports':
+        case 'hscript':
+          return 'reports';
+        case 'basalam':
+          return 'basalam';
+        case 'woocommerce':
+          return 'woocommerce';
+        case 'digipay':
+          return 'digipay';
+        case 'warehouses':
+          return 'warehouses';
+        case 'warehouse-docs':
+        case 'stock-count':
+          return 'warehouse_transfers';
+        case 'quick-sales-stock-discrepancies':
+        case 'production-orders':
+          return 'inventory';
+        case 'goods-expense-income':
+          return 'goods_expense_income';
+        case 'storage-files':
+          return 'storage';
+        case 'tax-workspace':
+          return 'moadian';
+        case 'workflows':
+        case 'zohal/inquiries':
+        case 'settings':
+          return 'settings';
+        case 'warranty':
+          return 'warranty';
+        case 'repair-shop':
+          return 'repair_shop';
+        case 'customer-club':
+          return 'customer_club';
+        case 'payroll':
+          return 'payroll';
+        case 'procurement':
+          return 'procurement';
+        case 'advanced-production':
+          return 'advanced_production';
+        case 'fixed-assets':
+          return 'fixed_assets';
+        case 'telephony':
+          return 'telephony';
+        case 'distribution':
+          return 'distribution';
+        case 'report-templates':
+          return 'report_templates';
+        case 'sepidar-import':
+          return 'sepidar';
+        case 'plugin-marketplace':
+          return 'marketplace';
+      }
     }
     final path = item.path;
     if (path != null) {
+      if (path.contains('/report-templates')) return 'report_templates';
       if (path.contains('/projects') || path.contains('/tasks')) return 'projects';
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/procurement')) return 'procurement';
+      if (path.contains('/advanced-production')) return 'advanced_production';
+      if (path.contains('/office-automation')) return 'office_automation';
+      if (path.contains('/fixed-assets')) return 'fixed_assets';
       if (path.contains('/barcode-labels')) return 'barcode_labels';
       if (path.contains('/telephony')) return 'telephony';
       if (path.contains('/customer-club')) return 'customer_club';
@@ -3933,29 +4259,36 @@ class _BusinessShellState extends State<BusinessShell> {
       if (path.contains('/warranty')) return 'warranty';
       if (path.contains('/distribution')) return 'distribution';
       if (path.contains('/tax-workspace')) return 'moadian';
+      if (path.contains('/crm/')) return 'crm';
+      if (path.contains('/ai/')) return 'ai';
     }
     return _sectionForLabel(item.label, t);
   }
 
-  // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
+  // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی (پشتیبان برای آیتم بدون کلید)
   String? _sectionForLabel(String label, AppLocalizations t) {
-    if (label == t.reports) return 'reports';
-    if (label == 'گزارش‌ساز اسکریپتی' || label == 'HScript Reports') return 'reports';
+    if (label == t.reports || label == t.reportsHscriptTitle) return 'reports';
     if (label == t.people) return 'people';
-    if (label == 'CRM' ||
-        label == 'داشبورد' ||
-        label == 'فرایندها و مراحل قیف' ||
-        label == 'فرایندها و مراحل قیف' ||
-        label == 'سرنخ‌ها' ||
-        label == 'فرصت‌های فروش' ||
-        label == 'فعالیت‌ها' ||
-        label == 'گزارشات' ||
+    if (label == t.crmMenu ||
+        label == t.crmMenuDashboard ||
+        label == t.crmMenuProcessDefinitions ||
+        label == t.crmMenuLeads ||
+        label == t.crmMenuDeals ||
+        label == t.crmMenuActivities ||
+        label == t.crmMenuReports ||
         label == t.crmMenuNotesCalendar ||
-        label == 'چت وب') {
+        label == t.crmMenuWebChat ||
+        label == t.crmMenuTasks ||
+        label == t.crmMenuCustomer360 ||
+        label == t.crmMenuSequences ||
+        label == t.crmMenuEnterprise) {
       return 'crm';
     }
-    if (label == t.products) return 'products';
-    if (label == 'باندل‌های کالا' || label == 'Product bundles') return 'products';
+    if (label == t.products ||
+        label == t.productBundlesMenu ||
+        label == t.catalogSpecFieldsMenu) {
+      return 'products';
+    }
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';
     if (label == t.accounts) return 'bank_accounts';
@@ -3964,8 +4297,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.wallet) return 'wallet';
     if (label == t.loanFacilities) return 'loan_facilities';
     if (label == t.checks) return 'checks';
-    if (label == 'فروش سریع') return 'invoices'; // فروش سریع نیازمند دسترسی invoices.add است
-    if (label == t.invoice) return 'invoices';
+    if (label == t.quickSalesMenu || label == t.invoice) return 'invoices';
     if (label == t.receiptsAndPayments) return 'people_transactions';
     if (label == t.expenseAndIncome) return 'expenses_income';
     if (label == t.transfers) return 'transfers';
@@ -3975,44 +4307,54 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.currencyRevaluation) return 'currency_revaluation';
     if (label == t.warehouses) return 'warehouses';
-    if (label == 'حواله‌های انبار') return 'warehouse_transfers';
-    // انبارگردانی (Stock Count) در نهایت به ایجاد/مدیریت حواله‌های تعدیل منجر می‌شود؛
-    // بنابراین در مدل دسترسی فعلی زیر مجموعه‌ی warehouse_transfers در نظر گرفته می‌شود.
-    if (label == 'انبار گردانی' || label == 'انبارگردانی' || label == 'Stock Count') return 'warehouse_transfers';
-    if (label == 'مغایرت‌های موجودی فروش سریع') return 'inventory';
-    if (label == 'کالای هزینه/درآمد شده' ||
-        label == 'کالای هزینه‌شده / کالای درآمدشده' ||
-        label == 'Goods Expense/Income') {
-      return 'goods_expense_income';
+    if (label == t.warehouseDocsMenu || label == t.stockCountMenu) {
+      return 'warehouse_transfers';
     }
+    if (label == t.quickSalesStockDiscrepanciesMenu ||
+        label == t.productionOrdersMenu) {
+      return 'inventory';
+    }
+    if (label == t.goodsExpenseIncomeMenu) return 'goods_expense_income';
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'moadian';
-    if (label == t.settings) return 'settings';
-    if (label == t.pluginMarketplace) return 'marketplace';
-    if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
-    if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
-    if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
-    if (label == t.payrollMenu ||
-        label == t.payrollTitle ||
-        label == 'Payroll' ||
-        label == 'حقوق و دستمزد') {
-      return 'payroll';
+    if (label == t.settings || label == t.inquiries || label == t.workflows) {
+      return 'settings';
     }
-    if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
-    if (label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
+    if (label == t.templates) return 'report_templates';
+    if (label == t.pluginMarketplace) return 'marketplace';
+    if (label == t.warranty) return 'warranty';
+    if (label == t.repairShopMenu) return 'repair_shop';
+    if (label == t.customerClubMenu) return 'customer_club';
+    if (label == t.payrollMenu || label == t.payrollTitle) return 'payroll';
+    if (label == t.advancedProductionMenu || label == t.advancedProductionTitle) {
+      return 'advanced_production';
+    }
+    if (label == t.oaMenu ||
+        label == t.oaOrg ||
+        label == t.oaCartable ||
+        label == t.oaExternalOrgs ||
+        label == t.oaArchiveTree ||
+        label == t.oaReports) {
+      return 'office_automation';
+    }
+    if (label == t.fixedAssetsMenu || label == t.fixedAssetsTitle) {
+      return 'fixed_assets';
+    }
+    if (label == t.distributionMenu) return 'distribution';
+    if (label == t.telephonyMenu) return 'telephony';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
-    if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
-    if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
-    if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';
-    if (label == 'آمار استفاده' || label == 'AI Usage') return 'ai';
-    if (label == 'استعلامات' || label == 'Inquiries') return 'settings';
-    if (label == _workflowMenuLabel(t)) return 'settings';
+    if (label == t.digipayMenuTitle) return 'digipay';
+    if (label == t.aiMenu ||
+        label == t.aiAssistantMenu ||
+        label == t.aiMcpConnectionsMenu ||
+        label == t.aiSubscriptionMenu ||
+        label == t.aiUsageMenu ||
+        label == t.aiSkillsMarketplaceMenu ||
+        label == t.aiSkillsPublisherMenu) {
+      return 'ai';
+    }
     return null;
-  }
-
-  String _workflowMenuLabel(AppLocalizations t) {
-    return t.localeName.startsWith('fa') ? 'اتوماسیون‌ها' : 'Automations';
   }
 
 }

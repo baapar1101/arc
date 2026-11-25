@@ -30,6 +30,13 @@ def tick_once() -> Dict[str, Dict]:
         except Exception as e:
             logger.error("crm stale deals tick failed: %s", e, exc_info=True)
             out["stale_deals"] = {"error": str(e)}
+        try:
+            from app.services.crm_person_stats_service import refresh_stale_person_stats
+
+            out["person_stats"] = refresh_stale_person_stats(db)
+        except Exception as e:
+            logger.error("crm person stats tick failed: %s", e, exc_info=True)
+            out["person_stats"] = {"error": str(e)}
     return out
 
 

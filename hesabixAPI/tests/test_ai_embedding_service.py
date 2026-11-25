@@ -1,12 +1,13 @@
 """تست embedding و شباهت کسینوسی."""
 from __future__ import annotations
+import pytest
 
 from app.services.ai.ai_embedding_service import cosine_similarity, split_text_chunks
 
 
 def test_cosine_similarity_identical():
     v = [1.0, 0.0, 0.5]
-    assert cosine_similarity(v, v) == 1.0
+    assert cosine_similarity(v, v) == pytest.approx(1.0, abs=1e-12)
 
 
 def test_split_text_chunks_overlap():

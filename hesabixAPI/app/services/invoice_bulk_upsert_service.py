@@ -162,6 +162,8 @@ def bulk_upsert_invoices_integration(
                         }
                     )
                 except ApiError as ae:
+                    if "woo_create_key" in payload:
+                        db.rollback()
                     p = _api_error_parts(ae)
                     results.append(
                         {
@@ -173,6 +175,8 @@ def bulk_upsert_invoices_integration(
                         }
                     )
                 except IntegrityError as e:
+                    if "woo_create_key" in payload:
+                        db.rollback()
                     results.append(
                         {
                             **base,
@@ -242,6 +246,8 @@ def bulk_upsert_invoices_integration(
                     )
                 except ApiError as ae:
                     p = _api_error_parts(ae)
+                    if p["code"] in {"WOO_POSTED_ISSUE_SOURCE_AMBIGUOUS", "WOO_POSTED_ISSUE_REWRITE_REQUIRED"}:
+                        db.rollback()
                     results.append(
                         {
                             **base,

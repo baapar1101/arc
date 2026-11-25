@@ -1,8 +1,12 @@
 import 'package:pdf/pdf.dart';
 
 import '../../../models/barcode_label/label_design_v1.dart';
+import 'roll_label_page_metrics.dart';
 
 /// اندازه صفحه PDF متناسب با sheet و بوم — مشترک بین استودیو و دیالوگ چاپ.
+///
+/// [labelCount] is ignored in roll mode: each row is its own page with a
+/// fixed height (top + label + bottom), independent of how many labels print.
 PdfPageFormat pdfPageFormatForLabelSheet(
   LabelSheet sheet, {
   required double labelWidthMm,
@@ -10,20 +14,14 @@ PdfPageFormat pdfPageFormatForLabelSheet(
   int labelCount = 1,
 }) {
   if (sheet.isRollMode) {
-    final left = sheet.rollMarginMm['left'] ?? 0;
-    final right = sheet.rollMarginMm['right'] ?? 0;
-    final top = sheet.rollMarginMm['top'] ?? 0;
-    final bottom = sheet.rollMarginMm['bottom'] ?? 0;
-    final columns = sheet.rollColumns.clamp(1, 20).toInt();
-    final gapX = sheet.rollGapMm['x'] ?? 2;
-    final gapY = sheet.rollGapMm['y'] ?? 2;
-    final widthMm = sheet.rollPaperWidthMm > 0
-        ? sheet.rollPaperWidthMm
-        : left + right + columns * labelWidthMm + (columns - 1) * gapX;
-    final rows = ((labelCount.clamp(1, 10000).toInt() + columns - 1) ~/ columns);
-    final heightMm = top + bottom + rows * labelHeightMm + (rows - 1) * gapY;
-    return PdfPageFormat(widthMm * PdfPageFormat.mm, heightMm * PdfPageFormat.mm, marginAll: 0);
+    final metrics = rollLabelPageMetrics(
+      sheet: sheet,
+      labelWidthMm: labelWidthMm,
+      labelHeightMm: labelHeightMm,
+    );
+    return PdfPageFormat(metrics.widthMm * PdfPageFormat.mm, metrics.heightMm * PdfPageFormat.mm, marginAll: 0);
   }
+  assert(labelCount >= 0);
   if (sheet.paper == 'custom') {
     final w = (sheet.customPaperMm?['width'] ?? 210) * PdfPageFormat.mm;
     final h = (sheet.customPaperMm?['height'] ?? 297) * PdfPageFormat.mm;

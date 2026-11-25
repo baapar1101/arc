@@ -6,6 +6,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../category/category_picker_field.dart';
 import '../../../models/product_form_data.dart';
+import '../../../models/product_measurement.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../controllers/product_form_controller.dart';
@@ -16,6 +17,9 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import '../product_variant_inventory_section.dart';
+import '../product_photo_capture_dialog.dart';
+import '../../quick_sales/quick_sales_personal_pin_toggle.dart';
 
 
 class ProductBasicInfoSection extends StatefulWidget {
@@ -26,6 +30,7 @@ class ProductBasicInfoSection extends StatefulWidget {
   final List<Map<String, dynamic>> attributes;
   final ProductFormController? controller;
   final AuthStore? authStore;
+  final int? productId;
   
   const ProductBasicInfoSection({
     super.key,
@@ -36,6 +41,7 @@ class ProductBasicInfoSection extends StatefulWidget {
     required this.attributes,
     this.controller,
     this.authStore,
+    this.productId,
   });
 
   @override
@@ -287,6 +293,20 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
           SizedBox(height: spacing),
           _buildUnitsSection(context),
         ],
+        if (widget.formData.itemType == 'کالا' && widget.controller != null) ...[
+          SizedBox(height: spacing * 2),
+          Text('مشخصات فیزیکی', style: Theme.of(context).textTheme.titleSmall),
+          SizedBox(height: spacing),
+          _buildMeasurements(widget.controller!, spacing),
+        ],
+        if (widget.productId != null) ...[
+          SizedBox(height: spacing),
+          QuickSalesPersonalPinToggle(
+            businessId: widget.businessId,
+            productId: widget.productId!,
+            authStore: widget.authStore,
+          ),
+        ],
         
         if (widget.attributes.isNotEmpty) ...[
           SizedBox(height: spacing * 2),
@@ -304,15 +324,28 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                 selected: selected,
                 onSelected: (value) {
                   final newIds = Set<int>.from(widget.formData.selectedAttributeIds);
+                  final dimIds = Set<int>.from(widget.formData.inventoryDimensionAttributeIds);
                   if (value) {
                     newIds.add(id);
                   } else {
                     newIds.remove(id);
+                    dimIds.remove(id);
                   }
-                  _updateFormData(widget.formData.copyWith(selectedAttributeIds: newIds));
+                  _updateFormData(widget.formData.copyWith(
+                    selectedAttributeIds: newIds,
+                    inventoryDimensionAttributeIds: dimIds,
+                  ));
                 },
               );
             }).toList(),
+          ),
+          ProductVariantInventorySection(
+            businessId: widget.businessId,
+            productId: widget.productId,
+            formData: widget.formData,
+            attributes: widget.attributes,
+            onChanged: widget.onChanged,
+            warehouses: widget.controller?.warehouses ?? const [],
           ),
         ],
       ],
@@ -321,6 +354,51 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
 
   void _updateFormData(ProductFormData newData) {
     widget.onChanged(newData);
+  }
+
+  Widget _buildMeasurements(ProductFormController controller, double spacing) {
+    if (controller.measurementUnit(ProductMeasurement.length) == null) {
+      return const Text('واحدهای کالا دریافت نشد. برای ورود اندازه‌ها فرم را دوباره باز کنید.');
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 520 ? 2 : 1;
+        final width = (constraints.maxWidth - (columns - 1) * spacing) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final field in ProductMeasurement.values)
+              SizedBox(
+                width: width,
+                child: _measurementField(controller, field),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _measurementField(
+    ProductFormController controller,
+    ProductMeasurement field,
+  ) {
+    final unit = controller.measurementUnit(field)!;
+    return TextFormField(
+      key: ValueKey(field.apiKey),
+      initialValue: controller.measurementInput(field),
+      decoration: InputDecoration(
+        labelText: '${field.label} (${unit.label})',
+        helperText: controller.isMeasurementApproximate(field)
+            ? 'نمایش تقریبی'
+            : null,
+      ),
+      textDirection: TextDirection.ltr,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: const [EnglishDigitsFormatter()],
+      onChanged: (value) => controller.updateMeasurement(field, value),
+      validator: (value) => controller.measurementError(field, value ?? ''),
+    );
   }
 
   Widget _buildProductCodeBlock(BuildContext context, double spacing) {
@@ -407,7 +485,10 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
               SizedBox(height: spacing),
               TextFormField(
                 initialValue: widget.formData.unitConversionFactor.toString(),
-                decoration: InputDecoration(labelText: t.unitConversionFactor),
+                decoration: InputDecoration(
+                  labelText: t.unitConversionFactor,
+                  helperText: '۱ واحد اصلی = ضریب × واحد فرعی؛ مثال: ۱ کارتن = ۲۰ عدد، ضریب ۲۰',
+                ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   const EnglishDigitsFormatter(),
@@ -455,7 +536,10 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
               Expanded(
                 child: TextFormField(
                   initialValue: widget.formData.unitConversionFactor.toString(),
-                  decoration: InputDecoration(labelText: t.unitConversionFactor),
+                  decoration: InputDecoration(
+                    labelText: t.unitConversionFactor,
+                    helperText: '۱ واحد اصلی = ضریب × واحد فرعی؛ مثال: ۱ کارتن = ۲۰ عدد، ضریب ۲۰',
+                  ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
                     const EnglishDigitsFormatter(),
@@ -588,6 +672,8 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
   }
   
   Widget _buildImagePicker(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final controller = widget.controller;
     final hasImage = widget.controller?.hasSelectedImage == true || widget.formData.imageUrl != null;
     Uint8List? imageBytes;
     
@@ -599,7 +685,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'عکس کالا',
+          t.productPhoto,
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
@@ -649,56 +735,45 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                                   child: Icon(Icons.image, size: 48),
                                 ),
                     ),
-                    Positioned(
+                    PositionedDirectional(
                       top: 8,
-                      right: 8,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.edit, size: 20),
-                            onPressed: () => _pickImage(context),
-                            tooltip: 'تغییر عکس',
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white.withValues(alpha: 0.8),
-                              padding: const EdgeInsets.all(8),
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          IconButton(
-                            icon: Icon(Icons.delete, size: 20, color: SemanticColorResolver.negative(context)),
-                            onPressed: () {
-                              widget.controller?.clearProductImage();
-                            },
-                            tooltip: 'حذف عکس',
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white.withValues(alpha: 0.8),
-                              padding: const EdgeInsets.all(8),
-                            ),
-                          ),
-                        ],
+                      end: 8,
+                      child: IconButton(
+                        icon: Icon(Icons.delete, size: 20, color: SemanticColorResolver.negative(context)),
+                        onPressed: controller?.clearProductImage,
+                        tooltip: t.productPhotoRemove,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.8),
+                          padding: const EdgeInsets.all(8),
+                        ),
                       ),
                     ),
                   ],
                 )
               : Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_photo_alternate,
-                        size: 48,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => _pickImage(context),
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('انتخاب عکس'),
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.add_photo_alternate,
+                    size: 48,
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: controller == null ? null : _pickImage,
+              icon: const Icon(Icons.upload_file),
+              label: Text(t.chooseFile),
+            ),
+            OutlinedButton.icon(
+              onPressed: controller == null ? null : _captureImage,
+              icon: const Icon(Icons.photo_camera_outlined),
+              label: Text(t.productPhotoTake),
+            ),
+          ],
         ),
         if (hasImage && widget.controller?.selectedImageFilename != null)
           Padding(
@@ -723,65 +798,45 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
     return imageUrl;
   }
   
-  Future<void> _pickImage(BuildContext context) async {
-    if (widget.controller == null) {
-      if (context.mounted) {
-        SnackBarHelper.show(context, message: 'خطا: کنترلر فرم در دسترس نیست');
-      }
-      return;
-    }
-    
+  Future<void> _pickImage() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         withData: true,
-        // حذف allowedExtensions چون FileType.image خودش فیلتر می‌کند
-        // و در برخی پلتفرم‌ها (مخصوصاً وب) مشکل ایجاد می‌کند
       );
-      
-      if (result == null || result.files.isEmpty) {
-        // کاربر فایل را انتخاب نکرده یا انتخاب را لغو کرده
-        return;
-      }
-      
+      if (!mounted || result == null || result.files.isEmpty) return;
       final file = result.files.first;
-      
-      // بررسی وجود bytes
-      if (file.bytes == null || file.bytes!.isEmpty) {
-        if (context.mounted) {
-          SnackBarHelper.show(context, message: 'خطا: فایل انتخاب شده خالی است');
-        }
-        return;
-      }
-      
-      // بررسی فرمت فایل
-      final fileName = file.name.toLowerCase();
-      final allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-      final hasValidExtension = allowedExtensions.any((ext) => fileName.endsWith(ext));
-      
-      if (!hasValidExtension) {
-        if (context.mounted) {
-          SnackBarHelper.show(context, message: 'فرمت فایل معتبر نیست. لطفاً یک فایل تصویری انتخاب کنید (JPG, PNG, GIF, WebP, BMP)');
-        }
-        return;
-      }
-      
-      // تنظیم عکس در controller
-      widget.controller!.setProductImage(file.bytes!, file.name);
-      
-    } on PlatformException catch (e) {
-      // خطای خاص پلتفرم (مثلاً دسترسی رد شده)
-      if (context.mounted) {
-        SnackBarHelper.show(context, message: 'خطا در دسترسی به فایل: ${e.message ?? "خطای نامشخص"}');
-      }
+      _selectProductImage(file.bytes, file.name);
     } catch (e) {
-      // خطای عمومی
-      if (context.mounted) {
+      if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در انتخاب فایل: ${ErrorExtractor.forContext(e, context)}',
+          message: '${t.pickFileError}\n${ErrorExtractor.forContext(e, context)}',
         );
       }
     }
+  }
+
+  Future<void> _captureImage() async {
+    final photo = await showDialog<CapturedProductPhoto>(
+      context: context,
+      builder: (_) => const ProductPhotoCaptureDialog(),
+    );
+    if (mounted && photo != null) _selectProductImage(photo.bytes, photo.filename);
+  }
+
+  void _selectProductImage(Uint8List? bytes, String filename) {
+    final t = AppLocalizations.of(context);
+    if (bytes == null || bytes.isEmpty) {
+      SnackBarHelper.showError(context, message: t.productPhotoEmpty);
+      return;
+    }
+    const extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    if (!extensions.any(filename.toLowerCase().endsWith)) {
+      SnackBarHelper.showError(context, message: t.productPhotoInvalidFormat);
+      return;
+    }
+    widget.controller?.setProductImage(bytes, filename);
   }
 }

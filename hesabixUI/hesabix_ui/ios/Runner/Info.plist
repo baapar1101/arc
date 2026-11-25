@@ -46,7 +46,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>برای مکالمه صوتی با دستیار هوش مصنوعی، دسترسی به میکروفون لازم است.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>برای اسکن بارکد و کیوآرکد در فروش سریع، دسترسی به دوربین لازم است.</string>
+	<string>برای گرفتن عکس کالا و اسکن بارکد یا کیوآرکد، دسترسی به دوربین لازم است.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>CFBundleURLTypes</key>

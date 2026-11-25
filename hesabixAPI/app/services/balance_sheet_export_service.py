@@ -10,12 +10,11 @@ from fastapi.responses import Response
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlalchemy.orm import Session
-from weasyprint import CSS, HTML
-from weasyprint.text.fonts import FontConfiguration
 
 from adapters.db.models.business import Business
 from adapters.db.models.currency import Currency
 from adapters.db.models.fiscal_year import FiscalYear
+from app.core.weasyprint_runtime import load_weasyprint
 
 
 def _slugify(text: str) -> str:
@@ -390,7 +389,8 @@ def build_balance_sheet_pdf_bytes(
     else:
         table_html = injected + table_html
 
-    css = CSS(string=(font_face_css or "") + f"""
+    weasyprint = load_weasyprint()
+    css = weasyprint.CSS(string=(font_face_css or "") + f"""
       @page {{ size: A4 portrait; margin: 12mm; }}
       body {{ font-family: {preferred_stack} !important; font-size: 11px; color: #222; }}
       .header {{ display: flex; justify-content: space-between; margin-bottom: 10px;
@@ -413,8 +413,8 @@ def build_balance_sheet_pdf_bytes(
       tr.equation-balanced td {{ background: #ecfdf5; color: {brand_positive}; font-weight: 700; }}
       tr.equation-unbalanced td {{ background: #fff7ed; color: {brand_negative}; font-weight: 700; }}
     """)
-    font_config = FontConfiguration()
-    return HTML(string=table_html).write_pdf(stylesheets=[css], font_config=font_config)
+    font_config = weasyprint.FontConfiguration()
+    return weasyprint.HTML(string=table_html).write_pdf(stylesheets=[css], font_config=font_config)
 
 
 def balance_sheet_excel_response(

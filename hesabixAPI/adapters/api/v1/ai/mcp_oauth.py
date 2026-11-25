@@ -213,6 +213,25 @@ def _has_explicit_business_access(db: Session, user_id: int, business_id: int) -
     return permissions.get("join") is True and membership_is_active(permission)
 
 
+def _consent_tool_catalog(db: Session, ctx: AuthContext, business_id: int) -> list[dict]:
+    """Return only tools the signed-in member can already use in this business."""
+    from app.services.ai.ai_mcp_service import _get_tools, _mcp_readonly, _openai_tool_to_mcp
+
+    registry, definitions = _get_tools(db, ctx, business_id)
+    catalog = []
+    for definition in definitions:
+        tool = _openai_tool_to_mcp(definition, registry)
+        func = registry.get_function(tool["name"])
+        readonly = _mcp_readonly(tool["name"], registry)
+        catalog.append({
+            "name": tool["name"],
+            "description": tool["description"],
+            "category": getattr(func, "category", None) or "other",
+            "read_only": readonly,
+        })
+    return sorted(catalog, key=lambda item: (item["category"], item["name"]))
+
+
 def _append_query(uri: str, values: dict[str, str]) -> str:
     p = urlsplit(uri)
     query = parse_qsl(p.query, keep_blank_values=True)
@@ -333,8 +352,7 @@ async def authorize(
     ))
     db.commit()
     html_body = _authorization_html(
-        raw_request_id, client.client_name, WRITE_SCOPE in requested_scopes,
-        "offline_access" in requested_scopes,
+        raw_request_id, client.client_name, "offline_access" in requested_scopes,
     )
     return HTMLResponse(html_body, headers={
         "Cache-Control": "no-store", "Pragma": "no-cache",
@@ -365,15 +383,10 @@ def oauth_font(font_name: str) -> FileResponse:
     )
 
 
-def _authorization_html(request_id: str, client_name: str, write_requested: bool, offline_requested: bool) -> str:
+def _authorization_html(request_id: str, client_name: str, offline_requested: bool) -> str:
     safe_name = html.escape(client_name)
     api_json = json.dumps(get_settings().api_v1_prefix)
     request_json = json.dumps(request_id)
-    write_option = (
-        '<label class="permission permission--optional"><input type="checkbox" id="write">'
-        '<span><strong>ابزارهای ویرایشی</strong><small>امکان ثبت یا تغییر اطلاعات کسب‌وکار (ویژهٔ مالک)</small></span></label>'
-        if write_requested else ""
-    )
     offline_option = (
         '<label class="permission permission--optional"><input type="checkbox" id="offline">'
         '<span><strong>تداوم اتصال بدون ورود دوباره</strong><small>تمدید اتصال در بازهٔ زمانی تعیین‌شده در تنظیمات حسابیکس</small></span></label>'
@@ -427,6 +440,7 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
     .channel-option {{ display:flex; align-items:center; justify-content:center; gap:8px; min-height:41px; color:#667b89; background:transparent; border:1px solid transparent; border-radius:9px; cursor:pointer; font-size:13px; transition:all .16s; }}
     .channel-option svg {{ width:17px; height:17px; }}
     .channel-option[aria-pressed="true"] {{ color:var(--brand); background:#fff; border-color:#e3ebf0; box-shadow:0 2px 5px rgba(31,63,82,.07); font-weight:700; }}
+    .auth-mode {{ margin-bottom:17px; }}
     .captcha-field {{ margin-top:2px; }}
     .captcha-layout {{ display:grid; grid-template-columns:minmax(0,1fr) 164px; gap:10px; align-items:end; }}
     .captcha-image {{ height:54px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:linear-gradient(135deg,#f5f9fb,#edf4f7); border:1px solid #dfe8ee; border-radius:12px; }}
@@ -463,6 +477,7 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
     .permission small {{ color:var(--muted); font-size:12px; line-height:1.7; }}
     .permission--optional {{ background:#fff; }}
     .business-label {{ margin-bottom:7px; }}
+    .plugin-banner {{ margin:0 0 16px; padding:12px 14px; color:#8a4b12; background:#fff8ee; border:1px solid #f0d3b0; border-radius:12px; font-size:13px; line-height:1.8; }}
     .button-row {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:17px; }}
     .footnote {{ display:flex; justify-content:center; align-items:center; gap:6px; margin:16px 0 0; color:#778b99; text-align:center; font-size:11px; }}
     .footnote svg {{ width:14px; height:14px; color:#438069; }}
@@ -483,13 +498,20 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
       <div class="card-body">
         <section id="loginSection" aria-labelledby="login-heading">
           <h2 class="section-heading" id="login-heading">ورود به حسابیکس</h2>
-          <p class="section-hint">برای ادامه، کد یک‌بارمصرف برای شما ارسال می‌شود.</p>
-          <div class="channel-label">روش دریافت کد</div>
+          <p class="section-hint">با کد یک‌بارمصرف یا رمز عبور حسابیکس وارد شوید.</p>
+          <div class="channel-switch auth-mode" role="group" aria-label="روش ورود">
+            <button class="channel-option" type="button" data-mode="otp" aria-pressed="true"><span>کد یک‌بارمصرف</span></button>
+            <button class="channel-option" type="button" data-mode="password" aria-pressed="false"><span>رمز عبور</span></button>
+          </div>
+          <div id="otpMethod">
+          <div class="channel-label">ارسال کد از طریق</div>
           <div class="channel-switch" role="group" aria-label="روش دریافت کد">
             <button class="channel-option" type="button" data-channel="sms" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="2.8" width="14" height="18.4" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M9 6h6M10 18h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>پیامک</span></button>
             <button class="channel-option" type="button" data-channel="email" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="m4.5 7 7.5 5.5L19.5 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ایمیل</span></button>
           </div>
+          </div>
           <label class="field"><span class="field-label" id="identifierLabel">شماره موبایل</span><input class="control" id="identifier" type="tel" inputmode="tel" autocomplete="tel" maxlength="255" placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷" required></label>
+          <div id="passwordField" hidden><label class="field"><span class="field-label" for="password">رمز عبور</span><input class="control" id="password" type="password" autocomplete="current-password" maxlength="128" placeholder="رمز عبور حسابیکس" required></label></div>
           <div class="field captcha-field">
             <label class="field-label" for="captchaCode">کد امنیتی تصویر</label>
             <div class="captcha-layout">
@@ -498,6 +520,7 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
             </div>
           </div>
           <button class="primary" id="send" type="button">ارسال کد تایید</button>
+          <button class="primary" id="passwordLogin" type="button" hidden>ورود و ادامه</button>
           <p id="status" class="status" role="status" aria-live="polite"></p>
         </section>
         <section id="otpSection" hidden aria-labelledby="otp-heading">
@@ -513,8 +536,10 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
         <section id="consent" hidden aria-labelledby="consent-heading">
           <div class="divider"></div><h2 class="section-heading" id="consent-heading">اتصال را بررسی و تایید کنید</h2>
           <p class="section-hint">کسب‌وکار و سطح دسترسی را انتخاب کنید. فقط موارد انتخاب‌شده در اختیار این اتصال قرار می‌گیرد.</p>
+          <div id="pluginBanner" class="plugin-banner" hidden role="alert"></div>
           <label class="field"><span class="field-label business-label" for="business">کسب‌وکار موردنظر</span><select class="control" id="business" required><option value="" selected disabled>یک کسب‌وکار را انتخاب کنید</option></select></label>
-          <div class="permission-list"><label class="permission"><input type="checkbox" checked disabled><span><strong>مشاهدهٔ اطلاعات و گزارش‌ها</strong><small>دسترسی پایه برای استفاده از ابزارهای حسابیکس</small></span></label>{write_option}{offline_option}</div>
+          <div id="toolPermissionSection" hidden><h3 class="section-heading">انتخاب ابزارها</h3><p class="section-hint">فقط ابزارهای مجاز برای حساب شما نمایش داده می‌شوند. ابزارهای تغییردهنده نیز مطابق سطح دسترسی شما قابل انتخاب‌اند.</p><button class="text-button" id="grantAll" type="button">فعال‌سازی همهٔ دسترسی‌های مجاز</button><div id="toolPermissions" class="permission-list"></div></div>
+          <div class="permission-list">{offline_option}</div>
           <div class="button-row"><button class="primary" id="approve" type="button">تایید و اتصال</button><button class="secondary" id="deny" type="button">رد درخواست</button></div>
           <p class="status" id="consentStatus" role="status" aria-live="polite"></p>
         </section>
@@ -523,7 +548,7 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
     <p class="footnote"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-3 7.5-7 9-4-1.5-7-4.4-7-9V6l7-3Z" stroke="currentColor" stroke-width="1.7"/><path d="m9 11.5 2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>می‌توانید دسترسی این اتصال را بعداً از تنظیمات حسابیکس لغو کنید.</p>
   </main>
 <script>
-const api={api_json},rid={request_json};let captchaId='',loginSession='',sessionKey='',selectedChannel='sms';
+const api={api_json},rid={request_json};let captchaId='',loginSession='',sessionKey='',selectedChannel='sms',loginMode='otp';
 const $=id=>document.getElementById(id);
 function status(id,message,tone=''){{const el=$(id);el.textContent=message;el.dataset.tone=tone}}
 async function request(path,options={{}}){{
@@ -531,7 +556,7 @@ async function request(path,options={{}}){{
   let payload;try{{payload=await response.json()}}catch{{if(response.status===404)throw Error(`مسیر API «${{path}}» در سرور پیدا نشد (HTTP 404). سرور یا تنظیم Nginx نیاز به به‌روزرسانی دارد.`);throw Error(`پاسخ سرور معتبر نیست (HTTP ${{response.status}}). اگر خطا ادامه دارد، صفحه را دوباره باز کنید.`)}}
   const error=payload?.error&&typeof payload.error==='object'?payload.error:payload;
   if(!response.ok||payload?.success===false){{
-    const friendlyErrors={{INVALID_CAPTCHA:'کد امنیتی درست نیست. تصویر تازه بگیرید و دوباره وارد کنید.',INVALID_OTP_FORMAT:'کد تایید باید ۶ رقم باشد.',OTP_NOT_FOUND:'کد تایید منقضی شده است. دوباره کد بگیرید.',SESSION_NOT_FOUND:'نشست ورود منقضی شده است. دوباره کد بگیرید.',INVALID_OTP:'کد واردشده صحیح نیست. آن را بررسی و دوباره وارد کنید.',OTP_ATTEMPTS_EXCEEDED:'تعداد تلاش مجاز تمام شده است. دوباره کد ورود بگیرید.',RATE_LIMIT_EXCEEDED:'درخواست‌های زیادی ثبت شده است. کمی صبر کنید و دوباره تلاش کنید.',CHANNEL_NOT_SUPPORTED:'روش دریافت انتخاب‌شده در دسترس نیست.',USER_NOT_FOUND:'برای این شماره یا ایمیل حساب فعالی پیدا نشد. اطلاعات ورود را بررسی کنید.'}};
+    const friendlyErrors={{INVALID_CAPTCHA:'کد امنیتی درست نیست. تصویر تازه بگیرید و دوباره وارد کنید.',INVALID_CREDENTIALS:'ایمیل یا شماره موبایل و رمز عبور را بررسی کنید.',INVALID_IDENTIFIER:'ایمیل یا شماره موبایل معتبر وارد کنید.',INVALID_OTP_FORMAT:'کد تایید باید ۶ رقم باشد.',OTP_NOT_FOUND:'کد تایید منقضی شده است. دوباره کد بگیرید.',SESSION_NOT_FOUND:'نشست ورود منقضی شده است. دوباره کد بگیرید.',INVALID_OTP:'کد واردشده صحیح نیست. آن را بررسی و دوباره وارد کنید.',OTP_ATTEMPTS_EXCEEDED:'تعداد تلاش مجاز تمام شده است. دوباره کد ورود بگیرید.',RATE_LIMIT_EXCEEDED:'درخواست‌های زیادی ثبت شده است. کمی صبر کنید و دوباره تلاش کنید.',CHANNEL_NOT_SUPPORTED:'روش دریافت انتخاب‌شده در دسترس نیست.',USER_NOT_FOUND:'برای این شماره یا ایمیل حساب فعالی پیدا نشد. اطلاعات ورود را بررسی کنید.',AI_MCP_PLUGIN_NOT_ACTIVE:'افزونه سرور MCP هوش مصنوعی برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها فعال یا تمدید کنید.',AI_MCP_PLUGIN_EXPIRED:'اشتراک افزونه سرور MCP هوش مصنوعی تمام شده است. از بازار افزونه‌ها آن را تمدید کنید.'}};
     if(friendlyErrors[error?.code])throw Error(friendlyErrors[error.code]);
     if(response.status===404&&(!error?.code||error.code==='HTTP_ERROR'))throw Error(`مسیر API «${{path}}» در نسخهٔ فعلی سرور پیدا نشد (HTTP 404). صفحه را تازه کنید؛ اگر مشکل ماند، سرور باید به‌روزرسانی شود.`);
     throw Error(error?.message||payload?.detail||`درخواست ناموفق بود (HTTP ${{response.status}}).`)
@@ -539,21 +564,56 @@ async function request(path,options={{}}){{
   return payload?.data??payload;
 }}
 function asciiDigits(value){{return value.replace(/[۰-۹٠-٩]/g,d=>String('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩'.indexOf(d)%10))}}
-function setChannel(channel){{selectedChannel=channel;status('status','','');document.querySelectorAll('.channel-option').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.channel===channel)));const email=channel==='email';$('identifierLabel').textContent=email?'آدرس ایمیل':'شماره موبایل';$('identifier').type=email?'email':'tel';$('identifier').inputMode=email?'email':'tel';$('identifier').autocomplete=email?'email':'tel';$('identifier').placeholder=email?'مثلاً name@example.com':'مثلاً ۰۹۱۲۱۲۳۴۵۶۷';$('identifier').focus()}}
+function setChannel(channel){{selectedChannel=channel;status('status','','');document.querySelectorAll('.channel-option[data-channel]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.channel===channel)));const email=channel==='email';$('identifierLabel').textContent=email?'آدرس ایمیل':'شماره موبایل';$('identifier').type=email?'email':'tel';$('identifier').inputMode=email?'email':'tel';$('identifier').autocomplete=email?'email':'tel';$('identifier').placeholder=email?'مثلاً name@example.com':'مثلاً ۰۹۱۲۱۲۳۴۵۶۷';$('identifier').focus()}}
+function setMode(mode){{loginMode=mode;status('status','','');const password=mode==='password';$('otpMethod').hidden=password;$('passwordField').hidden=!password;$('send').hidden=password;$('passwordLogin').hidden=!password;document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));$('identifierLabel').textContent=password?'ایمیل یا شماره موبایل':(selectedChannel==='email'?'آدرس ایمیل':'شماره موبایل');$('identifier').type=password?'text':(selectedChannel==='email'?'email':'tel');$('identifier').inputMode=password?'text':(selectedChannel==='email'?'email':'tel');$('identifier').autocomplete=password?'username':(selectedChannel==='email'?'email':'tel');$('identifier').placeholder=password?'ایمیل یا شماره موبایل حسابیکس':(selectedChannel==='email'?'مثلاً name@example.com':'مثلاً ۰۹۱۲۱۲۳۴۵۶۷');if(password)$('password').focus();else $('identifier').focus()}}
 function maskDestination(value,channel){{const clean=value.trim();if(channel==='email'){{const parts=clean.split('@');return parts.length===2?(parts[0].slice(0,1)+'•••@'+parts[1]):clean}}const digits=asciiDigits(clean).replace(/\\D/g,'');return digits.length>4?('•••••'+digits.slice(-4)):clean}}
 async function loadCaptcha(){{const button=$('reload');button.disabled=true;$('captchaPlaceholder').hidden=false;$('captchaPlaceholder').textContent='در حال دریافت تصویر…';try{{const result=await request('/auth/captcha',{{method:'POST'}});captchaId=result.captcha_id;$('captcha').src='data:image/png;base64,'+result.image_base64;$('captchaPlaceholder').hidden=true}}catch(error){{captchaId='';$('captchaPlaceholder').textContent='تصویر دریافت نشد';status('status',error.message,'error')}}finally{{button.disabled=false}}}}
 function setBusy(button,busy,label){{button.disabled=busy;if(busy){{button.dataset.label=button.textContent;button.textContent=label}}else if(button.dataset.label){{button.textContent=button.dataset.label;delete button.dataset.label}}}}
-$('reload').addEventListener('click',loadCaptcha);document.querySelectorAll('.channel-option').forEach(button=>button.addEventListener('click',()=>setChannel(button.dataset.channel)));loadCaptcha();
+$('reload').addEventListener('click',loadCaptcha);document.querySelectorAll('.channel-option[data-channel]').forEach(button=>button.addEventListener('click',()=>setChannel(button.dataset.channel)));document.querySelectorAll('.channel-option[data-mode]').forEach(button=>button.addEventListener('click',()=>setMode(button.dataset.mode)));loadCaptcha();
 $('send').addEventListener('click',async()=>{{const button=$('send');let requestStarted=false;setBusy(button,true,'در حال ارسال کد…');status('status','');try{{if(!$('identifier').value.trim())throw Error(selectedChannel==='email'?'آدرس ایمیل را وارد کنید.':'شماره موبایل را وارد کنید.');if(selectedChannel==='email'&&!$('identifier').checkValidity())throw Error('فرمت آدرس ایمیل را بررسی کنید.');if(!$('captchaCode').value.trim())throw Error('متن تصویر امنیتی را وارد کنید.');if(!captchaId)throw Error('تصویر امنیتی هنوز آماده نیست. چند لحظه دیگر دوباره تلاش کنید.');requestStarted=true;const result=await request('/auth/login/send-otp',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{identifier:$('identifier').value.trim(),channel:selectedChannel,captcha_id:captchaId,captcha_code:$('captchaCode').value.trim()}})}});loginSession=result.session_id;$('deliverySummary').textContent='کد تایید به '+maskDestination($('identifier').value,selectedChannel)+' ارسال شد.';$('otp').value='';$('loginSection').hidden=true;$('otpSection').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.remove('active');$('otp').focus();status('otpStatus','کد ارسال شد. کد را وارد کنید.','success')}}catch(error){{status('status',error.message,'error');if(requestStarted)await loadCaptcha()}}finally{{setBusy(button,false)}}}});
 $('otp').addEventListener('input',()=>{{const value=asciiDigits($('otp').value).replace(/\\D/g,'').slice(0,6);if($('otp').value!==value)$('otp').value=value}});
 $('changeLogin').addEventListener('click',()=>{{status('otpStatus','','');$('otpSection').hidden=true;$('loginSection').hidden=false;$('stepLogin').classList.add('active');$('stepConsent').classList.remove('active');$('captchaCode').value='';loadCaptcha();$('identifier').focus()}});
-$('verify').addEventListener('click',async()=>{{const button=$('verify');setBusy(button,true,'در حال بررسی کد…');status('otpStatus','');try{{const otp=asciiDigits($('otp').value.trim());if(otp.length!==6)throw Error('کد تایید باید ۶ رقم باشد.');const login=await request('/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent(otp),{{method:'POST'}});const consent=await request('/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+login.api_key}},body:JSON.stringify({{request_id:rid}})}});sessionKey=consent.consent_token;$('business').replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='یک کسب‌وکار را انتخاب کنید';placeholder.disabled=true;placeholder.selected=true;$('business').append(placeholder);for(const item of consent.items){{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.dataset.owner=item.owner?'1':'0';$('business').append(option)}}$('business').addEventListener('change',()=>{{const write=$('write');if(write){{write.disabled=$('business').selectedOptions[0]?.dataset.owner!=='1';if(write.disabled)write.checked=false}}}});$('business').dispatchEvent(new Event('change'));$('loginSection').hidden=true;$('otpSection').hidden=true;$('consent').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.add('active');status('consentStatus','ورود موفق بود. دسترسی‌های درخواستی را بررسی کنید.','success')}}catch(error){{status('otpStatus',error.message,'error')}}finally{{setBusy(button,false)}}}});
-async function decide(approved){{const button=approved?$('approve'):$('deny');setBusy(button,true,approved?'در حال اتصال…':'در حال ثبت…');status('consentStatus','');try{{const scopes=['ai:tools:read'];if($('write')?.checked)scopes.push('ai:tools:write');if($('offline')?.checked)scopes.push('offline_access');const result=await request('/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value),approved,scopes}})}});location.assign(result.redirect_to)}}catch(error){{status('consentStatus',error.message,'error');setBusy(button,false)}}}}
+async function continueToConsent(login){{const consent=await request('/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+login.api_key}},body:JSON.stringify({{request_id:rid}})}});sessionKey=consent.consent_token;$('business').replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='یک کسب‌وکار را انتخاب کنید';placeholder.disabled=true;placeholder.selected=true;$('business').append(placeholder);for(const item of consent.items){{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.dataset.owner=item.owner?'1':'0';$('business').append(option)}}$('business').addEventListener('change',()=>{{const write=$('write');if(write){{write.disabled=$('business').selectedOptions[0]?.dataset.owner!=='1';if(write.disabled)write.checked=false}}}});$('business').dispatchEvent(new Event('change'));$('loginSection').hidden=true;$('otpSection').hidden=true;$('consent').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.add('active');status('consentStatus','ورود موفق بود. دسترسی‌های درخواستی را بررسی کنید.','success')}}
+$('verify').addEventListener('click',async()=>{{const button=$('verify');setBusy(button,true,'در حال بررسی کد…');status('otpStatus','');try{{const otp=asciiDigits($('otp').value.trim());if(otp.length!==6)throw Error('کد تایید باید ۶ رقم باشد.');const login=await request('/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent(otp),{{method:'POST'}});await continueToConsent(login)}}catch(error){{status('otpStatus',error.message,'error')}}finally{{setBusy(button,false)}}}});
+async function passwordLogin(){{const button=$('passwordLogin');let attempted=false;setBusy(button,true,'در حال ورود…');status('status','');try{{const identifier=$('identifier').value.trim(),password=$('password').value;if(!identifier)throw Error('ایمیل یا شماره موبایل را وارد کنید.');if(!password)throw Error('رمز عبور را وارد کنید.');if(!$('captchaCode').value.trim())throw Error('متن تصویر امنیتی را وارد کنید.');if(!captchaId)throw Error('تصویر امنیتی هنوز آماده نیست. چند لحظه دیگر دوباره تلاش کنید.');attempted=true;const login=await request('/auth/login',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{identifier,password,captcha_id:captchaId,captcha_code:$('captchaCode').value.trim()}})}});await continueToConsent(login)}}catch(error){{status('status',error.message,'error');if(attempted)await loadCaptcha()}}finally{{setBusy(button,false)}}}}
+$('passwordLogin').addEventListener('click',passwordLogin);
+async function decide(approved){{const button=approved?$('approve'):$('deny');setBusy(button,true,approved?'در حال اتصال…':'در حال ثبت…');status('consentStatus','');try{{const selected=[...document.querySelectorAll('[data-tool-name]:checked')].map(el=>el.dataset.toolName);const hasWrite=selected.some(name=>consentCatalog.some(tool=>tool.name===name&&!tool.read_only));const scopes=['ai:tools:read'];if(hasWrite)scopes.push('ai:tools:write');if($('offline')?.checked)scopes.push('offline_access');const result=await request('/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value),approved,scopes,tool_permissions:selected}})}});location.assign(result.redirect_to)}}catch(error){{status('consentStatus',error.message,'error');setBusy(button,false)}}}}
+let consentCatalog=[];
+const categoryLabels={{invoices:'فاکتورها',products:'کالاها',inventory:'انبار',people:'اشخاص',financial:'مالی',crm:'CRM',reports:'گزارش‌ها',workflow:'گردش‌کار',export:'خروجی‌ها',integration:'یکپارچه‌سازی',other:'سایر'}};
+async function loadConsentCatalog(){{
+  const host=$('toolPermissions');host.replaceChildren();$('toolPermissionSection').hidden=true;
+  const banner=$('pluginBanner');if(banner){{banner.hidden=true;banner.textContent=''}}
+  if(!$('business').value)return;
+  try{{
+    const result=await request('/ai/mcp/oauth/authorize/catalog',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value)}})}});
+    const plugin=result.plugin;
+    const approve=$('approve');
+    if(plugin&&plugin.is_active===false){{
+      if(banner){{banner.hidden=false;banner.textContent=(plugin.message||'افزونه سرور MCP هوش مصنوعی برای این کسب‌وکار فعال نیست یا اشتراک آن تمام شده است.')+' اتصال جدید تا فعال‌سازی افزونه برقرار نمی‌شود.'}}
+      if(approve)approve.disabled=true;
+      consentCatalog=[];return;
+    }}
+    if(approve)approve.disabled=false;
+    consentCatalog=result.tools||[];const groups=new Map();
+    for(const tool of consentCatalog){{const category=tool.category||'other';if(!groups.has(category))groups.set(category,[]);groups.get(category).push(tool)}}
+    for(const [category,tools] of groups){{
+      const heading=document.createElement('h4');heading.textContent=categoryLabels[category]||category;host.append(heading);
+      for(const tool of tools){{
+        const label=document.createElement('label');label.className='permission';const input=document.createElement('input');input.type='checkbox';input.dataset.toolName=tool.name;
+        const isWrite=!tool.read_only;const writeAllowed=__WRITE_ALLOWED__;input.checked=false;input.disabled=isWrite&&!writeAllowed;
+        const content=document.createElement('span');const title=document.createElement('strong');title.textContent=tool.name+(isWrite?' · تغییردهنده':' · فقط‌خواندنی');const description=document.createElement('small');description.textContent=tool.description||'';content.append(title,description);label.append(input,content);host.append(label)
+      }}
+    }}
+    $('toolPermissionSection').hidden=false
+  }}catch(error){{status('consentStatus',error.message,'error')}}
+}}
+$('business').addEventListener('change',loadConsentCatalog);
+$('grantAll').addEventListener('click',()=>{{document.querySelectorAll('#toolPermissions input[type="checkbox"]:not(:disabled)').forEach(input=>input.checked=true)}});
 $('approve').addEventListener('click',()=>{{if(!$('business').value){{status('consentStatus','ابتدا کسب‌وکار موردنظر را انتخاب کنید.','error');return}}decide(true)}});$('deny').addEventListener('click',()=>decide(false));
-$('identifier').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('send').click()}}}});$('captchaCode').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('send').click()}}}});$('otp').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('verify').click()}}}});
+$('identifier').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();(loginMode==='password'?$('passwordLogin'):$('send')).click()}}}});$('captchaCode').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();(loginMode==='password'?$('passwordLogin'):$('send')).click()}}}});$('password').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();passwordLogin()}}}});$('otp').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('verify').click()}}}});
 </script>
 </body>
-</html>'''
+</html>'''.replace("__WRITE_ALLOWED__", "true")
 
 
 @oauth_router.post("/authorize/session")
@@ -602,6 +662,39 @@ def create_consent_session(payload: dict, db: Session = Depends(get_db), ctx: Au
     return {"consent_token": consent_token, "expires_in": 300, "items": result}
 
 
+@oauth_router.post("/authorize/catalog")
+@rate_limit(max_requests=60, window_seconds=600, error_message="درخواست‌های فهرست ابزار بیش از حد مجاز است.")
+def consent_catalog(payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
+    auth_header = request.headers.get("authorization", "")
+    scheme, _, raw_token = auth_header.partition(" ")
+    raw_request_id = payload.get("request_id")
+    row = db.query(McpOAuthAuthorizationRequest).filter(
+        McpOAuthAuthorizationRequest.request_hash == _hash(str(raw_request_id or "")),
+        McpOAuthAuthorizationRequest.expires_at > datetime.utcnow(),
+        McpOAuthAuthorizationRequest.user_id.is_not(None),
+        McpOAuthAuthorizationRequest.consent_expires_at > datetime.utcnow(),
+    ).first()
+    if (scheme.lower() != "bearer" or not raw_token.startswith("mcp_consent_") or not row
+            or not row.consent_token_hash
+            or not secrets.compare_digest(row.consent_token_hash, _hash(raw_token))):
+        raise HTTPException(401, "A valid one-time OAuth consent token is required")
+    user = db.get(User, row.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "The authenticated user is no longer active")
+    try:
+        business_id = int(payload.get("business_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "A business must be selected")
+    ctx = AuthContext(user=user, api_key_id=0, business_id=business_id, db=db)
+    if not _has_explicit_business_access(db, user.id, business_id):
+        raise HTTPException(403, "Business access is no longer active")
+    from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access, mcp_oauth_catalog_envelope
+
+    plugin_access = get_ai_mcp_plugin_access(db, business_id)
+    catalog = _consent_tool_catalog(db, ctx, business_id) if plugin_access["is_active"] else []
+    return mcp_oauth_catalog_envelope(plugin_access, catalog)
+
+
 @oauth_router.post("/authorize/consent")
 @rate_limit(max_requests=30, window_seconds=600, error_message="تاییدهای OAuth بیش از حد مجاز است.")
 def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
@@ -642,20 +735,40 @@ def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> d
     if (not ctx.is_user_active() or
             not _has_explicit_business_access(db, ctx.get_user_id(), business_id)):
         raise HTTPException(403, "Business access is no longer active")
+    raw_tool_permissions = payload.get("tool_permissions")
+    if (not isinstance(raw_tool_permissions, list)
+            or not all(isinstance(name, str) for name in raw_tool_permissions)
+            or len(raw_tool_permissions) != len(set(raw_tool_permissions))):
+        raise HTTPException(400, "Invalid tool permissions")
+    from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access
+
+    plugin_access = get_ai_mcp_plugin_access(db, business_id)
+    if not plugin_access["is_active"]:
+        raise HTTPException(403, plugin_access["message"])
+    tool_catalog = _consent_tool_catalog(db, ctx, business_id)
+    available_tools = {tool["name"]: tool for tool in tool_catalog}
+    selected_tools = set(raw_tool_permissions)
+    if not selected_tools <= set(available_tools):
+        raise HTTPException(400, "A selected tool is unavailable for this business member")
+    selected_write = any(not available_tools[name]["read_only"] for name in selected_tools)
     requested = set(row.scopes or [])
     raw_scopes = payload.get("scopes")
     if not isinstance(raw_scopes, list) or not all(isinstance(scope, str) for scope in raw_scopes):
         raise HTTPException(400, "Invalid consent scopes")
     scopes = set(raw_scopes)
-    if not scopes or not scopes <= requested or READ_SCOPE not in scopes or not scopes <= AUTH_SCOPES:
+    # The consent UI is the authority for optional write access. Allow it to
+    # grant the server-advertised write scope even when the client requested
+    # only the required read scope; all selected tools are still user-filtered.
+    if (not scopes or not scopes <= (requested | {WRITE_SCOPE})
+            or READ_SCOPE not in scopes or not scopes <= AUTH_SCOPES):
         raise HTTPException(400, "Invalid consent scopes")
-    if WRITE_SCOPE in scopes and not ctx.is_business_owner(business_id):
-        raise HTTPException(403, "Only the business owner can grant write tools")
+    if (selected_write != (WRITE_SCOPE in scopes)):
+        raise HTTPException(400, "Write scope must match the selected tools")
     raw_code = "mcp_code_" + secrets.token_urlsafe(40)
     db.add(McpOAuthAuthorizationCode(
         code_hash=_hash(raw_code), client_id=row.client_id, redirect_uri=row.redirect_uri,
         resource=row.resource, user_id=ctx.get_user_id(), business_id=business_id,
-        scopes=sorted(scopes), code_challenge=row.code_challenge,
+        scopes=sorted(scopes), tool_permissions=sorted(selected_tools), code_challenge=row.code_challenge,
         expires_at=datetime.utcnow() + CODE_TTL,
     ))
     response_params = {"code": raw_code, "iss": _issuer(request)}
@@ -704,6 +817,9 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
             return _json_error("invalid_grant", "PKCE verification failed")
         code_row.consumed_at = datetime.utcnow()
         user_id, business_id, scopes = code_row.user_id, code_row.business_id, list(code_row.scopes or [])
+        from app.services.ai.ai_mcp_connections import clone_stored_tool_permissions
+
+        tool_permissions = clone_stored_tool_permissions(code_row.tool_permissions)
         resource = code_row.resource
         db.add(code_row)
         db.flush()
@@ -746,6 +862,9 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
             )
         refresh_row.revoked_at = datetime.utcnow()
         user_id, business_id, scopes = refresh_row.user_id, refresh_row.business_id, list(refresh_row.scopes or [])
+        from app.services.ai.ai_mcp_connections import clone_stored_tool_permissions
+
+        tool_permissions = clone_stored_tool_permissions(refresh_row.tool_permissions)
         oauth_grant_id = refresh_row.grant_id
         db.add(refresh_row)
     else:
@@ -777,7 +896,8 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
         user_id=user_id, key_hash=access_hash, key_type="mcp", business_id=business_id,
         mcp_resource=resource, oauth_client_id=client_id, oauth_grant_id=oauth_grant_id,
         name=f"OAuth: {client.client_name}"[:100],
-        scopes=json.dumps(access_scopes), expires_at=datetime.utcnow() + session_ttl,
+        scopes=json.dumps(access_scopes), mcp_tool_permissions=tool_permissions,
+        expires_at=datetime.utcnow() + session_ttl,
     )
     db.add(access_row)
     returned = {"access_token": access_token, "token_type": "Bearer", "expires_in": int(session_ttl.total_seconds()), "scope": " ".join(access_scopes)}
@@ -785,7 +905,8 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
         refresh_token, refresh_hash = generate_api_key(prefix="mcp_refresh_")
         refresh_row = McpOAuthRefreshToken(
             token_hash=refresh_hash, client_id=client_id, user_id=user_id, business_id=business_id,
-            grant_id=oauth_grant_id, resource=resource, scopes=scopes, expires_at=datetime.utcnow() + session_ttl,
+            grant_id=oauth_grant_id, resource=resource, scopes=scopes,
+            tool_permissions=tool_permissions, expires_at=datetime.utcnow() + session_ttl,
         )
         db.add(refresh_row)
         db.flush()

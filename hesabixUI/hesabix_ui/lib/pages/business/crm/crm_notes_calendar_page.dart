@@ -108,7 +108,13 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
     _monthStartLocal = _firstOfMonth(DateTime.now());
     _selectedDay = _onlyDate(DateTime.now());
     widget.calendarController.addListener(_onCalendarChanged);
-    _loadTypes();
+    final noteId = int.tryParse(GoRouterState.of(context).uri.queryParameters['noteId'] ?? '');
+    _loadTypes().then((_) {
+      if (!mounted || noteId == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openNoteEditor(existing: {'id': noteId});
+      });
+    });
     _loadMonth();
   }
 

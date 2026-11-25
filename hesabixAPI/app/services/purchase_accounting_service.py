@@ -16,6 +16,12 @@ from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+from app.services.invoice_unit_conversion_service import (
+	extra_info_dict,
+	inventory_quantity_is_already_main,
+	inventory_quantity_to_main,
+	price_line_to_main,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +40,7 @@ PURCHASE_ACCOUNTING_MODES = frozenset(
 GRNI_ACCOUNT_CODE_LEGACY = "30101"
 GRNI_ACCOUNT_CODE_STANDARD = "10107"
 INVENTORY_ACCOUNT_CODE = "10102"
+SERVICE_PURCHASE_ACCOUNT_CODE = "70401"
 
 GRNI_CLEARANCE_DESC = "تسویه GRNI — رسید انبار"
 GRNI_CLEARANCE_REVERSAL_DESC = "برگشت تسویه GRNI — لغو رسید انبار"
@@ -111,30 +118,40 @@ def add_purchase_invoice_debit_lines(
 	mode: str,
 	accounts: Dict[str, Account],
 	gross: Decimal,
+	service_gross: Decimal = Decimal(0),
 ) -> None:
-	if gross <= 0:
-		return
-	m = normalize_purchase_accounting_mode(mode)
-	if m == PURCHASE_ACCOUNTING_DIRECT:
+	if gross > 0:
+		m = normalize_purchase_accounting_mode(mode)
+		if m == PURCHASE_ACCOUNTING_DIRECT:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["inventory"].id,
+					debit=gross,
+					credit=Decimal(0),
+					description="ثبت موجودی کالا (فاکتور خرید)",
+				)
+			)
+		else:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["grni"].id,
+					debit=gross,
+					credit=Decimal(0),
+					description="ثبت GRNI خرید (مبلغ ناخالص)",
+				)
+			)
+	if service_gross > 0:
 		db.add(
 			DocumentLine(
 				document_id=document_id,
-				account_id=accounts["inventory"].id,
-				debit=gross,
+				account_id=accounts["purchase_service"].id,
+				debit=service_gross,
 				credit=Decimal(0),
-				description="ثبت موجودی کالا (فاکتور خرید)",
+				description="خرید خدمات",
 			)
 		)
-		return
-	db.add(
-		DocumentLine(
-			document_id=document_id,
-			account_id=accounts["grni"].id,
-			debit=gross,
-			credit=Decimal(0),
-			description="ثبت GRNI خرید (مبلغ ناخالص)",
-		)
-	)
 
 
 def add_purchase_return_credit_lines(
@@ -144,30 +161,40 @@ def add_purchase_return_credit_lines(
 	mode: str,
 	accounts: Dict[str, Account],
 	gross: Decimal,
+	service_gross: Decimal = Decimal(0),
 ) -> None:
-	if gross <= 0:
-		return
-	m = normalize_purchase_accounting_mode(mode)
-	if m == PURCHASE_ACCOUNTING_DIRECT:
+	if gross > 0:
+		m = normalize_purchase_accounting_mode(mode)
+		if m == PURCHASE_ACCOUNTING_DIRECT:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["inventory"].id,
+					debit=Decimal(0),
+					credit=gross,
+					description="برگشت موجودی کالا (برگشت از خرید)",
+				)
+			)
+		else:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["grni"].id,
+					debit=Decimal(0),
+					credit=gross,
+					description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
+				)
+			)
+	if service_gross > 0:
 		db.add(
 			DocumentLine(
 				document_id=document_id,
-				account_id=accounts["inventory"].id,
+				account_id=accounts["purchase_service"].id,
 				debit=Decimal(0),
-				credit=gross,
-				description="برگشت موجودی کالا (برگشت از خرید)",
+				credit=service_gross,
+				description="برگشت خرید خدمات",
 			)
 		)
-		return
-	db.add(
-		DocumentLine(
-			document_id=document_id,
-			account_id=accounts["grni"].id,
-			debit=Decimal(0),
-			credit=gross,
-			description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
-		)
-	)
 
 
 def _line_unit_cost_for_purchase(extra: Dict[str, Any]) -> Decimal:
@@ -175,6 +202,37 @@ def _line_unit_cost_for_purchase(extra: Dict[str, Any]) -> Decimal:
 	for key in ("cost_price", "unit_price", "base_purchase_price"):
 		if info.get(key) is not None:
 			return Decimal(str(info[key]))
+	return Decimal(0)
+
+
+def _invoice_item_line_id_from_warehouse_line(ln: WarehouseDocumentLine) -> Optional[int]:
+	extra = extra_info_dict(getattr(ln, "extra_info", None))
+	raw = extra.get("invoice_item_line_id")
+	if raw is None:
+		raw = getattr(ln, "invoice_item_line_id", None)
+	try:
+		return int(raw) if raw is not None else None
+	except (TypeError, ValueError):
+		return None
+
+
+def _purchase_unit_cost_on_main(
+	product: Product,
+	warehouse_extra: Dict[str, Any],
+	invoice_extra: Optional[Dict[str, Any]],
+) -> Decimal:
+	if invoice_extra:
+		raw = _line_unit_cost_for_purchase(invoice_extra)
+		if raw > 0:
+			return price_line_to_main(raw, product, invoice_extra.get("unit"), strict=False)
+	raw = _line_unit_cost_for_purchase(warehouse_extra)
+	if raw > 0:
+		cost_unit = warehouse_extra.get("unit")
+		if inventory_quantity_is_already_main(warehouse_extra):
+			cost_unit = warehouse_extra.get("source_line_unit") or cost_unit
+		return price_line_to_main(raw, product, cost_unit, strict=False)
+	if getattr(product, "base_purchase_price", None) is not None:
+		return Decimal(str(product.base_purchase_price))
 	return Decimal(0)
 
 
@@ -187,9 +245,7 @@ def compute_warehouse_receipt_inventory_amount(
 	for ln in wh_lines:
 		if str(ln.movement or "").strip().lower() != "in":
 			continue
-		qty = Decimal(str(ln.quantity or 0))
-		if qty <= 0:
-			continue
+		warehouse_extra = extra_info_dict(getattr(ln, "extra_info", None))
 		product = (
 			db.query(Product)
 			.filter(Product.id == int(ln.product_id), Product.business_id == int(business_id))
@@ -197,23 +253,29 @@ def compute_warehouse_receipt_inventory_amount(
 		)
 		if not product or not getattr(product, "track_inventory", False):
 			continue
-		unit_cost = Decimal(0)
-		if getattr(ln, "invoice_item_line_id", None):
+		qty_main = inventory_quantity_to_main(
+			ln.quantity,
+			product,
+			warehouse_extra,
+			strict=False,
+		)
+		if qty_main <= 0:
+			continue
+		invoice_extra = None
+		invoice_line_id = _invoice_item_line_id_from_warehouse_line(ln)
+		if invoice_line_id is not None:
 			row = (
 				db.query(InvoiceItemLine)
 				.filter(
-					InvoiceItemLine.id == int(ln.invoice_item_line_id),
+					InvoiceItemLine.id == int(invoice_line_id),
 					InvoiceItemLine.document_id.isnot(None),
 				)
 				.first()
 			)
 			if row:
-				unit_cost = _line_unit_cost_for_purchase(dict(row.extra_info or {}))
-		if unit_cost <= 0:
-			unit_cost = _line_unit_cost_for_purchase(dict(ln.extra_info or {}))
-		if unit_cost <= 0 and getattr(product, "base_purchase_price", None) is not None:
-			unit_cost = Decimal(str(product.base_purchase_price))
-		total += qty * unit_cost
+				invoice_extra = extra_info_dict(row.extra_info)
+		unit_cost_main = _purchase_unit_cost_on_main(product, warehouse_extra, invoice_extra)
+		total += qty_main * unit_cost_main
 	return total
 
 
@@ -399,5 +461,79 @@ def reverse_purchase_grni_clearance_for_warehouse(
 	links["grni_clearances"] = items
 	extra["links"] = links
 	invoice.extra_info = extra
+	db.flush()
+	return True
+
+
+def post_grni_clearance_for_receipt_invoice(
+	db: Session,
+	*,
+	invoice_id: int,
+	warehouse_document_id: int,
+) -> bool:
+	"""تسویه GRNI برای رسیدی که از سفارش خرید آمده و بعداً به فاکتور خرید وصل شده است.
+
+	رسید تدارکات source_type برابر purchase_order دارد، پس تسویهٔ مخصوص حوالهٔ
+	فاکتور اجرا نمی‌شود. این تابع همان سند موجودی/GRNI را روی فاکتور مشخص می‌نویسد.
+	"""
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == int(warehouse_document_id)).first()
+	if not wh or str(wh.status or "").lower() != "posted":
+		return False
+	if str(wh.doc_type or "").strip().lower() != "receipt":
+		return False
+	invoice = (
+		db.query(Document)
+		.filter(Document.id == int(invoice_id), Document.business_id == int(wh.business_id))
+		.first()
+	)
+	if not invoice or str(invoice.document_type or "") != "invoice_purchase":
+		return False
+	mode = resolve_purchase_accounting_mode(
+		db, int(wh.business_id), extra_info=dict(invoice.extra_info or {})
+	)
+	if mode != PURCHASE_ACCOUNTING_GRNI:
+		return False
+	extra = dict(invoice.extra_info or {})
+	if _clearance_already_recorded(extra, int(wh.id)):
+		return False
+	wh_lines = (
+		db.query(WarehouseDocumentLine)
+		.filter(WarehouseDocumentLine.warehouse_document_id == int(wh.id))
+		.all()
+	)
+	receipt_amount = compute_warehouse_receipt_inventory_amount(db, int(wh.business_id), wh_lines)
+	if receipt_amount <= 0:
+		return False
+	from app.services.invoice_service import _get_fixed_account_by_code
+
+	grni_account = resolve_grni_account_for_mode(db, mode)
+	inventory_account = _get_fixed_account_by_code(db, INVENTORY_ACCOUNT_CODE)
+	remaining = _grni_net_on_document(db, int(invoice.id), int(grni_account.id))
+	if remaining <= 0:
+		return False
+	amount = min(remaining, receipt_amount)
+	if amount <= 0:
+		return False
+	db.add(
+		DocumentLine(
+			document_id=int(invoice.id),
+			account_id=int(inventory_account.id),
+			debit=amount,
+			credit=Decimal(0),
+			description=GRNI_CLEARANCE_DESC,
+			extra_info={"warehouse_document_id": int(wh.id), "side": "grni_clearance", "procurement": True},
+		)
+	)
+	db.add(
+		DocumentLine(
+			document_id=int(invoice.id),
+			account_id=int(grni_account.id),
+			debit=Decimal(0),
+			credit=amount,
+			description=GRNI_CLEARANCE_DESC,
+			extra_info={"warehouse_document_id": int(wh.id), "side": "grni_clearance", "procurement": True},
+		)
+	)
+	invoice.extra_info = _append_clearance_record(extra, warehouse_document_id=int(wh.id), amount=amount)
 	db.flush()
 	return True

@@ -1,9 +1,11 @@
 import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/tax_settings_model.dart';
@@ -40,6 +42,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   bool _saving = false;
   bool _providerSaving = false;
   bool _fanavaSyncing = false;
+  bool _motamedAsaBusy = false;
   String? _error;
   TaxSettingsModel? _settings;
   TaxDataQualityReport? _dataQuality;
@@ -86,6 +89,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           _loading = false;
         });
         _loadDataQuality();
+        // Coming back from the Motamed ASA sign-up page: pick up the result without a click.
+        if (_settings?.motamedAsaAccount?['status'] == 'onboarding') {
+          _syncMotamedAsa(silent: true);
+        }
       }
     }
   }
@@ -160,7 +167,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       return true;
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
       return false;
     } finally {
@@ -174,7 +184,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
 
   Future<void> _save() async {
     if (await _saveCurrentTaxSettings() && mounted) {
-      SnackBarHelper.show(context, message: AppLocalizations.of(context).taxSettingsSaved);
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).taxSettingsSaved,
+      );
     }
   }
 
@@ -183,13 +196,21 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final prefill = _settings?.enrollmentPrefill ?? const <String, dynamic>{};
     final formKey = GlobalKey<FormState>();
     final fields = <String, TextEditingController>{
-      'first_name': TextEditingController(text: prefill['first_name']?.toString() ?? ''),
-      'last_name': TextEditingController(text: prefill['last_name']?.toString() ?? ''),
+      'first_name': TextEditingController(
+        text: prefill['first_name']?.toString() ?? '',
+      ),
+      'last_name': TextEditingController(
+        text: prefill['last_name']?.toString() ?? '',
+      ),
       'father_name': TextEditingController(),
-      'national_code': TextEditingController(text: prefill['national_code']?.toString() ?? ''),
+      'national_code': TextEditingController(
+        text: prefill['national_code']?.toString() ?? '',
+      ),
       'identification_number': TextEditingController(),
       'birth_date': TextEditingController(),
-      'phone_number': TextEditingController(text: prefill['phone_number']?.toString() ?? ''),
+      'phone_number': TextEditingController(
+        text: prefill['phone_number']?.toString() ?? '',
+      ),
     };
     bool consent = false;
     try {
@@ -208,21 +229,51 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                   children: [
                     Text(t.fanavaConsentDescription),
                     const SizedBox(height: 16),
-                    Text(t.fanavaRegistrationDataTitle, style: Theme.of(context).textTheme.titleSmall),
+                    Text(
+                      t.fanavaRegistrationDataTitle,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                     const SizedBox(height: 4),
-                    Text(t.fanavaRegistrationDataHint, style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      t.fanavaRegistrationDataHint,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 12),
                     Form(
                       key: formKey,
                       child: Column(
                         children: [
-                          _fanavaEnrollmentField(fields['first_name']!, t.fanavaFirstName),
-                          _fanavaEnrollmentField(fields['last_name']!, t.fanavaLastName),
-                          _fanavaEnrollmentField(fields['father_name']!, t.fanavaFatherName),
-                          _fanavaEnrollmentField(fields['national_code']!, t.fanavaNationalCode, numeric: true),
-                          _fanavaEnrollmentField(fields['identification_number']!, t.fanavaIdentificationNumber),
-                          _fanavaEnrollmentField(fields['birth_date']!, t.fanavaBirthDate, hint: '۱۳۷۰/۰۱/۰۱'),
-                          _fanavaEnrollmentField(fields['phone_number']!, t.fanavaPhoneNumber, numeric: true),
+                          _fanavaEnrollmentField(
+                            fields['first_name']!,
+                            t.fanavaFirstName,
+                          ),
+                          _fanavaEnrollmentField(
+                            fields['last_name']!,
+                            t.fanavaLastName,
+                          ),
+                          _fanavaEnrollmentField(
+                            fields['father_name']!,
+                            t.fanavaFatherName,
+                          ),
+                          _fanavaEnrollmentField(
+                            fields['national_code']!,
+                            t.fanavaNationalCode,
+                            numeric: true,
+                          ),
+                          _fanavaEnrollmentField(
+                            fields['identification_number']!,
+                            t.fanavaIdentificationNumber,
+                          ),
+                          _fanavaEnrollmentField(
+                            fields['birth_date']!,
+                            t.fanavaBirthDate,
+                            hint: '۱۳۷۰/۰۱/۰۱',
+                          ),
+                          _fanavaEnrollmentField(
+                            fields['phone_number']!,
+                            t.fanavaPhoneNumber,
+                            numeric: true,
+                          ),
                         ],
                       ),
                     ),
@@ -231,7 +282,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                       contentPadding: EdgeInsets.zero,
                       value: consent,
                       controlAffinity: ListTileControlAffinity.leading,
-                      onChanged: (value) => setDialogState(() => consent = value == true),
+                      onChanged: (value) =>
+                          setDialogState(() => consent = value == true),
                       title: Text(t.fanavaConsentCheckbox),
                     ),
                   ],
@@ -246,10 +298,13 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
               FilledButton.icon(
                 onPressed: consent
                     ? () {
-                        if (!(formKey.currentState?.validate() ?? false)) return;
+                        if (!(formKey.currentState?.validate() ?? false))
+                          return;
                         Navigator.pop(
                           dialogContext,
-                          fields.map((key, value) => MapEntry(key, value.text.trim())),
+                          fields.map(
+                            (key, value) => MapEntry(key, value.text.trim()),
+                          ),
                         );
                       }
                     : null,
@@ -278,7 +333,11 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       child: TextFormField(
         controller: controller,
         keyboardType: numeric ? TextInputType.number : TextInputType.text,
-        decoration: InputDecoration(labelText: label, hintText: hint, border: const OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: const OutlineInputBorder(),
+        ),
         validator: (value) => value == null || value.trim().isEmpty
             ? AppLocalizations.of(context).required
             : null,
@@ -290,7 +349,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final t = AppLocalizations.of(context);
     if (_providerSaving || _saving) return;
     if (providerCode == _settings?.submissionProvider &&
-        (providerCode == 'moadian_direct' || _settings?.fanavaAccount?['connected'] == true)) {
+        (providerCode == 'moadian_direct' ||
+            _settings?.fanavaAccount?['connected'] == true)) {
       return;
     }
     if (providerCode == 'fanava' && _settings?.fanavaAvailable != true) return;
@@ -305,7 +365,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     Map<String, dynamic>? enrollment;
     final accountStatus = _settings?.fanavaAccount?['status']?.toString();
     final canReconcilePreviousRegistration =
-        accountStatus == 'registering' || accountStatus == 'registration_unknown';
+        accountStatus == 'registering' ||
+        accountStatus == 'registration_unknown';
     if (providerCode == 'fanava' &&
         _settings?.fanavaAccount?['connected'] != true &&
         !canReconcilePreviousRegistration) {
@@ -334,11 +395,16 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       setState(() => _settings = refreshed);
       SnackBarHelper.show(
         context,
-        message: providerCode == 'fanava' ? t.fanavaConnectedSuccess : t.taxSubmissionDirect,
+        message: providerCode == 'fanava'
+            ? t.fanavaConnectedSuccess
+            : t.taxSubmissionDirect,
       );
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
         await _load();
       }
     } finally {
@@ -357,9 +423,394 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       setState(() => _settings = refreshed);
       SnackBarHelper.show(context, message: t.fanavaSyncSuccess);
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      if (mounted)
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
     } finally {
       if (mounted) setState(() => _fanavaSyncing = false);
+    }
+  }
+
+  static final Uri _motamedAsaRulesUri = Uri.parse('https://asatsp.ir/rules');
+  static final Uri _motamedAsaPrivacyUri = Uri.parse(
+    'https://asatsp.ir/privacy#partner-software',
+  );
+
+  Future<bool> _requestMotamedAsaConsent() async {
+    final t = AppLocalizations.of(context);
+    bool consent = false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final textTheme = Theme.of(dialogContext).textTheme;
+          return AlertDialog(
+            title: Text(t.motamedAsaConsentTitle),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.motamedAsaConsentDescription),
+                    const SizedBox(height: 16),
+                    Text(
+                      t.motamedAsaSharedDataTitle,
+                      style: textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    _consentBullet(t.motamedAsaSharedDataSignup),
+                    _consentBullet(t.motamedAsaSharedDataInvoices),
+                    const SizedBox(height: 8),
+                    Text(
+                      t.motamedAsaSharedDataPurpose,
+                      style: textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => launchUrl(
+                            _motamedAsaRulesUri,
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(Icons.gavel_outlined, size: 18),
+                          label: Text(t.motamedAsaTermsLink),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => launchUrl(
+                            _motamedAsaPrivacyUri,
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(
+                            Icons.privacy_tip_outlined,
+                            size: 18,
+                          ),
+                          label: Text(t.motamedAsaPrivacyLink),
+                        ),
+                      ],
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: consent,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (value) =>
+                          setDialogState(() => consent = value == true),
+                      title: Text(t.motamedAsaConsentCheckbox),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(t.cancel),
+              ),
+              FilledButton.icon(
+                onPressed: consent
+                    ? () => Navigator.pop(dialogContext, true)
+                    : null,
+                icon: const Icon(Icons.open_in_new),
+                label: Text(t.motamedAsaContinueButton),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return result == true;
+  }
+
+  Widget _consentBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.check_circle_outline, size: 18),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+
+  String? _validMotamedAsaEconomicCode() {
+    final economicCode = _convertDigitsToEnglish(
+      _economicCodeController.text.trim(),
+    );
+    if (!RegExp(r'^(\d{11}|\d{14})$').hasMatch(economicCode)) {
+      SnackBarHelper.showError(
+        context,
+        message: AppLocalizations.of(context).motamedAsaEconomicCodeRequired,
+      );
+      return null;
+    }
+    return economicCode;
+  }
+
+  Future<void> _selectMotamedAsa() async {
+    final t = AppLocalizations.of(context);
+    if (_providerSaving || _saving || _motamedAsaBusy) return;
+    if (_settings?.submissionProvider == 'motamed_asa' &&
+        _settings?.motamedAsaAccount?['connected'] == true) {
+      return;
+    }
+    final economicCode = _validMotamedAsaEconomicCode();
+    if (economicCode == null) return;
+    if (!await _requestMotamedAsaConsent() || !mounted) return;
+
+    setState(() => _providerSaving = true);
+    try {
+      final result = await _service.selectProvider(
+        businessId: widget.businessId,
+        providerCode: 'motamed_asa',
+        consent: true,
+        economicCode: economicCode,
+      );
+      if (!mounted) return;
+      setState(() => _settings = result);
+      final url = result.motamedAsaOnboardingUrl;
+      if (url != null) {
+        await _openMotamedAsaSignup(url);
+      } else if (result.motamedAsaAccount?['connected'] == true) {
+        SnackBarHelper.show(context, message: t.motamedAsaConnectedSuccess);
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+        await _load();
+      }
+    } finally {
+      if (mounted) setState(() => _providerSaving = false);
+    }
+  }
+
+  Future<void> _openMotamedAsaSignup(String url) async {
+    final t = AppLocalizations.of(context);
+    final uri = Uri.tryParse(url);
+    var opened = false;
+    if (uri != null && uri.scheme == 'https') {
+      try {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        opened = false;
+      }
+    }
+    if (!mounted) return;
+    if (opened) {
+      SnackBarHelper.show(context, message: t.motamedAsaSignupOpened);
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(t.motamedAsaOpenSignup),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.motamedAsaLinkCopyHint),
+            const SizedBox(height: 8),
+            SelectableText(url, textDirection: ui.TextDirection.ltr),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _copyToClipboard(url),
+            icon: const Icon(Icons.copy, size: 18),
+            label: Text(t.copyLink),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(t.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _renewMotamedAsaLink() async {
+    if (_motamedAsaBusy) return;
+    setState(() => _motamedAsaBusy = true);
+    try {
+      final data = await _service.renewMotamedAsaLink(widget.businessId);
+      final onboarding = data['motamed_asa_onboarding'];
+      final url = onboarding is Map ? onboarding['url']?.toString() : null;
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      if (url != null && url.isNotEmpty) {
+        await _openMotamedAsaSignup(url);
+      } else if (refreshed.motamedAsaAccount?['connected'] == true) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).motamedAsaConnectedSuccess,
+        );
+      }
+    } catch (e) {
+      if (mounted)
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+    } finally {
+      if (mounted) setState(() => _motamedAsaBusy = false);
+    }
+  }
+
+  Future<void> _syncMotamedAsa({bool silent = false}) async {
+    if (_motamedAsaBusy) return;
+    setState(() => _motamedAsaBusy = true);
+    try {
+      await _service.syncMotamedAsaAccount(widget.businessId);
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      final t = AppLocalizations.of(context);
+      if (refreshed.motamedAsaAccount?['connected'] == true &&
+          refreshed.submissionProvider == 'motamed_asa') {
+        if (!silent)
+          SnackBarHelper.show(context, message: t.motamedAsaConnectedSuccess);
+      } else if (!silent) {
+        SnackBarHelper.show(context, message: t.motamedAsaSyncSuccess);
+      }
+    } catch (e) {
+      if (mounted && !silent) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _motamedAsaBusy = false);
+    }
+  }
+
+  Future<void> _enterMotamedAsaCredentials() async {
+    final t = AppLocalizations.of(context);
+    if (_motamedAsaBusy) return;
+    final economicCode = _validMotamedAsaEconomicCode();
+    if (economicCode == null) return;
+    final formKey = GlobalKey<FormState>();
+    final clientId = TextEditingController();
+    final clientSecret = TextEditingController();
+    bool consent = false;
+    try {
+      final submitted = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(t.motamedAsaCredentialsTitle),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.motamedAsaCredentialsDescription),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: clientId,
+                        textDirection: ui.TextDirection.ltr,
+                        decoration: InputDecoration(
+                          labelText: t.motamedAsaClientId,
+                          hintText: 'v2-customer-12345',
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            RegExp(
+                              r'^v2-customer-\d+$',
+                            ).hasMatch(value?.trim() ?? '')
+                            ? null
+                            : t.motamedAsaClientIdInvalid,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: clientSecret,
+                        obscureText: true,
+                        textDirection: ui.TextDirection.ltr,
+                        decoration: InputDecoration(
+                          labelText: t.motamedAsaClientSecret,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? t.required
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: consent,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (value) =>
+                            setDialogState(() => consent = value == true),
+                        title: Text(t.motamedAsaConsentCheckbox),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(t.cancel),
+              ),
+              FilledButton.icon(
+                onPressed: consent
+                    ? () {
+                        if (!(formKey.currentState?.validate() ?? false))
+                          return;
+                        Navigator.pop(dialogContext, true);
+                      }
+                    : null,
+                icon: const Icon(Icons.link),
+                label: Text(t.motamedAsaSaveCredentials),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (submitted != true || !mounted) return;
+      setState(() => _motamedAsaBusy = true);
+      await _service.saveMotamedAsaCredentials(
+        businessId: widget.businessId,
+        clientId: clientId.text.trim(),
+        clientSecret: clientSecret.text.trim(),
+        economicCode: economicCode,
+      );
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      SnackBarHelper.show(context, message: t.motamedAsaConnectedSuccess);
+    } catch (e) {
+      if (mounted)
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+    } finally {
+      clientId.dispose();
+      clientSecret.dispose();
+      if (mounted) setState(() => _motamedAsaBusy = false);
     }
   }
 
@@ -393,9 +844,9 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         widget.businessId,
         formPayload: formPayload,
       );
-      
+
       if (!mounted) return;
-      
+
       final status = result['status']?.toString() ?? '';
       final message = result['message']?.toString();
       final sandboxMode = result['sandbox_mode'] as bool? ?? false;
@@ -422,13 +873,13 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                 isOk
                     ? Icons.check_circle
                     : isIdentityIssue
-                        ? Icons.gpp_bad
-                        : Icons.warning_amber,
+                    ? Icons.gpp_bad
+                    : Icons.warning_amber,
                 color: isOk
                     ? SemanticColorResolver.positive(context)
                     : isIdentityIssue
-                        ? SemanticColorResolver.negative(context)
-                        : SemanticColorResolver.warning(context),
+                    ? SemanticColorResolver.negative(context)
+                    : SemanticColorResolver.warning(context),
               ),
               SizedBox(width: 8),
               Expanded(child: Text(t.taxTestConnectionResultTitle)),
@@ -446,8 +897,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     Text(
                       t.taxTestConnectionJwtTitle,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     if (jwtClaims['sub'] != null)
@@ -459,12 +910,16 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     if (auth?['tax_memory_id_match'] == false)
                       Text(
                         t.taxTestConnectionMemoryMismatch,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     if (auth?['economic_code_match'] == false)
                       Text(
                         t.taxTestConnectionEconomicMismatch,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                   ],
                   if (identityCheck != null) ...[
@@ -476,8 +931,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     Text(
                       t.taxConfigurationWarningsTitle,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     ...warnings.map((w) => _buildWarningTile(context, w)),
@@ -487,12 +942,17 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: SemanticColorResolver.warning(context).withValues(alpha: 0.18),
+                        color: SemanticColorResolver.warning(
+                          context,
+                        ).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.warning_amber, color: SemanticColorResolver.warning(context)),
+                          Icon(
+                            Icons.warning_amber,
+                            color: SemanticColorResolver.warning(context),
+                          ),
                           const SizedBox(width: 8),
                           Expanded(child: Text(t.taxSandboxModeActive)),
                         ],
@@ -511,15 +971,20 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           ],
         ),
       );
-      
+
       if (isOk) {
         SnackBarHelper.show(context, message: t.taxTestConnectionSuccess);
       } else if (isIdentityIssue) {
-        SnackBarHelper.showError(context, message: t.taxTestConnectionIdentityFailed);
+        SnackBarHelper.showError(
+          context,
+          message: t.taxTestConnectionIdentityFailed,
+        );
       } else {
-        SnackBarHelper.showWarning(context, message: t.taxTestConnectionWithWarnings);
+        SnackBarHelper.showWarning(
+          context,
+          message: t.taxTestConnectionWithWarnings,
+        );
       }
-      
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -555,8 +1020,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final color = level == 'error'
         ? Theme.of(context).colorScheme.error
         : level == 'info'
-            ? Theme.of(context).colorScheme.primary
-            : SemanticColorResolver.warning(context);
+        ? Theme.of(context).colorScheme.primary
+        : SemanticColorResolver.warning(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -589,9 +1054,9 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         Text(
           t.taxIdentityCheckTitle,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isFailed ? Theme.of(context).colorScheme.error : null,
-              ),
+            fontWeight: FontWeight.bold,
+            color: isFailed ? Theme.of(context).colorScheme.error : null,
+          ),
         ),
         const SizedBox(height: 6),
         Text(msg),
@@ -599,7 +1064,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           const SizedBox(height: 8),
           ...failures.take(5).map((item) {
             if (item is! Map) return const SizedBox.shrink();
-            final code = item['code']?.toString() ?? item['invoice_id']?.toString() ?? '';
+            final code =
+                item['code']?.toString() ??
+                item['invoice_id']?.toString() ??
+                '';
             final err = item['tax_error_message']?.toString() ?? '';
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -618,8 +1086,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       return const SizedBox.shrink();
     }
 
-    final hasError = identity?.isFailed == true ||
-        warnings.any((w) => w.level == 'error');
+    final hasError =
+        identity?.isFailed == true || warnings.any((w) => w.level == 'error');
 
     return Container(
       width: double.infinity,
@@ -650,9 +1118,9 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
               const SizedBox(width: 8),
               Text(
                 t.taxConfigurationWarningsTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -669,10 +1137,11 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           ],
           const SizedBox(height: 8),
           ...warnings.map(
-            (w) => _buildWarningTile(
-              context,
-              {'code': w.code, 'level': w.level, 'message': w.message},
-            ),
+            (w) => _buildWarningTile(context, {
+              'code': w.code,
+              'level': w.level,
+              'message': w.message,
+            }),
           ),
         ],
       ),
@@ -711,13 +1180,19 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       }
       if (!mounted) return;
       if (generated.csr == null || generated.csr!.trim().isEmpty) {
-        SnackBarHelper.showWarning(context, message: t.taxGenerateKeysCsrMissing);
+        SnackBarHelper.showWarning(
+          context,
+          message: t.taxGenerateKeysCsrMissing,
+        );
       } else {
         SnackBarHelper.show(context, message: t.taxKeysGenerated);
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     } finally {
       if (mounted) {
@@ -743,33 +1218,33 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     return MoadianPluginGate(
       businessId: widget.businessId,
       child: DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(t.taxIntegrationTitle),
-          leading: businessSubpageBackLeading(context, widget.businessId),
-          backgroundColor: cs.surface,
-          foregroundColor: cs.onSurface,
-          bottom: TabBar(
-            tabs: [
-              Tab(
-                text: t.taxSettingsTabConnection,
-                icon: const Icon(Icons.cloud_sync_outlined),
-              ),
-              Tab(
-                text: t.taxSettingsTabDataQuality,
-                icon: const Icon(Icons.fact_check_outlined),
-              ),
-              Tab(
-                text: t.taxSettingsTabGuide,
-                icon: const Icon(Icons.menu_book_outlined),
-              ),
-            ],
+        length: 3,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(t.taxIntegrationTitle),
+            leading: businessSubpageBackLeading(context, widget.businessId),
+            backgroundColor: cs.surface,
+            foregroundColor: cs.onSurface,
+            bottom: TabBar(
+              tabs: [
+                Tab(
+                  text: t.taxSettingsTabConnection,
+                  icon: const Icon(Icons.cloud_sync_outlined),
+                ),
+                Tab(
+                  text: t.taxSettingsTabDataQuality,
+                  icon: const Icon(Icons.fact_check_outlined),
+                ),
+                Tab(
+                  text: t.taxSettingsTabGuide,
+                  icon: const Icon(Icons.menu_book_outlined),
+                ),
+              ],
+            ),
           ),
+          body: _buildBody(t, cs),
         ),
-        body: _buildBody(t, cs),
       ),
-    ),
     );
   }
 
@@ -925,13 +1400,18 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(t.taxSubmissionMethodLabel, style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          t.taxSubmissionMethodLabel,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         const SizedBox(height: 4),
         RadioListTile<String>(
           contentPadding: EdgeInsets.zero,
           value: 'moadian_direct',
           groupValue: provider,
-          onChanged: (_saving || _providerSaving) ? null : (_) => _selectSubmissionProvider('moadian_direct'),
+          onChanged: (_saving || _providerSaving)
+              ? null
+              : (_) => _selectSubmissionProvider('moadian_direct'),
           title: Text(t.taxSubmissionDirect),
           subtitle: Text(t.taxSubmissionDirectDescription),
         ),
@@ -939,7 +1419,11 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           contentPadding: EdgeInsets.zero,
           value: 'fanava',
           groupValue: provider,
-          onChanged: (_saving || _providerSaving || _sandboxMode || _settings?.fanavaAvailable != true)
+          onChanged:
+              (_saving ||
+                  _providerSaving ||
+                  _sandboxMode ||
+                  _settings?.fanavaAvailable != true)
               ? null
               : (_) => _selectSubmissionProvider('fanava'),
           title: Text(t.taxSubmissionFanava),
@@ -947,10 +1431,31 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             _sandboxMode
                 ? t.fanavaSandboxUnavailable
                 : _settings?.fanavaAvailable == true
-                    ? t.taxSubmissionFanavaDescription
-                    : t.fanavaUnavailable,
+                ? t.taxSubmissionFanavaDescription
+                : t.fanavaUnavailable,
           ),
         ),
+        RadioListTile<String>(
+          contentPadding: EdgeInsets.zero,
+          value: 'motamed_asa',
+          groupValue: provider,
+          onChanged:
+              (_saving ||
+                  _providerSaving ||
+                  _motamedAsaBusy ||
+                  _settings?.motamedAsaAvailable != true)
+              ? null
+              : (_) => _selectMotamedAsa(),
+          title: Text(t.taxSubmissionMotamedAsa),
+          subtitle: Text(
+            _settings?.motamedAsaAvailable == true
+                ? t.taxSubmissionMotamedAsaDescription
+                : t.motamedAsaUnavailable,
+          ),
+        ),
+        if (provider == 'motamed_asa' && _sandboxMode)
+          _buildMotamedAsaSandboxNote(t),
+        _buildMotamedAsaStatus(t),
         if (_providerSaving)
           const LinearProgressIndicator(minHeight: 2)
         else if (status != 'not_connected' || connected)
@@ -960,8 +1465,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: connected
-                  ? SemanticColorResolver.positive(context).withValues(alpha: 0.10)
-                  : SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+                  ? SemanticColorResolver.positive(
+                      context,
+                    ).withValues(alpha: 0.10)
+                  : SemanticColorResolver.warning(
+                      context,
+                    ).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -970,22 +1479,37 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                 Row(
                   children: [
                     Icon(
-                      connected ? Icons.check_circle_outline : Icons.sync_problem_outlined,
+                      connected
+                          ? Icons.check_circle_outline
+                          : Icons.sync_problem_outlined,
                       color: connected
                           ? SemanticColorResolver.positive(context)
                           : SemanticColorResolver.warning(context),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(connected ? t.fanavaConnected : _fanavaStatusLabel(t, status))),
+                    Expanded(
+                      child: Text(
+                        connected
+                            ? t.fanavaConnected
+                            : _fanavaStatusLabel(t, status),
+                      ),
+                    ),
                     if (connected)
                       TextButton.icon(
                         onPressed: _fanavaSyncing ? null : _syncFanavaAccount,
                         icon: _fanavaSyncing
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Icon(Icons.refresh, size: 18),
                         label: Text(t.fanavaSyncAccount),
                       )
-                    else if (status == 'registering' || status == 'registration_unknown')
+                    else if (status == 'registering' ||
+                        status == 'registration_unknown')
                       TextButton.icon(
                         onPressed: (_providerSaving || _saving)
                             ? null
@@ -1003,6 +1527,122 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Where Motamed ASA sends while sandbox mode is on, and what the business needs for it.
+  Widget _buildMotamedAsaSandboxNote(AppLocalizations t) {
+    final tone = SemanticColorResolver.warning(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.science_outlined, color: tone),
+          const SizedBox(width: 8),
+          Expanded(child: Text(t.motamedAsaSandboxNote)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMotamedAsaStatus(AppLocalizations t) {
+    final account = _settings?.motamedAsaAccount;
+    if (account == null) return const SizedBox.shrink();
+    final status = account['status']?.toString() ?? 'not_connected';
+    final connected = account['connected'] == true;
+    final lastError = account['last_error']?.toString();
+    if (!connected &&
+        status == 'not_connected' &&
+        (lastError == null || lastError.trim().isEmpty)) {
+      return const SizedBox.shrink();
+    }
+    final memoryId = account['memory_unique_id']?.toString();
+    final tone = connected
+        ? SemanticColorResolver.positive(context)
+        : SemanticColorResolver.warning(context);
+    final label = connected
+        ? t.motamedAsaConnected
+        : switch (status) {
+            'onboarding' => t.motamedAsaOnboarding,
+            'credentials_required' => t.motamedAsaCredentialsRequired,
+            _ => t.motamedAsaNotConnected,
+          };
+    final busy = _motamedAsaBusy || _providerSaving || _saving;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: connected ? 0.10 : 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                connected
+                    ? Icons.check_circle_outline
+                    : Icons.sync_problem_outlined,
+                color: tone,
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(label)),
+            ],
+          ),
+          if (connected && memoryId != null && memoryId.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${t.motamedAsaMemoryId}: $memoryId',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          if (!connected &&
+              lastError != null &&
+              lastError.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(lastError, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 4,
+            children: [
+              if (!connected && status != 'credentials_required')
+                TextButton.icon(
+                  onPressed: busy ? null : _renewMotamedAsaLink,
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: Text(t.motamedAsaOpenSignup),
+                ),
+              if (!connected)
+                TextButton.icon(
+                  onPressed: busy ? null : _enterMotamedAsaCredentials,
+                  icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                  label: Text(t.motamedAsaEnterCredentials),
+                ),
+              TextButton.icon(
+                onPressed: busy ? null : () => _syncMotamedAsa(),
+                icon: _motamedAsaBusy
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(t.motamedAsaCheckConnection),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1109,7 +1749,9 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                 ),
                 wrapButton(
                   FilledButton.tonalIcon(
-                    onPressed: (_saving || _settings == null) ? null : _testConnection,
+                    onPressed: (_saving || _settings == null)
+                        ? null
+                        : _testConnection,
                     icon: const Icon(Icons.network_check),
                     label: Text(t.taxTestConnectionButton),
                   ),
@@ -1206,11 +1848,13 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     }
   }
-
 
   String _convertDigitsToEnglish(String input) {
     if (input.isEmpty) return input;
@@ -2147,8 +2791,8 @@ class _GenerateKeysDialogState extends State<_GenerateKeysDialog> {
               Text(
                 t.taxGenerateKeysCsrHint,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(

@@ -30,7 +30,11 @@ from app.services.warehouse_placement_sync import placement_reconciliation_for_w
 router = APIRouter(prefix="/warehouses", tags=["چیدمان انبار"])
 
 
-@router.get("/business/{business_id}/{warehouse_id}/locations")
+@router.get(
+	"/business/{business_id}/{warehouse_id}/locations",
+	summary="درخت محل‌های انبار",
+	description="ابزار MCP: `list_warehouse_locations`.",
+)
 @require_business_access("business_id")
 def list_locations_endpoint(
 	request: Request,
@@ -44,7 +48,11 @@ def list_locations_endpoint(
 	return success_response(data=data, request=request)
 
 
-@router.post("/business/{business_id}/{warehouse_id}/locations")
+@router.post(
+	"/business/{business_id}/{warehouse_id}/locations",
+	summary="ایجاد محل انبار",
+	description="ابزار MCP: `create_warehouse_location` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_location_endpoint(
 	request: Request,
@@ -59,7 +67,11 @@ def create_location_endpoint(
 	return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.put("/business/{business_id}/{warehouse_id}/locations/{location_id}")
+@router.put(
+	"/business/{business_id}/{warehouse_id}/locations/{location_id}",
+	summary="ویرایش محل انبار",
+	description="ابزار MCP: `update_warehouse_location` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_location_endpoint(
 	request: Request,
@@ -77,7 +89,11 @@ def update_location_endpoint(
 	return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.delete("/business/{business_id}/{warehouse_id}/locations/{location_id}")
+@router.delete(
+	"/business/{business_id}/{warehouse_id}/locations/{location_id}",
+	summary="حذف محل انبار",
+	description="ابزار MCP: `delete_warehouse_location` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_location_endpoint(
 	request: Request,
@@ -92,7 +108,11 @@ def delete_location_endpoint(
 	return success_response({"deleted": ok}, request=request)
 
 
-@router.get("/business/{business_id}/{warehouse_id}/placement-reconciliation")
+@router.get(
+	"/business/{business_id}/{warehouse_id}/placement-reconciliation",
+	summary="مغایرت چیدمان انبار",
+	description="ابزار MCP: `reconcile_warehouse_placements`.",
+)
 @require_business_access("business_id")
 def placement_reconciliation_endpoint(
 	request: Request,
@@ -110,7 +130,11 @@ def placement_reconciliation_endpoint(
 	return success_response(data=data, request=request)
 
 
-@router.get("/business/{business_id}/{warehouse_id}/placements")
+@router.get(
+	"/business/{business_id}/{warehouse_id}/placements",
+	summary="چیدمان کالا در انبار",
+	description="ابزار MCP: `list_warehouse_placements`.",
+)
 @require_business_access("business_id")
 def list_placements_endpoint(
 	request: Request,
@@ -126,7 +150,11 @@ def list_placements_endpoint(
 	return success_response(data=data, request=request)
 
 
-@router.post("/business/{business_id}/{warehouse_id}/placements")
+@router.post(
+	"/business/{business_id}/{warehouse_id}/placements",
+	summary="ثبت چیدمان کالا",
+	description="ابزار MCP: `create_warehouse_placement` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_placement_endpoint(
 	request: Request,
@@ -141,7 +169,11 @@ def create_placement_endpoint(
 	return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.put("/business/{business_id}/{warehouse_id}/placements/{placement_id}")
+@router.put(
+	"/business/{business_id}/{warehouse_id}/placements/{placement_id}",
+	summary="ویرایش چیدمان کالا",
+	description="ابزار MCP: `update_warehouse_placement` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_placement_endpoint(
 	request: Request,
@@ -159,7 +191,11 @@ def update_placement_endpoint(
 	return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.delete("/business/{business_id}/{warehouse_id}/placements/{placement_id}")
+@router.delete(
+	"/business/{business_id}/{warehouse_id}/placements/{placement_id}",
+	summary="حذف چیدمان کالا",
+	description="ابزار MCP: `delete_warehouse_placement` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_placement_endpoint(
 	request: Request,

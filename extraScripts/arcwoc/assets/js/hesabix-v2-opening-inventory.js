@@ -107,7 +107,7 @@
 		}
 		var inF = false;
 		for (var i = 0; i < filtered.length; i++) {
-			if (filtered[i].id === sid) {
+			if (parseInt(filtered[i].id, 10) === sid) {
 				inF = true;
 				break;
 			}
@@ -117,7 +117,7 @@
 		}
 		var extra = null;
 		(fullList || []).forEach(function (a) {
-			if (a.id === sid) {
+			if (parseInt(a.id, 10) === sid) {
 				extra = a;
 			}
 		});
@@ -127,41 +127,110 @@
 		return [extra].concat(filtered);
 	}
 
-	function fillAccountSelects() {
-		var invSel = $('#ob_inv_inventory_account_id');
-		var eqSel = $('#ob_inv_equity_account_id');
-		var invKeep = invSel.val();
-		var eqKeep = eqSel.val();
-		var $ini = $('#hesabix-v2-obinv-initial');
-		var invInit = parseInt($ini.attr('data-inventory-id') || '0', 10);
-		var eqInit = parseInt($ini.attr('data-equity-id') || '0', 10);
-		var q = accountSearchQuery();
-		var base = filterAccountsList(accountsCache, q);
-		var invList = ensureSelectedInList(base, invKeep || String(invInit || ''), accountsCache);
-		var eqList = ensureSelectedInList(base, eqKeep || String(eqInit || ''), accountsCache);
+	function locCfg() {
+		return window.hesabix_v2_ob_inv || {};
+	}
 
-		invSel.find('option:not(:first)').remove();
-		eqSel.find('option:not(:first)').remove();
-		invList.forEach(function (a) {
-			invSel.append($('<option></option>').attr('value', a.id).text(accountDisplayLabel(a)));
-		});
-		eqList.forEach(function (a) {
-			eqSel.append($('<option></option>').attr('value', a.id).text(accountDisplayLabel(a)));
-		});
-		if (invKeep && invKeep !== '0') {
-			invSel.val(invKeep);
-		} else if (invInit) {
-			invSel.val(String(invInit));
+	function savedAccountId(kind) {
+		var hiddenId = kind === 'inventory' ? '#ob_inv_inventory_account_id_hidden' : '#ob_inv_equity_account_id_hidden';
+		var fromHidden = parseInt($(hiddenId).val() || '0', 10);
+		if (fromHidden > 0) {
+			return fromHidden;
 		}
-		if (eqKeep && eqKeep !== '0') {
-			eqSel.val(eqKeep);
-		} else if (eqInit) {
-			eqSel.val(String(eqInit));
+		var loc = locCfg();
+		if (kind === 'inventory') {
+			return parseInt(loc.savedInventoryAccountId || '0', 10);
+		}
+		return parseInt(loc.savedEquityAccountId || '0', 10);
+	}
+
+	function defaultAccountCodes(kind) {
+		var loc = locCfg();
+		var list = kind === 'inventory' ? loc.defaultInventoryCodes : loc.defaultEquityCodes;
+		return Array.isArray(list) ? list : [];
+	}
+
+	function pickDefaultAccountId($sel, codes) {
+		var i;
+		for (i = 0; i < codes.length; i++) {
+			var $opt = $sel.find('option[data-code="' + String(codes[i]) + '"]').first();
+			if ($opt.length) {
+				return String($opt.val() || '');
+			}
+		}
+		return '';
+	}
+
+	function appendAccountOptions($sel, list) {
+		(list || []).forEach(function (a) {
+			if (!a || !a.id) {
+				return;
+			}
+			var $opt = $('<option></option>').attr('value', String(a.id)).text(accountDisplayLabel(a));
+			if (a.code) {
+				$opt.attr('data-code', String(a.code));
+			}
+			$sel.append($opt);
+		});
+	}
+
+	function applyAccountSelection($sel, wantedId, defaultCodes) {
+		var want = parseInt(wantedId || '0', 10);
+		if (want > 0) {
+			$sel.val(String(want));
+		}
+		if (!$sel.val() || $sel.val() === '0') {
+			var def = pickDefaultAccountId($sel, defaultCodes);
+			if (def) {
+				$sel.val(def);
+			}
 		}
 	}
 
-	function loadAccounts(cb) {
-		$('#hesabix_v2_obinv_status').text(s('loadAccounts'));
+	function syncAccountHidden() {
+		var inv = parseInt($('#ob_inv_inventory_account_id').val() || '0', 10);
+		var eq = parseInt($('#ob_inv_equity_account_id').val() || '0', 10);
+		if (inv > 0) {
+			$('#ob_inv_inventory_account_id_hidden').val(String(inv));
+		}
+		if (eq > 0) {
+			$('#ob_inv_equity_account_id_hidden').val(String(eq));
+		}
+	}
+
+	function accountIdFromUi(selectSel, hiddenSel) {
+		var v = parseInt($(selectSel).val() || '0', 10);
+		if (v > 0) {
+			return v;
+		}
+		return parseInt($(hiddenSel).val() || '0', 10);
+	}
+
+	function fillAccountSelects() {
+		var invSel = $('#ob_inv_inventory_account_id');
+		var eqSel = $('#ob_inv_equity_account_id');
+		var invKeep = parseInt(invSel.val() || '0', 10);
+		var eqKeep = parseInt(eqSel.val() || '0', 10);
+		var invWant = invKeep > 0 ? invKeep : savedAccountId('inventory');
+		var eqWant = eqKeep > 0 ? eqKeep : savedAccountId('equity');
+		var q = accountSearchQuery();
+		var base = filterAccountsList(accountsCache, q);
+		var invList = ensureSelectedInList(base, invWant, accountsCache);
+		var eqList = ensureSelectedInList(base, eqWant, accountsCache);
+
+		invSel.find('option:not(:first)').remove();
+		eqSel.find('option:not(:first)').remove();
+		appendAccountOptions(invSel, invList);
+		appendAccountOptions(eqSel, eqList);
+		applyAccountSelection(invSel, invWant, defaultAccountCodes('inventory'));
+		applyAccountSelection(eqSel, eqWant, defaultAccountCodes('equity'));
+		syncAccountHidden();
+	}
+
+	function loadAccounts(cb, isAuto) {
+		if (!isAuto) {
+			$('#hesabix_v2_obinv_status').text(s('loadAccounts'));
+		}
 		$.post(window.hesabix_v2_ob_inv.ajax_url, {
 			action: 'hesabix_v2_opening_inventory_accounts',
 			nonce: window.hesabix_v2_ob_inv.nonce,
@@ -242,8 +311,8 @@
 			cost_basis: $('#ob_inv_cost_basis').val(),
 			auto_balance_to_equity: $('#ob_inv_auto_balance').is(':checked') ? 1 : 0,
 			do_post: $('#ob_inv_do_post').is(':checked') ? 1 : 0,
-			inventory_account_id: parseInt($('#ob_inv_inventory_account_id').val() || '0', 10),
-			equity_account_id: parseInt($('#ob_inv_equity_account_id').val() || '0', 10),
+			inventory_account_id: accountIdFromUi('#ob_inv_inventory_account_id', '#ob_inv_inventory_account_id_hidden'),
+			equity_account_id: accountIdFromUi('#ob_inv_equity_account_id', '#ob_inv_equity_account_id_hidden'),
 			batch_size: parseInt($('#ob_inv_batch_size').val() || '12', 10),
 			warehouse_id: parseInt($('#ob_inv_warehouse_override').val() || '0', 10),
 		};
@@ -453,11 +522,19 @@
 		$('#hesabix_v2_default_warehouse_id').on('change', refreshWarehouseRowOnly);
 		$('#ob_inv_warehouse_override').on('input change', refreshWarehouseRowOnly);
 
+		$('#ob_inv_inventory_account_id, #ob_inv_equity_account_id').on('change', syncAccountHidden);
+
 		$('#hesabix_v2_obinv_load_accounts').on('click', function () {
 			loadAccounts(function (ok, err) {
 				$('#hesabix_v2_obinv_status').text(ok ? '' : err || s('accountsError'));
-			});
+			}, false);
 		});
+
+		loadAccounts(function (ok, err) {
+			if (!ok) {
+				$('#hesabix_v2_obinv_status').text(err || s('accountsError'));
+			}
+		}, true);
 
 		$('#hesabix_v2_obinv_preview').on('click', function () {
 			var $btn = $(this);
@@ -525,9 +602,13 @@
 		});
 
 		$('.hesabix-v2-settings-tabs').on('click', 'a[data-tab="opening_inv"]', function () {
-			loadAccounts(function () {
-				$('#hesabix_v2_obinv_status').text('');
-			});
+			if (accountsCache.length) {
+				fillAccountSelects();
+				return;
+			}
+			loadAccounts(function (ok, err) {
+				$('#hesabix_v2_obinv_status').text(ok ? '' : (err || s('accountsError')));
+			}, true);
 		});
 
 		$('#hesabix_v2_obinv_run').on('click', function () {

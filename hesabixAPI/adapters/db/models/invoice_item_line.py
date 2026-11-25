@@ -23,4 +23,12 @@ class InvoiceItemLine(Base):
 	ledger_recognized_at = Column(DateTime, nullable=True, comment="زمان شناسایی قطعی")
 	ledger_recognition_event = Column(String(40), nullable=True, comment="warehouse_document_posting | sales_invoice_document")
 
+	# Snapshot مبنای purchase_price در لحظه ثبت/ویرایش فروش؛ مبلغ به ارز پایه و روی واحد ردیف است.
+	purchase_price_snapshot_unit_cost_base = Column(Numeric(18, 6), nullable=True)
+	purchase_price_snapshot_currency_id = Column(Integer, nullable=True)
+	purchase_price_snapshot_unit = Column(String(32), nullable=True)
+	purchase_price_snapshot_factor = Column(Numeric(18, 6), nullable=True)
+	purchase_price_snapshot_source = Column(String(40), nullable=True)
+	purchase_price_snapshot_at = Column(DateTime, nullable=True)
+
 

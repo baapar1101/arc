@@ -20,7 +20,11 @@ from adapters.api.v1.invoices import SUPPORTED_INVOICE_TYPES
 router = APIRouter(prefix="/tax-reports", tags=["tax-reports"])
 
 
-@router.post("/business/{business_id}/export")
+@router.post(
+    "/business/{business_id}/export",
+    summary="خروجی گزارش مالیاتی",
+    description="خروجی باینری/فایل است و در MCP ثبت نشده. داده JSON از `get_report` و ابزارهای ارسال صورتحساب مالیاتی استفاده شود.",
+)
 @require_business_access("business_id")
 def export_tax_report(
     request: Request,

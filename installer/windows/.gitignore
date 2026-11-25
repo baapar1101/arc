@@ -3,6 +3,7 @@ dist/
 *.msi
 *.exe
 hesabix.aip.bak
+*-cache/
 
 # Local code-signing material (never commit)
 codesign.pfx

@@ -22,7 +22,7 @@ class CreatePromptRequest(BaseModel):
     prompt_type: str = "system"
 
 
-@router.get("/my", summary="دریافت prompt های شخصی")
+@router.get("/my", summary="دریافت prompt های شخصی", description="prompt حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 async def get_my_prompts(
     request: Request,
     db: Session = Depends(get_db),
@@ -48,7 +48,7 @@ async def get_my_prompts(
     return success_response(result, request)
 
 
-@router.post("/my", summary="ایجاد prompt شخصی")
+@router.post("/my", summary="ایجاد prompt شخصی", description="prompt حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 async def create_my_prompt(
     request: Request,
     prompt_data: CreatePromptRequest = Body(...),
@@ -80,7 +80,7 @@ async def create_my_prompt(
     }, request, "Prompt شخصی با موفقیت ایجاد شد")
 
 
-@router.put("/my/{prompt_id}", summary="ویرایش prompt شخصی")
+@router.put("/my/{prompt_id}", summary="ویرایش prompt شخصی", description="prompt حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 async def update_my_prompt(
     prompt_id: int = Path(...),
     request: Request = None,
@@ -115,7 +115,7 @@ async def update_my_prompt(
     }, request, "Prompt با موفقیت به‌روزرسانی شد")
 
 
-@router.delete("/my/{prompt_id}", summary="حذف prompt شخصی")
+@router.delete("/my/{prompt_id}", summary="حذف prompt شخصی", description="prompt حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 async def delete_my_prompt(
     prompt_id: int = Path(...),
     request: Request = None,

@@ -30,7 +30,11 @@ router = APIRouter(prefix="/tax/product-codes", tags=["tax-product-codes"])
 admin_router = APIRouter(prefix="/admin/tax/product-codes", tags=["admin-tax-product-codes"])
 
 
-@router.get("")
+@router.get(
+    "",
+    summary="جستجوی کد کالای مالیاتی",
+    description="ابزار MCP: `search_tax_product_codes`. جستجو در فهرست کد کالا/خدمت واردشده از سامانه امور مالیاتی با عبارت q و صفحه‌بندی skip/take (حداکثر ۲۰۰).",
+)
 def search_tax_codes_endpoint(
     request: Request,
     q: str | None = Query(None, description="عبارت جستجو (کد یا شرح)"),
@@ -44,7 +48,11 @@ def search_tax_codes_endpoint(
     return success_response(data, request)
 
 
-@router.get("/{code}")
+@router.get(
+    "/{code}",
+    summary="شرح کد کالای مالیاتی",
+    description="ابزار MCP: `get_tax_product_code`. اگر کد در فهرست سیستم باشد شرح را برمی‌گرداند؛ در غیر این صورت پاسخ موفق با found=false تا ثبت کالا متوقف نشود.",
+)
 def get_tax_code_endpoint(
     request: Request,
     code: str,

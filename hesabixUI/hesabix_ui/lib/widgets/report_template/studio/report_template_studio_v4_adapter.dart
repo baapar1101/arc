@@ -99,7 +99,7 @@ Map<String, dynamic> _mergedNode(
 ) {
   final result = _cloneMap(node);
   final override = _map(overrides[(node['id'] ?? '').toString()]);
-  for (final key in const ['layout', 'placement', 'style']) {
+  for (final key in const ['layout', 'placement', 'style', 'constraints']) {
     if (override[key] is Map) {
       result[key] = <String, dynamic>{
         ..._map(result[key]),
@@ -151,6 +151,7 @@ Map<String, dynamic> reportTemplateV4StudioProjection(
         final fallbackWidth = pageWidth * span / 60;
         final style = <String, dynamic>{
           ..._map(component['style']),
+          'anchor_constraints': _cloneMap(_map(component['constraints'])),
           'row_id': row['id'],
           'layout_type': 'page_grid',
           'grid_span': placement['column_span'] ?? 60,
@@ -239,6 +240,7 @@ Map<String, dynamic> _layoutFromBlocks(List<Map<String, dynamic>> blocks) {
 
 Map<String, dynamic> _componentFromBlock(Map<String, dynamic> block) {
   final style = _cloneMap(_map(block['style']));
+  final constraints = _cloneMap(_map(style.remove('anchor_constraints')));
   final layoutType = (style['layout_type'] ?? 'grid').toString();
   final placement = layoutType == 'freeform' || layoutType == 'page_grid'
       ? <String, dynamic>{
@@ -277,6 +279,7 @@ Map<String, dynamic> _componentFromBlock(Map<String, dynamic> block) {
     'props': _cloneMap(_map(block['props'])),
     'style': style,
     'placement': placement,
+    if (constraints.isNotEmpty) 'constraints': constraints,
   };
 }
 
@@ -468,8 +471,10 @@ Map<String, dynamic> applyStudioProjectionToReportTemplateV4(
             'height_mm': height,
           };
         }
+        final constraints = _cloneMap(_map(node['constraints']));
         nextOverrides[nodeEntry.key] = <String, dynamic>{
           'placement': placement,
+          if (constraints.isNotEmpty) 'constraints': constraints,
         };
       }
     }

@@ -31,7 +31,7 @@ router = APIRouter(tags=["expense-income"])
 @router.post(
     "/businesses/{business_id}/expense-income/create",
     summary="ایجاد سند هزینه یا درآمد",
-    description="ایجاد سند هزینه/درآمد با چند سطر حساب و چند طرف‌حساب",
+    description="ایجاد سند هزینه/درآمد با چند سطر حساب و چند طرف‌حساب. ابزار MCP: `create_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_expense_income_endpoint(
@@ -55,7 +55,7 @@ async def create_expense_income_endpoint(
     summary="ایجاد/ویرایش گروهی هزینه و درآمد",
     description=(
         "بدنه: `{ items:[{client_ref?, document_id?, payload}], migration_mode? }`؛ "
-        "حداکثر ۲۰۰ آیتم؛ payload همان بدنه ایجاد تکی است."
+        "حداکثر ۲۰۰ آیتم؛ payload همان بدنه ایجاد تکی است. ابزار MCP تکی: `create_expense_income` / `update_expense_income`."
     ),
 )
 @require_business_access("business_id")
@@ -81,7 +81,7 @@ async def bulk_upsert_expense_income_endpoint(
 @router.post(
     "/businesses/{business_id}/expense-income",
     summary="لیست اسناد هزینه/درآمد",
-    description="دریافت لیست اسناد هزینه/درآمد با جستجو و صفحه‌بندی",
+    description="جستجو و صفحه‌بندی. ابزار MCP: `search_expense_income`.",
 )
 @require_business_access("business_id")
 async def list_expense_income_endpoint(
@@ -130,7 +130,7 @@ async def list_expense_income_endpoint(
 @router.get(
     "/expense-income/{document_id}",
     summary="جزئیات سند هزینه/درآمد",
-    description="دریافت جزئیات یک سند هزینه یا درآمد",
+    description="ابزار MCP: `get_expense_income`. extra_info در MCP برنمی‌گردد.",
 )
 async def get_expense_income_endpoint(
     request: Request,
@@ -165,7 +165,7 @@ async def get_expense_income_endpoint(
 @router.put(
     "/expense-income/{document_id}",
     summary="ویرایش سند هزینه/درآمد",
-    description="ویرایش یک سند هزینه یا درآمد",
+    description="ابزار MCP: `update_expense_income` (نیازمند تأیید).",
 )
 async def update_expense_income_endpoint(
     request: Request,
@@ -188,7 +188,7 @@ async def update_expense_income_endpoint(
 @router.delete(
     "/expense-income/{document_id}",
     summary="حذف سند هزینه/درآمد",
-    description="حذف یک سند هزینه یا درآمد",
+    description="ابزار MCP: `delete_expense_income` (نیازمند تأیید).",
 )
 async def delete_expense_income_endpoint(
     request: Request,
@@ -214,7 +214,7 @@ async def delete_expense_income_endpoint(
 @router.post(
     "/expense-income/bulk-delete",
     summary="حذف گروهی اسناد هزینه/درآمد",
-    description="حذف چندین سند هزینه یا درآمد",
+    description="ابزار MCP: `bulk_delete_expense_income` (نیازمند تأیید).",
 )
 async def delete_multiple_expense_income_endpoint(
     request: Request,
@@ -277,7 +277,7 @@ async def delete_multiple_expense_income_endpoint(
 @router.post(
     "/businesses/{business_id}/expense-income/export/excel",
     summary="خروجی Excel اسناد هزینه/درآمد",
-    description="دریافت فایل Excel لیست اسناد هزینه/درآمد",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `search_expense_income`.",
 )
 @require_business_access("business_id")
 async def export_expense_income_excel_endpoint(
@@ -326,7 +326,7 @@ async def export_expense_income_excel_endpoint(
 @router.post(
     "/businesses/{business_id}/expense-income/export/pdf",
     summary="خروجی PDF اسناد هزینه/درآمد",
-    description="دریافت فایل PDF لیست اسناد هزینه/درآمد",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `search_expense_income`.",
 )
 @require_business_access("business_id")
 async def export_expense_income_pdf_endpoint(
@@ -518,7 +518,7 @@ async def export_expense_income_pdf_endpoint(
 @router.get(
     "/expense-income/{document_id}/pdf",
     summary="PDF یک سند هزینه/درآمد",
-    description="دریافت فایل PDF یک سند هزینه یا درآمد",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_expense_income`.",
 )
 async def get_expense_income_pdf_endpoint(
     request: Request,

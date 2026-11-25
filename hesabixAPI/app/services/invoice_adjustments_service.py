@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any, Dict, List, Tuple, Optional
 
 from sqlalchemy import or_
@@ -16,6 +16,7 @@ from adapters.db.models.document_line import DocumentLine
 from app.core.responses import ApiError
 
 INVOICE_ADJUSTMENTS_KEY = "invoice_adjustments"
+SALES_RECEIVABLE_TOTAL_KEY = "_server_sales_receivable_total"
 
 INVOICE_SALES = "invoice_sales"
 INVOICE_PURCHASE = "invoice_purchase"
@@ -39,6 +40,17 @@ def total_with_tax_from_totals_dict(totals: Dict[str, Any]) -> Decimal:
     return _money_quant(gross - discount + tax + adj_n + adj_t)
 
 
+def sales_receivable_total_from_totals(totals: dict[str, Any]) -> Decimal | None:
+    stored = totals.get(SALES_RECEIVABLE_TOTAL_KEY)
+    if not isinstance(stored, str):
+        return None
+    try:
+        amount = Decimal(stored)
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() else None
+
+
 def payable_total_from_totals_dict(totals: Dict[str, Any]) -> Decimal:
     """
     مبلغ قابل پرداخت/دریافت فاکتور (مبنای مانده و سقف تخصیص دریافت/پرداخت).
@@ -48,6 +60,9 @@ def payable_total_from_totals_dict(totals: Dict[str, Any]) -> Decimal:
     """
     if not isinstance(totals, dict):
         return Decimal(0)
+    receivable = sales_receivable_total_from_totals(totals)
+    if receivable is not None:
+        return receivable
     if "net" in totals:
         net = Decimal(str(totals.get("net", 0)))
         adj_n = Decimal(str(totals.get("adjustments_net", 0)))

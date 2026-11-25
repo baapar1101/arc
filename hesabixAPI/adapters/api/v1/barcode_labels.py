@@ -31,7 +31,11 @@ def _uid(ctx: AuthContext) -> int | None:
 		return None
 
 
-@router.get("/business/{business_id}/templates", summary="لیست طرح‌های برچسب")
+@router.get(
+	"/business/{business_id}/templates",
+	summary="لیست طرح‌های برچسب",
+	description="ابزار MCP: `list_barcode_label_templates`.",
+)
 def list_templates(
 	request: Request,
 	business_id: int,
@@ -48,7 +52,11 @@ def list_templates(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.post("/business/{business_id}/templates", summary="ایجاد طرح برچسب")
+@router.post(
+	"/business/{business_id}/templates",
+	summary="ایجاد طرح برچسب",
+	description="استودیوی بصری است و در MCP ثبت نشده. ساخت از preset: `create_barcode_label_from_preset`.",
+)
 def create_template(
 	request: Request,
 	business_id: int,
@@ -71,7 +79,11 @@ def create_template(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.get("/business/{business_id}/templates/default", summary="طرح پیش‌فرض")
+@router.get(
+	"/business/{business_id}/templates/default",
+	summary="طرح پیش‌فرض",
+	description="ابزار MCP: `get_default_barcode_label_template`.",
+)
 def get_default(
 	request: Request,
 	business_id: int,
@@ -85,7 +97,11 @@ def get_default(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.post("/business/{business_id}/templates/set-default", summary="تنظیم طرح پیش‌فرض")
+@router.post(
+	"/business/{business_id}/templates/set-default",
+	summary="تنظیم طرح پیش‌فرض",
+	description="ابزار MCP: `set_default_barcode_label_template` (نیازمند تأیید).",
+)
 def set_default(
 	request: Request,
 	business_id: int,
@@ -100,7 +116,11 @@ def set_default(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.post("/business/{business_id}/templates/from-preset", summary="ساخت طرح از preset")
+@router.post(
+	"/business/{business_id}/templates/from-preset",
+	summary="ساخت طرح از preset",
+	description="ابزار MCP: `create_barcode_label_from_preset` (نیازمند تأیید).",
+)
 def from_preset(
 	request: Request,
 	business_id: int,
@@ -121,7 +141,11 @@ def from_preset(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.get("/business/{business_id}/templates/{template_id}", summary="جزئیات طرح")
+@router.get(
+	"/business/{business_id}/templates/{template_id}",
+	summary="جزئیات طرح",
+	description="ابزار MCP: `get_barcode_label_template`.",
+)
 def get_template(
 	request: Request,
 	business_id: int,
@@ -136,7 +160,11 @@ def get_template(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.put("/business/{business_id}/templates/{template_id}", summary="ویرایش طرح")
+@router.put(
+	"/business/{business_id}/templates/{template_id}",
+	summary="ویرایش طرح",
+	description="استودیوی بصری است و در MCP ثبت نشده.",
+)
 def update_template(
 	request: Request,
 	business_id: int,
@@ -158,7 +186,11 @@ def update_template(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.post("/business/{business_id}/templates/{template_id}/publish", summary="انتشار طرح")
+@router.post(
+	"/business/{business_id}/templates/{template_id}/publish",
+	summary="انتشار طرح",
+	description="ابزار MCP: `publish_barcode_label_template` (نیازمند تأیید).",
+)
 def publish_template(
 	request: Request,
 	business_id: int,
@@ -173,7 +205,11 @@ def publish_template(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.post("/business/{business_id}/templates/{template_id}/archive", summary="بایگانی طرح")
+@router.post(
+	"/business/{business_id}/templates/{template_id}/archive",
+	summary="بایگانی طرح",
+	description="ابزار MCP: `archive_barcode_label_template` (نیازمند تأیید).",
+)
 def archive_template(
 	request: Request,
 	business_id: int,
@@ -188,7 +224,11 @@ def archive_template(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.post("/business/{business_id}/templates/{template_id}/duplicate", summary="کپی طرح")
+@router.post(
+	"/business/{business_id}/templates/{template_id}/duplicate",
+	summary="کپی طرح",
+	description="ابزار MCP: `duplicate_barcode_label_template` (نیازمند تأیید).",
+)
 def duplicate_template(
 	request: Request,
 	business_id: int,
@@ -206,6 +246,7 @@ def duplicate_template(
 @router.get(
 	"/business/{business_id}/templates/{template_id}/revisions",
 	summary="تاریخچه نسخه‌های طرح",
+	description="بازنگری‌های یک قالب برچسب بارکد. ابزار MCP: `list_barcode_label_revisions`.",
 )
 def list_revisions(
 	request: Request,
@@ -221,7 +262,11 @@ def list_revisions(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.get("/business/{business_id}/presets", summary="گالری preset سیستمی")
+@router.get(
+	"/business/{business_id}/presets",
+	summary="گالری preset سیستمی",
+	description="ابزار MCP: `list_barcode_label_presets`.",
+)
 def presets(
 	request: Request,
 	business_id: int,
@@ -234,7 +279,11 @@ def presets(
 	return success_response(svc.presets_catalog(), request)
 
 
-@router.get("/business/{business_id}/sample-context", summary="داده نمونه برای پیش‌نمایش")
+@router.get(
+	"/business/{business_id}/sample-context",
+	summary="داده نمونه برای پیش‌نمایش",
+	description="داده نمونه پیش‌نمایش قالب برچسب. ابزار MCP: `get_barcode_label_sample_context`.",
+)
 def sample_context(
 	request: Request,
 	business_id: int,
@@ -250,6 +299,7 @@ def sample_context(
 @router.get(
 	"/business/{business_id}/printer-settings",
 	summary="تنظیمات پروفایل چاپگر رولی/سیستم",
+	description="ابزار MCP: `get_barcode_label_printer_settings`.",
 )
 def get_printer_settings(
 	request: Request,
@@ -266,6 +316,7 @@ def get_printer_settings(
 @router.put(
 	"/business/{business_id}/printer-settings",
 	summary="ذخیره پروفایل‌های چاپگر",
+	description="ابزار MCP: `update_barcode_label_printer_settings` (نیازمند تأیید). چاپ باینری در MCP نیست.",
 )
 def put_printer_settings(
 	request: Request,

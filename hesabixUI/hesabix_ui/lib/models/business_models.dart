@@ -366,6 +366,7 @@ class BusinessResponse {
   // تنظیمات محاسبه سود فاکتور
   final String? invoiceProfitCalculationMethod;
   final String? invoiceProfitCalculationBasis;
+  final String invoiceProfitMissingPurchasePricePolicy;
   final bool invoiceProfitIncludeOverhead;
   final String? invoiceProfitOverheadType;
   final double? invoiceProfitOverheadPercent;
@@ -378,6 +379,7 @@ class BusinessResponse {
   final bool invoiceSyncUpdatePurchasePriceEnabled;
   final String? invoiceSyncSalesPriceBasis;
   final String? invoiceSyncPurchasePriceBasis;
+  final String invoiceSyncPurchasePriceMultiLinePolicy;
   /// none | draft | posted
   final String invoiceWarehouseReleaseMode;
   /// direct_inventory | grni_two_step | grni_legacy
@@ -388,6 +390,8 @@ class BusinessResponse {
   final bool invoiceDefaultWarehouseFillDocumentHeader;
   /// خروج با کسری برای کالای فله‌ای هنگام قطعی حواله
   final bool allowNegativeInventoryForBulk;
+  final String productDimensionUnit;
+  final String productWeightUnit;
   /// خروج با کسری برای کالای یونیک هنگام قطعی حواله
   final bool allowNegativeInventoryForUnique;
   /// حواله انتقال همیشه کنترل کسری کامل
@@ -448,6 +452,7 @@ class BusinessResponse {
     this.displayTimezone,
     this.invoiceProfitCalculationMethod,
     this.invoiceProfitCalculationBasis,
+    this.invoiceProfitMissingPurchasePricePolicy = 'zero_cost',
     this.invoiceProfitIncludeOverhead = false,
     this.invoiceProfitOverheadType,
     this.invoiceProfitOverheadPercent,
@@ -458,12 +463,15 @@ class BusinessResponse {
     this.invoiceSyncUpdatePurchasePriceEnabled = false,
     this.invoiceSyncSalesPriceBasis,
     this.invoiceSyncPurchasePriceBasis,
+    this.invoiceSyncPurchasePriceMultiLinePolicy = 'weighted_average',
     this.invoiceWarehouseReleaseMode = 'draft',
     this.invoicePurchaseAccountingMode = 'direct_inventory',
     this.invoiceMissingLineWarehousePolicy = 'reject',
     this.invoiceDefaultWarehouseId,
     this.invoiceDefaultWarehouseFillDocumentHeader = true,
     this.allowNegativeInventoryForBulk = false,
+    this.productDimensionUnit = 'mm',
+    this.productWeightUnit = 'g',
     this.allowNegativeInventoryForUnique = false,
     this.warehouseTransferRequirePositiveStock = true,
     this.goodsExpenseIncomeWorkflowMode = 'simple',
@@ -540,6 +548,8 @@ class BusinessResponse {
       displayTimezone: json['display_timezone'] as String?,
       invoiceProfitCalculationMethod: json['invoice_profit_calculation_method'] as String?,
       invoiceProfitCalculationBasis: json['invoice_profit_calculation_basis'] as String?,
+      invoiceProfitMissingPurchasePricePolicy:
+          (json['invoice_profit_missing_purchase_price_policy'] as String?) ?? 'zero_cost',
       invoiceProfitIncludeOverhead: (json['invoice_profit_include_overhead'] as bool?) ?? false,
       invoiceProfitOverheadType: json['invoice_profit_overhead_type'] as String?,
       invoiceProfitOverheadPercent: (json['invoice_profit_overhead_percent'] as num?)?.toDouble(),
@@ -555,6 +565,8 @@ class BusinessResponse {
           (json['invoice_sync_update_purchase_price_enabled'] as bool?) ?? false,
       invoiceSyncSalesPriceBasis: json['invoice_sync_sales_price_basis'] as String?,
       invoiceSyncPurchasePriceBasis: json['invoice_sync_purchase_price_basis'] as String?,
+      invoiceSyncPurchasePriceMultiLinePolicy:
+          (json['invoice_sync_purchase_price_multi_line_policy'] as String?) ?? 'weighted_average',
       invoiceWarehouseReleaseMode: _normalizeInvoiceWarehouseReleaseMode(
         json['invoice_warehouse_release_mode'] as String?,
       ),
@@ -568,6 +580,8 @@ class BusinessResponse {
       invoiceDefaultWarehouseFillDocumentHeader:
           (json['invoice_default_warehouse_fill_document_header'] as bool?) ?? true,
       allowNegativeInventoryForBulk: (json['allow_negative_inventory_for_bulk'] as bool?) ?? false,
+      productDimensionUnit: (json['product_dimension_unit'] as String?) ?? 'mm',
+      productWeightUnit: (json['product_weight_unit'] as String?) ?? 'g',
       allowNegativeInventoryForUnique: (json['allow_negative_inventory_for_unique'] as bool?) ?? false,
       warehouseTransferRequirePositiveStock:
           (json['warehouse_transfer_require_positive_stock'] as bool?) ?? true,

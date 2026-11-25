@@ -33,7 +33,7 @@ def _iso_expires_at(exp) -> str:
 	return expires_at_utc.isoformat()
 
 
-@router.post("/link", summary="ایجاد لینک اتصال بله")
+@router.post("/link", summary="ایجاد لینک اتصال بله", description="توکن اتصال حساب شخصی است و در MCP ثبت نشده. فهرست کسب‌وکار: `list_bale_connected_users`.")
 def create_link(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -70,7 +70,7 @@ def create_link(
 	)
 
 
-@router.get("/status", summary="وضعیت اتصال بله")
+@router.get("/status", summary="وضعیت اتصال بله", description="وضعیت حساب شخصی است و در MCP کسب‌وکار ثبت نشده. فهرست: `list_bale_connected_users`.")
 def link_status(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -85,7 +85,7 @@ def link_status(
 	return success_response(data, request)
 
 
-@router.delete("/unlink", summary="قطع اتصال بله")
+@router.delete("/unlink", summary="قطع اتصال بله", description="قطع اتصال حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 def unlink(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -158,7 +158,7 @@ def _handle_bale_callback_query(
 	return True
 
 
-@router.post("/webhook/{secret}", summary="وب‌هوک بله", name="bale_webhook")
+@router.post("/webhook/{secret}", summary="وب‌هوک بله", name="bale_webhook", description="وب‌هوک عمومی است و در MCP ثبت نشده.")
 def bale_webhook(
 	secret: str,
 	payload: Dict[str, Any] = Body(...),

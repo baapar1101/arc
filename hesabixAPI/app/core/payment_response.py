@@ -4,14 +4,18 @@
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+import json
 import os
 from datetime import datetime
 
 from sqlalchemy.orm import Session
+
+from app.core.runtime_paths import REPOSITORY_ROOT
 
 
 # تنظیم Jinja2 environment
@@ -110,16 +114,90 @@ def join_frontend_url(base: str, path: str) -> str:
     return f"{base}{path}"
 
 
+_GENERIC_BRAND_NAMES = frozenset(
+    {
+        "",
+        "hesabix",
+        "hesabix api",
+        "hesabixapi",
+        "حسابیکس",
+        "حساب‌یکس",
+    }
+)
+_PAY_PAGE_FONT_FILES = frozenset(
+    {
+        "YekanBakhFaNum-Regular.woff2",
+        "YekanBakhFaNum-Regular.ttf",
+        "YekanBakhFaNum-SemiBold.woff2",
+        "YekanBakhFaNum-SemiBold.ttf",
+        "YekanBakhFaNum-Bold.woff2",
+        "YekanBakhFaNum-Bold.ttf",
+        "YekanBakhFaNum-ExtraBold.woff2",
+        "YekanBakhFaNum-ExtraBold.ttf",
+    }
+)
+
+
+def _normalize_brand_key(value: str) -> str:
+    return (value or "").replace("\u200c", "").strip().lower()
+
+
+def _is_generic_brand_name(value: str) -> bool:
+    return _normalize_brand_key(value) in _GENERIC_BRAND_NAMES
+
+
+def branding_display_names() -> tuple[str, str]:
+    """نام فارسی/انگلیسی ریبرند از env یا ‎.deploy_env (همان منبع Flutter)."""
+    from app.core.branding import branding_display_names as _branding_display_names
+
+    return _branding_display_names()
+
+
 def resolve_payment_display_name(db: Session) -> str:
-    """نام نمایشی برند برای صفحات HTML پرداخت (از تنظیمات سیستم)."""
+    """نام نمایشی برند برای صفحات HTML پرداخت (ریبرند، سپس تنظیمات سیستم)."""
     from app.services.system_settings_service import get_app_name
 
+    fa, en = branding_display_names()
+    if fa:
+        return fa
+    if en:
+        return en
     name = (get_app_name(db) or "").strip()
     if name.lower().endswith(" api"):
         name = name[:-4].strip()
-    if not name or name.lower() == "hesabix":
+    if _is_generic_brand_name(name):
         return "حسابیکس"
     return name
+
+
+def rebrand_product_text(text: str, app_name: str | None) -> str:
+    """جایگزینی حسابیکس/Hesabix در متن‌های ثابت صفحات پرداخت."""
+    name = (app_name or "").strip()
+    if not text or not name or _is_generic_brand_name(name):
+        return text
+    return (
+        text.replace("حسابیکس", name)
+        .replace("حساب‌یکس", name)
+        .replace("Hesabix", name)
+    )
+
+
+def pay_page_font_path(font_name: str) -> Optional[Path]:
+    """مسیر فایل فونت فارسی باندل‌شده برای صفحات عمومی پرداخت."""
+    name = Path(str(font_name or "")).name
+    if name not in _PAY_PAGE_FONT_FILES:
+        return None
+    ui_root = REPOSITORY_ROOT / "hesabixUI" / "hesabix_ui"
+    for folder in (ui_root / "web" / "fonts", ui_root / "assets" / "fonts"):
+        path = folder / name
+        if path.is_file():
+            return path
+    return None
+
+
+def pay_page_font_file_uri(font_name: str) -> str:
+    path = pay_page_font_path(font_name)
+    return path.resolve().as_uri() if path is not None else ""
 
 
 def wallet_return_urls(db: Session, business_id: Optional[int] = None) -> Dict[str, str]:
@@ -279,6 +357,22 @@ def render_payment_failed(
     
     html_content = template.render(**context)
     return HTMLResponse(content=html_content, status_code=200)
+
+
+def render_public_business_pay_page(
+    context: Dict[str, Any],
+    *,
+    status_code: int = 200,
+    template_name: str = "public/pay_page.html",
+) -> HTMLResponse:
+    """صفحهٔ HTML عمومی لینک واریز کسب‌وکار (/u/{username}) بدون بارگذاری Flutter."""
+    template = jinja_env.get_template(template_name)
+    html_content = template.render(**context)
+    return HTMLResponse(
+        content=html_content,
+        status_code=status_code,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 def should_return_json(request: Request) -> bool:

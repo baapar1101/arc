@@ -250,6 +250,31 @@ class CreateInvoiceAction(ActionHandler):
                                 "required": False,
                                 "maxLength": 200,
                                 "description": "توضیحات آیتم"
+                            },
+                            "lot_code": {
+                                "type": "string",
+                                "required": False,
+                                "description": "کد لات کالای تاریخ‌دار"
+                            },
+                            "manufacturing_date": {
+                                "type": "string",
+                                "required": False,
+                                "description": "تاریخ تولید لات"
+                            },
+                            "expiry_date": {
+                                "type": "string",
+                                "required": False,
+                                "description": "تاریخ انقضای لات"
+                            },
+                            "lot_allocations": {
+                                "type": "array",
+                                "required": False,
+                                "description": "تخصیص لات؛ خروج خالی با FEFO پر می‌شود"
+                            },
+                            "selected_instance_ids": {
+                                "type": "array",
+                                "required": False,
+                                "description": "واحدهای یونیک تاریخ‌دار"
                             }
                         }
                     },
@@ -455,6 +480,7 @@ class CreateInvoiceAction(ActionHandler):
         from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from app.services.invoice_service import create_invoice
+        from app.core.business_calendar import business_today
         from datetime import datetime, date
         import logging
         
@@ -520,13 +546,13 @@ class CreateInvoiceAction(ActionHandler):
                         document_date = date.fromisoformat(document_date_resolved)
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid document_date format: {document_date_resolved}, using today")
-                    document_date = datetime.now().date()
+                    document_date = business_today(business_id)
             elif isinstance(document_date_resolved, (date, datetime)):
                 document_date = document_date_resolved if isinstance(document_date_resolved, date) else document_date_resolved.date()
             else:
-                document_date = datetime.now().date()
+                document_date = business_today(business_id)
         else:
-            document_date = datetime.now().date()
+            document_date = business_today(business_id)
         
         # حل کردن توضیحات
         description = config.get("description")
@@ -539,12 +565,35 @@ class CreateInvoiceAction(ActionHandler):
             reference_code = WorkflowEngine._resolve_value_static(reference_code, context, node_results)
         
         # آماده‌سازی داده‌های فاکتور
+        stamped_items = []
+        for ln in items if isinstance(items, list) else []:
+            if not isinstance(ln, dict):
+                stamped_items.append(ln)
+                continue
+            row = dict(ln)
+            extra = dict(row.get("extra_info") or {})
+            for key in (
+                "lot_code",
+                "manufacturing_date",
+                "expiry_date",
+                "lot_allocations",
+                "selected_instance_ids",
+                "instance_ids",
+            ):
+                if row.get(key) is not None:
+                    extra[key] = row.get(key)
+            if extra:
+                row["extra_info"] = extra
+                if extra.get("lot_allocations") is not None:
+                    row["lot_allocations"] = extra.get("lot_allocations")
+            stamped_items.append(row)
+
         invoice_data = {
             "invoice_type": str(invoice_type),
             "person_id": int(person_id),
             "currency_id": int(currency_id),
             "document_date": document_date.isoformat(),
-            "lines": items
+            "lines": stamped_items
         }
         
         # افزودن توضیحات (اگر وجود دارد)
@@ -653,6 +702,31 @@ class UpdateInventoryAction(ActionHandler):
                     "type": "number",
                     "description": "تغییر مقدار موجودی (مثبت برای افزایش، منفی برای کاهش)",
                     "required": True
+                },
+                "lot_code": {
+                    "type": "string",
+                    "description": "کد لات برای ورود کالای تاریخ‌دار",
+                    "required": False
+                },
+                "manufacturing_date": {
+                    "type": "string",
+                    "description": "تاریخ تولید لات",
+                    "required": False
+                },
+                "expiry_date": {
+                    "type": "string",
+                    "description": "تاریخ انقضای لات",
+                    "required": False
+                },
+                "lot_allocations": {
+                    "type": "array",
+                    "description": "تخصیص لات؛ خروج خالی با FEFO پر می‌شود",
+                    "required": False
+                },
+                "selected_instance_ids": {
+                    "type": "array",
+                    "description": "واحدهای یونیک تاریخ‌دار",
+                    "required": False
                 }
             }
         }
@@ -667,7 +741,7 @@ class UpdateInventoryAction(ActionHandler):
         from app.services.workflow.dry_run import dry_run_skip
         from app.services.workflow.workflow_engine import WorkflowEngine
         from app.services.warehouse_service import create_manual_warehouse_document, post_warehouse_document
-        from datetime import datetime
+        from app.core.business_calendar import business_today
 
         sk = dry_run_skip(context, "به‌روزرسانی موجودی")
         if sk is not None:
@@ -688,18 +762,36 @@ class UpdateInventoryAction(ActionHandler):
         
         quantity_float = float(quantity)
         
-        # آماده‌سازی داده‌های حواله
+        extra: Dict[str, Any] = {}
+        for key in (
+            "lot_code",
+            "manufacturing_date",
+            "expiry_date",
+            "lot_allocations",
+            "selected_instance_ids",
+        ):
+            val = WorkflowEngine._resolve_value_static(config.get(key), context, node_results)
+            if val is not None:
+                extra[key] = val
+        line: Dict[str, Any] = {
+            "product_id": int(product_id),
+            "warehouse_id": int(warehouse_id),
+            "quantity": abs(quantity_float),
+            "movement": "in" if quantity_float > 0 else "out",
+        }
+        if extra:
+            line["extra_info"] = extra
+            if extra.get("lot_allocations") is not None:
+                line["lot_allocations"] = extra["lot_allocations"]
+            if extra.get("selected_instance_ids") is not None:
+                line["selected_instance_ids"] = extra["selected_instance_ids"]
+                line["instance_ids"] = extra["selected_instance_ids"]
         warehouse_data = {
             "doc_type": "adjustment",
-            "document_date": datetime.now().date().isoformat(),
+            "document_date": business_today(business_id).isoformat(),
             "warehouse_id_from": int(warehouse_id) if quantity_float < 0 else None,
             "warehouse_id_to": int(warehouse_id) if quantity_float > 0 else None,
-            "lines": [{
-                "product_id": int(product_id),
-                "warehouse_id": int(warehouse_id),
-                "quantity": abs(quantity_float),
-                "movement": "in" if quantity_float > 0 else "out"
-            }]
+            "lines": [line]
         }
         
         try:

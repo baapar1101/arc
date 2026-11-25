@@ -8,9 +8,12 @@ import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
 import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/telephony/telephony_dialer_sheet.dart';
+import '../../../widgets/telephony/telephony_party.dart';
 import '../../../widgets/telephony/telephony_recording_player.dart';
 import '../../../services/telephony/telephony_session_controller.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../services/telephony/telephony_l10n.dart';
 
 class TelephonyHubPage extends StatefulWidget {
   final int businessId;
@@ -31,6 +34,20 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
   Map<String, dynamic>? _dashboard;
   bool _loading = true;
   String? _error;
+
+  bool get _canManage =>
+      widget.authStore.hasBusinessPermission('telephony', 'manage') ||
+      (_dashboard?['access'] is Map && (_dashboard?['access'] as Map)['can_manage'] == true);
+
+  bool get _canLive =>
+      widget.authStore.hasBusinessPermission('telephony', 'live_monitor') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
+  bool get _canReports =>
+      widget.authStore.hasBusinessPermission('telephony', 'reports') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
 
   @override
   void initState() {
@@ -63,6 +80,7 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final today = _dashboard?['today'] as Map? ?? {};
     final pbx = (_dashboard?['pbx_connections'] as List? ?? const [])
@@ -102,7 +120,7 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'مرکز تماس',
+                            t.telephonyMenu,
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -111,7 +129,7 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'اتصال Issabel/Asterisk · Screen Pop · Click-to-Call',
+                      t.telephonySubtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 18),
@@ -127,29 +145,32 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                               ..bindBusiness(widget.businessId, pluginActive: true),
                           ),
                           icon: const Icon(Icons.dialpad_rounded),
-                          label: const Text('شماره‌گیر'),
+                          label: Text(t.telephonyDialer),
                         ),
                         OutlinedButton.icon(
                           onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
                           icon: const Icon(Icons.history_rounded),
-                          label: const Text('تاریخچه'),
+                          label: Text(t.history),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/live')),
-                          icon: const Icon(Icons.monitor_heart_outlined),
-                          label: const Text('زنده'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/reports')),
-                          icon: const Icon(Icons.insights_outlined),
-                          label: const Text('گزارش'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
-                          icon: const Icon(Icons.settings_outlined),
-                          label: const Text('تنظیمات'),
-                        ),
+                        if (_canLive)
+                          OutlinedButton.icon(
+                            onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/live')),
+                            icon: const Icon(Icons.monitor_heart_outlined),
+                            label: Text(t.telephonyLive),
+                          ),
+                        if (_canReports)
+                          OutlinedButton.icon(
+                            onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/reports')),
+                            icon: const Icon(Icons.insights_outlined),
+                            label: Text(t.telephonyReports),
+                          ),
+                        if (_canManage)
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
+                            icon: const Icon(Icons.settings_outlined),
+                            label: Text(t.settings),
+                          ),
                         TextButton.icon(
                           onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
                           icon: const Icon(Icons.headset_mic_outlined),
@@ -183,19 +204,19 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                     childAspectRatio: 1.35,
                   ),
                   delegate: SliverChildListDelegate([
-                    _KpiTile(label: 'ورودی امروز', value: '${today['inbound'] ?? 0}', icon: Icons.call_received_rounded, color: scheme.primary),
-                    _KpiTile(label: 'خروجی امروز', value: '${today['outbound'] ?? 0}', icon: Icons.call_made_rounded, color: scheme.tertiary),
-                    _KpiTile(label: 'پاسخ‌داده‌شده', value: '${today['answered'] ?? 0}', icon: Icons.call_rounded, color: const Color(0xFF159947)),
-                    _KpiTile(label: 'از دست‌رفته', value: '${today['missed'] ?? 0}', icon: Icons.call_missed_rounded, color: scheme.error),
-                    _KpiTile(label: 'تماس فعال', value: '${_dashboard?['active_calls'] ?? 0}', icon: Icons.graphic_eq_rounded, color: const Color(0xFFD97706)),
-                    _KpiTile(label: 'از دست‌رفته من', value: '${today['my_missed'] ?? 0}', icon: Icons.person_off_outlined, color: scheme.secondary),
+                    _KpiTile(label: t.telephonyInboundToday, value: '${today['inbound'] ?? 0}', icon: Icons.call_received_rounded, color: scheme.primary),
+                    _KpiTile(label: t.telephonyOutboundToday, value: '${today['outbound'] ?? 0}', icon: Icons.call_made_rounded, color: scheme.tertiary),
+                    _KpiTile(label: t.telephonyAnswered, value: '${today['answered'] ?? 0}', icon: Icons.call_rounded, color: const Color(0xFF159947)),
+                    _KpiTile(label: t.telephonyMissed, value: '${today['missed'] ?? 0}', icon: Icons.call_missed_rounded, color: scheme.error),
+                    _KpiTile(label: t.telephonyActiveCall, value: '${_dashboard?['active_calls'] ?? 0}', icon: Icons.graphic_eq_rounded, color: const Color(0xFFD97706)),
+                    _KpiTile(label: t.telephonyMyMissed, value: '${today['my_missed'] ?? 0}', icon: Icons.person_off_outlined, color: scheme.secondary),
                   ]),
                 ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                  child: Text('وضعیت مراکز تلفن', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(t.telephonyPbxStatusTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                 ),
               ),
               if (pbx.isEmpty)
@@ -210,13 +231,16 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                       ),
                       child: Column(
                         children: [
-                          const Text('هنوز مرکز تلفنی متصل نشده است.'),
+                          Text(t.telephonyNoPbxConnected),
                           const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: () =>
-                                context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
-                            child: const Text('اتصال Issabel'),
-                          ),
+                          if (_canManage)
+                            FilledButton(
+                              onPressed: () =>
+                                  context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
+                              child: Text(t.telephonyConnectIssabel),
+                            )
+                          else
+                            Text(t.telephonyAskAdminMapExt),
                         ],
                       ),
                     ),
@@ -236,8 +260,8 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                         title: Text('${row['name']}'),
                         subtitle: Text('${row['pbx_type']} · ${row['status']}'),
                         trailing: online
-                            ? const Chip(label: Text('آنلاین'), visualDensity: VisualDensity.compact)
-                            : const Chip(label: Text('آفلاین'), visualDensity: VisualDensity.compact),
+                            ? Chip(label: Text(t.telephonyOnline), visualDensity: VisualDensity.compact)
+                            : Chip(label: Text(t.telephonyOffline), visualDensity: VisualDensity.compact),
                       );
                     },
                     childCount: pbx.length,
@@ -356,30 +380,16 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
   }
 
   String _statusFa(String status) {
-    switch (status) {
-      case 'missed':
-        return 'از دست‌رفته';
-      case 'completed':
-        return 'پایان‌یافته';
-      case 'answered':
-        return 'پاسخ داده شد';
-      case 'ringing':
-        return 'زنگ';
-      case 'busy':
-        return 'اشغال';
-      case 'failed':
-        return 'ناموفق';
-      default:
-        return status;
-    }
+    return telephonyCallStatusLabel(AppLocalizations.of(context), status);
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تاریخچه تماس‌ها'),
+        title: Text(t.telephonyCallHistoryTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: Column(
@@ -389,7 +399,7 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
             child: TextField(
               controller: _search,
               decoration: InputDecoration(
-                hintText: 'جستجوی شماره یا یادداشت',
+                hintText: t.telephonySearchNumberOrNote,
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
@@ -402,10 +412,10 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
             child: Row(
               children: [
                 for (final e in [
-                  (null, 'همه'),
-                  ('missed', 'از دست‌رفته'),
-                  ('completed', 'موفق'),
-                  ('ringing', 'فعال'),
+                  (null, t.all),
+                  ('missed', t.telephonyStatusMissed),
+                  ('completed', t.telephonyFilterSuccessful),
+                  ('ringing', t.telephonyStatusActive),
                 ])
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -433,9 +443,12 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                         final c = _items[i];
                         final status = '${c['status'] ?? ''}';
                         final dir = '${c['direction'] ?? ''}';
-                        final peer = dir == 'inbound'
-                            ? (c['from_number_normalized'] ?? c['from_number_raw'])
-                            : (c['to_number_normalized'] ?? c['to_number_raw']);
+                        final peer = telephonyPartyTitle(
+                          c,
+                          unknownLabel: t.telephonyUnknownNumber,
+                          ambiguousLabel: t.telephonyAmbiguousCaller,
+                        );
+                        final peerSub = telephonyPartySubtitle(c);
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: _statusColor(status, scheme).withValues(alpha: 0.15),
@@ -444,12 +457,14 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                               color: _statusColor(status, scheme),
                             ),
                           ),
-                          title: Text('$peer'),
+                          title: Text(peer),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (peerSub != null && peerSub.isNotEmpty)
+                                Text(peerSub, style: Theme.of(context).textTheme.bodySmall),
                               Text(
-                                '${_statusFa(status)} · داخلی ${c['extension'] ?? '—'} · ${c['duration_sec'] ?? 0} ثانیه',
+                                t.telephonyCallListSubtitle(_statusFa(status), '${c['extension'] ?? '—'}', '${c['duration_sec'] ?? 0}'),
                               ),
                               if ('${c['recording_status']}' == 'available')
                                 Padding(
@@ -469,7 +484,7 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                             final ok = await showGlassDialog<bool>(
                               context: context,
                               builder: (ctx) => AlertDialog(
-                                title: const Text('جزئیات تماس'),
+                                title: Text(t.telephonyCallDetails),
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -477,21 +492,21 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                                       controller: note,
                                       minLines: 3,
                                       maxLines: 5,
-                                      decoration: const InputDecoration(labelText: 'یادداشت'),
+                                      decoration: InputDecoration(labelText: t.telephonyNote),
                                     ),
                                     TextField(
                                       controller: category,
-                                      decoration: const InputDecoration(
-                                        labelText: 'دسته‌بندی (فروش/پشتیبانی/مالی)',
+                                      decoration: InputDecoration(
+                                        labelText: t.telephonyCategoryHint,
                                       ),
                                     ),
                                   ],
                                 ),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('بستن')),
+                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.close)),
                                   FilledButton(
                                     onPressed: () => Navigator.pop(ctx, true),
-                                    child: const Text('ذخیره'),
+                                    child: Text(t.save),
                                   ),
                                 ],
                               ),
@@ -530,6 +545,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   List<Map<String, dynamic>> _pbx = [];
   List<Map<String, dynamic>> _extensions = [];
   List<Map<String, dynamic>> _userExt = [];
+  List<Map<String, dynamic>> _users = [];
   Map<String, dynamic>? _settings;
   bool _loading = true;
   String? _freshToken;
@@ -541,18 +557,27 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   }
 
   Future<void> _load() async {
+    if (!widget.authStore.hasBusinessPermission('telephony', 'manage')) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     setState(() => _loading = true);
     try {
       final settings = await _api.getSettings(widget.businessId);
       final pbx = await _api.listPbx(widget.businessId);
       final ext = await _api.listExtensions(widget.businessId);
       final ue = await _api.listUserExtensions(widget.businessId);
+      List<Map<String, dynamic>> users = const [];
+      try {
+        users = await _api.listAssignableUsers(widget.businessId);
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _settings = settings;
           _pbx = pbx;
           _extensions = ext;
           _userExt = ue;
+          _users = users;
           _loading = false;
         });
       }
@@ -565,15 +590,16 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   }
 
   Future<void> _addPbx() async {
-    final nameCtrl = TextEditingController(text: 'مرکز تلفن اصلی');
-    final ok = await showGlassDialog<bool>(
+    final t = AppLocalizations.of(context);
+    final nameCtrl = TextEditingController(text: t.telephonyDefaultPbxName);
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('افزودن مرکز تلفن'),
-        content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام')),
+        title: Text(t.telephonyAddPbx),
+        content: TextField(controller: nameCtrl, decoration: InputDecoration(labelText: t.telephonyPbxName)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ایجاد')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.create)),
         ],
       ),
     );
@@ -587,48 +613,83 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   }
 
   Future<void> _addExtension() async {
+    final t = AppLocalizations.of(context);
     if (_pbx.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا مرکز تلفن بسازید')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.telephonyCreatePbxFirst)));
       return;
     }
     final extCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
-    final pbxId = _pbx.first['id'];
-    final ok = await showGlassDialog<bool>(
+    final teamCtrl = TextEditingController();
+    var allowShared = false;
+    var pbxId = int.tryParse('${_pbx.first['id']}');
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('افزودن داخلی'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: extCtrl, decoration: const InputDecoration(labelText: 'شماره داخلی')),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام نمایشی')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.telephonyAddExtension),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_pbx.length > 1)
+                DropdownButtonFormField<int>(
+                  value: pbxId,
+                  decoration: InputDecoration(labelText: t.telephonyPbx),
+                  items: _pbx
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: int.tryParse('${p['id']}'),
+                          child: Text('${p['name']}'),
+                        ),
+                      )
+                      .where((e) => e.value != null)
+                      .toList(),
+                  onChanged: (v) => setLocal(() => pbxId = v),
+                ),
+              TextField(controller: extCtrl, decoration: InputDecoration(labelText: t.telephonyExtensionNumber)),
+              TextField(controller: nameCtrl, decoration: InputDecoration(labelText: t.telephonyDisplayName)),
+              TextField(
+                controller: teamCtrl,
+                decoration: InputDecoration(
+                  labelText: t.telephonyTeamCode,
+                  hintText: t.telephonyTeamCodeHint,
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.telephonyAllowSharedExt),
+                subtitle: Text(t.telephonyAllowSharedExtHint),
+                value: allowShared,
+                onChanged: (v) => setLocal(() => allowShared = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
-        ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || pbxId == null) return;
     await _api.upsertExtension(widget.businessId, {
       'pbx_id': pbxId,
       'extension': extCtrl.text.trim(),
       'display_name': nameCtrl.text.trim(),
+      'team_code': teamCtrl.text.trim().isEmpty ? null : teamCtrl.text.trim(),
+      'allow_shared': allowShared,
     });
     await _load();
   }
 
   Future<void> _mapMe() async {
+    final t = AppLocalizations.of(context);
     if (_extensions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا داخلی تعریف کنید')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.telephonyCreateExtFirst)));
       return;
     }
-    final userId = widget.authStore.currentUserId;
-    if (userId == null) return;
     await _editUserExtensionMapping(
-      userId: userId,
+      userId: widget.authStore.currentUserId,
       extensionId: int.tryParse('${_extensions.first['id']}'),
       endpointMode: 'relay',
       allowFallback: true,
@@ -637,19 +698,23 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   }
 
   Future<void> _editUserExtensionMapping({
-    required int userId,
+    int? userId,
     int? linkId,
     int? extensionId,
     String endpointMode = 'desk',
     bool allowFallback = true,
     bool isPrimary = true,
     String? directSipUser,
+    bool canSuperviseTeam = false,
   }) async {
     if (_extensions.isEmpty) return;
+    var selectedUserId = userId ?? widget.authStore.currentUserId;
     var selectedExtId = extensionId ?? int.tryParse('${_extensions.first['id']}');
     var mode = endpointMode;
     var fallback = allowFallback;
     var primary = isPrimary;
+    var supervise = canSuperviseTeam;
+    final t = AppLocalizations.of(context);
     final sipCtrl = TextEditingController(text: directSipUser ?? '');
 
     final ok = await showGlassDialog<bool>(
@@ -658,15 +723,30 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              title: Text(linkId == null ? 'نگاشت داخلی / Softphone' : 'ویرایش نگاشت Softphone'),
+              title: Text(linkId == null ? t.telephonyMapExtSoftphone : t.telephonyEditSoftphoneMapping),
               content: SizedBox(
                 width: 420,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<int>(
+                      value: selectedUserId,
+                      decoration: InputDecoration(labelText: t.telephonyBusinessUser),
+                      items: [
+                        for (final u in _users)
+                          DropdownMenuItem(
+                            value: int.tryParse('${u['id']}'),
+                            child: Text('${u['name'] ?? u['id']}'),
+                          ),
+                        if (_users.every((u) => int.tryParse('${u['id']}') != selectedUserId) && selectedUserId != null)
+                          DropdownMenuItem(value: selectedUserId, child: Text(t.telephonyUserId('$selectedUserId'))),
+                      ].where((e) => e.value != null).toList(),
+                      onChanged: (v) => setLocal(() => selectedUserId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
                       value: selectedExtId,
-                      decoration: const InputDecoration(labelText: 'داخلی'),
+                      decoration: InputDecoration(labelText: t.telephonyExtension),
                       items: _extensions
                           .map(
                             (e) => DropdownMenuItem(
@@ -681,60 +761,68 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: mode,
-                      decoration: const InputDecoration(
-                        labelText: 'حالت endpoint',
-                        helperText: 'relay = Softphone داخل اپ · desk = تلفن رومیزی · direct = PJSIP/WebRTC',
+                      decoration: InputDecoration(
+                        labelText: t.telephonyEndpointMode,
+                        helperText: t.telephonyEndpointModeHint,
                       ),
                       items: [
                         DropdownMenuItem(
                           value: 'relay',
-                          child: Text(BrandConfig.rebrand('Relay (Softphone داخل حسابیکس)')),
+                          child: Text(t.branded(t.telephonyEndpointRelay)),
                         ),
-                        const DropdownMenuItem(value: 'desk', child: Text('Desk (تلفن SIP خارجی)')),
-                        const DropdownMenuItem(value: 'direct', child: Text('Direct (رجیستر مستقیم اختیاری)')),
+                        DropdownMenuItem(value: 'desk', child: Text(t.telephonyEndpointDesk)),
+                        DropdownMenuItem(value: 'direct', child: Text(t.telephonyEndpointDirect)),
                       ],
                       onChanged: (v) => setLocal(() => mode = v ?? 'desk'),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('اجازه fallback'),
-                      subtitle: const Text('اگر حالت اصلی در دسترس نبود، حالت جایگزین'),
+                      title: Text(t.telephonyAllowFallback),
+                      subtitle: Text(t.telephonyAllowFallbackHint),
                       value: fallback,
                       onChanged: (v) => setLocal(() => fallback = v),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('داخلی اصلی'),
+                      title: Text(t.telephonyPrimaryExtension),
                       value: primary,
                       onChanged: (v) => setLocal(() => primary = v),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.telephonyTeamSupervisor),
+                      subtitle: Text(t.telephonyTeamSupervisorHint),
+                      value: supervise,
+                      onChanged: (v) => setLocal(() => supervise = v),
                     ),
                     if (mode == 'direct')
                       TextField(
                         controller: sipCtrl,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'SIP user (Direct)',
-                          hintText: 'اختیاری — برای provision مستقیم',
+                          hintText: t.telephonyDirectSipHint,
                         ),
                       ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
               ],
             );
           },
         );
       },
     );
-    if (ok != true || selectedExtId == null) return;
+    if (ok != true || selectedExtId == null || selectedUserId == null) return;
     await _api.upsertUserExtension(widget.businessId, {
-      'user_id': userId,
+      'user_id': selectedUserId,
       'extension_id': selectedExtId,
       'is_primary': primary,
       'receive_screen_pop': true,
       'can_click_to_call': true,
+      'can_supervise_team': supervise,
       'endpoint_mode': mode,
       'allow_mode_fallback': fallback,
       if (mode == 'direct') 'direct_sip_user': sipCtrl.text.trim(),
@@ -743,12 +831,13 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
     TelephonySessionStore.instance.controller.refresh();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('نگاشت ذخیره شد ($mode)')),
+        SnackBar(content: Text(t.telephonyMappingSaved(mode))),
       );
     }
   }
 
   Future<void> _editPbxSoftphone(Map<String, dynamic> pbx) async {
+    final t = AppLocalizations.of(context);
     final settings = Map<String, dynamic>.from((pbx['settings'] as Map?) ?? const {});
     final soft = Map<String, dynamic>.from((settings['softphone'] as Map?) ?? const {});
     var relay = soft['relay_enabled'] != false;
@@ -766,7 +855,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              title: Text('Softphone — ${pbx['name']}'),
+              title: Text(t.telephonySoftphoneForPbx('${pbx['name']}')),
               content: SizedBox(
                 width: 420,
                 child: Column(
@@ -774,34 +863,34 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                   children: [
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('فعال بودن Relay'),
-                      subtitle: const Text('صدا از طریق Connector بدون باز کردن PBX'),
+                      title: Text(t.telephonySoftphoneRelayEnabled),
+                      subtitle: Text(t.telephonySoftphoneRelayHint),
                       value: relay,
                       onChanged: (v) => setLocal(() => relay = v),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('فعال بودن Direct'),
-                      subtitle: const Text('رجیستر مستقیم WebRTC/PJSIP (نیاز به دسترسی شبکه به PBX)'),
+                      title: Text(t.telephonySoftphoneDirectEnabled),
+                      subtitle: Text(t.telephonySoftphoneDirectHint),
                       value: direct,
                       onChanged: (v) => setLocal(() => direct = v),
                     ),
                     TextField(
                       controller: maxCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'سقف سشن همزمان Softphone'),
+                      decoration: InputDecoration(labelText: t.telephonyMaxSoftphoneSessions),
                     ),
                     TextField(
                       controller: portCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'پورت AudioSocket محلی Connector'),
+                      decoration: InputDecoration(labelText: t.telephonyAudiosocketPort),
                     ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
               ],
             );
           },
@@ -821,22 +910,37 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
     await _api.patchPbx(widget.businessId, int.parse('${pbx['id']}'), {'settings': settings});
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تنظیمات Softphone ذخیره شد')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.telephonySoftphoneSettingsSaved)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    if (!widget.authStore.hasBusinessPermission('telephony', 'manage')) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(t.telephonySettingsTitle),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(t.telephonyManageOnlyHint),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تنظیمات مرکز تماس'),
+        title: Text(t.telephonySettingsTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPbx,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('مرکز تلفن'),
+        label: Text(t.telephonyPbx),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -854,7 +958,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('توکن Connector (فقط یک‌بار نمایش داده می‌شود)', style: TextStyle(fontWeight: FontWeight.w700)),
+                        Text(t.telephonyConnectorTokenOnce, style: const TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
                         SelectableText(_freshToken!, style: const TextStyle(fontFamily: 'monospace')),
                         const SizedBox(height: 8),
@@ -862,22 +966,19 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                           onPressed: () async {
                             await Clipboard.setData(ClipboardData(text: _freshToken!));
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('کپی شد')));
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
                             }
                           },
                           icon: const Icon(Icons.copy),
-                          label: const Text('کپی توکن'),
+                          label: Text(t.telephonyCopyToken),
                         ),
                       ],
                     ),
                   ),
-                Text('مراحل راه‌اندازی', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                Text(t.telephonySetupStepsTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                const Text(
-                  '۱) مرکز تلفن بسازید و توکن را کپی کنید\n'
-                  '۲) روی سرور Issabel/Asterisk دستور نصب را اجرا کنید\n'
-                  '۳) داخلی‌ها را تعریف و به کاربران وصل کنید\n'
-                  '۴) برای Softphone داخل‌برنامه: حالت endpoint را روی Relay بگذارید',
+                Text(
+                  t.telephonySetupSteps,
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -891,24 +992,20 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'راه‌اندازی Softphone Relay',
+                        t.telephonyRelaySetupTitle,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'پس از نصب Connector، روی سرور تلفن:\n'
-                        '• pip install -r requirements-softphone.txt\n'
-                        '• MEDIA_TUNNEL_ENABLED=1 و AUDIOSOCKET_PORT=9092 در .env\n'
-                        '• hesabix-pbx restart\n'
-                        'سپس نگاشت کاربر را Relay کنید و از صفحه Softphone آنلاین شوید.',
-                        style: TextStyle(height: 1.45),
+                      Text(
+                        t.telephonyRelaySetupBody,
+                        style: const TextStyle(height: 1.45),
                       ),
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: () =>
                             context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
                         icon: const Icon(Icons.headset_mic_outlined),
-                        label: const Text('باز کردن Softphone'),
+                        label: Text(t.telephonyOpenSoftphone),
                       ),
                     ],
                   ),
@@ -925,15 +1022,12 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'نصب یک‌خطی روی Issabel',
+                        t.telephonyOneLineIssabelInstall,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        BrandConfig.rebrand(
-                          'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد. '
-                          'در ویزارد فقط کلید API (پروفایل ← کلیدهای API) را وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید.',
-                        ),
+                        t.branded(t.telephonyInstallCommandHelp),
                         style: const TextStyle(height: 1.4),
                       ),
                       const SizedBox(height: 10),
@@ -953,12 +1047,12 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                               await Clipboard.setData(const ClipboardData(text: cmd));
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('دستور نصب کپی شد')),
+                                  SnackBar(content: Text(t.telephonyInstallCopied)),
                                 );
                               }
                             },
                             icon: const Icon(Icons.copy_rounded, size: 18),
-                            label: const Text('کپی دستور نصب'),
+                            label: Text(t.telephonyCopyInstallCommand),
                           ),
                           TextButton(
                             onPressed: () async {
@@ -966,17 +1060,17 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                               await Clipboard.setData(const ClipboardData(text: help));
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('دستورات مدیریت کپی شد')),
+                                  SnackBar(content: Text(t.telephonyManageCommandsCopied)),
                                 );
                               }
                             },
-                            child: const Text('کپی دستورات مدیریت'),
+                            child: Text(t.telephonyCopyManageCommands),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'بعد از نصب: hesabix-pbx test  ·  به‌روزرسانی: hesabix-pbx update',
+                        t.telephonyAfterInstallHint,
                         style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
                       ),
                     ],
@@ -985,7 +1079,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 const SizedBox(height: 16),
                 SwitchListTile(
                   title: const Text('Screen Pop'),
-                  subtitle: const Text('نمایش اطلاعات تماس‌گیرنده هنگام زنگ'),
+                  subtitle: Text(t.telephonyScreenPopHint),
                   value: _settings?['screen_pop_enabled'] == true,
                   onChanged: (v) async {
                     await _api.updateSettings(widget.businessId, {'screen_pop_enabled': v});
@@ -993,8 +1087,8 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                   },
                 ),
                 SwitchListTile(
-                  title: const Text('ساخت خودکار فعالیت CRM'),
-                  subtitle: const Text('ثبت فعالیت تماس پس از پایان مکالمه'),
+                  title: Text(t.telephonyAutoCrmActivity),
+                  subtitle: Text(t.telephonyAutoCrmActivityHint),
                   value: _settings?['auto_create_activity'] != false,
                   onChanged: (v) async {
                     await _api.updateSettings(widget.businessId, {'auto_create_activity': v});
@@ -1002,8 +1096,8 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                   },
                 ),
                 SwitchListTile(
-                  title: const Text('فرم اجباری پس از تماس'),
-                  subtitle: const Text('اپراتور باید نتیجه تماس را ثبت کند'),
+                  title: Text(t.telephonyForcePostCallForm),
+                  subtitle: Text(t.telephonyForcePostCallFormHint),
                   value: _settings?['post_call_form_required'] == true,
                   onChanged: (v) async {
                     await _api.updateSettings(widget.businessId, {'post_call_form_required': v});
@@ -1011,8 +1105,8 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                   },
                 ),
                 SwitchListTile(
-                  title: const Text('وظیفه برای تماس از دست‌رفته'),
-                  subtitle: const Text('ساخت تسک پیگیری پس از تماس بی‌پاسخ'),
+                  title: Text(t.telephonyMissedCallTask),
+                  subtitle: Text(t.telephonyMissedCallTaskHint),
                   value: _settings?['missed_call_create_task'] == true,
                   onChanged: (v) async {
                     await _api.updateSettings(widget.businessId, {'missed_call_create_task': v});
@@ -1021,13 +1115,13 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 ),
                 if (_settings?['missed_call_create_task'] == true)
                   ListTile(
-                    title: const Text('مهلت پیگیری (دقیقه)'),
-                    subtitle: Text('${_settings?['missed_call_task_due_minutes'] ?? 60} دقیقه'),
+                    title: Text(t.telephonyFollowUpMinutes),
+                    subtitle: Text(t.telephonyMinutesValue('${_settings?['missed_call_task_due_minutes'] ?? 60}')),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          tooltip: 'کاهش',
+                          tooltip: t.decrease,
                           onPressed: () async {
                             final cur = int.tryParse('${_settings?['missed_call_task_due_minutes']}') ?? 60;
                             final next = (cur - 15).clamp(15, 480);
@@ -1037,7 +1131,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                           icon: const Icon(Icons.remove_circle_outline),
                         ),
                         IconButton(
-                          tooltip: 'افزایش',
+                          tooltip: t.increase,
                           onPressed: () async {
                             final cur = int.tryParse('${_settings?['missed_call_task_due_minutes']}') ?? 60;
                             final next = (cur + 15).clamp(15, 480);
@@ -1050,17 +1144,20 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                     ),
                   ),
                 ListTile(
-                  title: const Text('دسترسی به ضبط مکالمه'),
+                  title: Text(t.telephonyRecordingAccess),
                   subtitle: Text(
-                    '${_settings?['recording_access_mode']}' == 'all_operators'
-                        ? 'همه اپراتورها'
-                        : 'بر اساس مجوز listen_recordings',
+                    {
+                          'all_operators': t.telephonyRecordingAccessAllOperatorsHint,
+                          'owner_and_managers': t.telephonyRecordingAccessOwnerHint,
+                        }['${_settings?['recording_access_mode']}'] ??
+                        t.telephonyRecordingAccessPermissionHint,
                   ),
                   trailing: DropdownButton<String>(
                     value: '${_settings?['recording_access_mode'] ?? 'permission_based'}',
-                    items: const [
-                      DropdownMenuItem(value: 'permission_based', child: Text('مجوزمحور')),
-                      DropdownMenuItem(value: 'all_operators', child: Text('همه')),
+                    items: [
+                      DropdownMenuItem(value: 'permission_based', child: Text(t.telephonyRecordingAccessPermissionBased)),
+                      DropdownMenuItem(value: 'owner_and_managers', child: Text(t.telephonyRecordingAccessOwnerManagers)),
+                      DropdownMenuItem(value: 'all_operators', child: Text(t.telephonyRecordingAccessAllowedOps)),
                     ],
                     onChanged: (v) async {
                       if (v == null) return;
@@ -1069,10 +1166,19 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                     },
                   ),
                 ),
+                SwitchListTile(
+                  title: Text(t.telephonyMultiPbx),
+                  subtitle: Text(t.telephonyMultiPbxHint),
+                  value: _settings?['multi_pbx_enabled'] == true,
+                  onChanged: (v) async {
+                    await _api.updateSettings(widget.businessId, {'multi_pbx_enabled': v});
+                    _load();
+                  },
+                ),
                 const Divider(),
                 ListTile(
-                  title: const Text('مراکز تلفن'),
-                  trailing: TextButton(onPressed: _addPbx, child: const Text('افزودن')),
+                  title: Text(t.telephonyPbxs),
+                  trailing: TextButton(onPressed: _addPbx, child: Text(t.add)),
                 ),
                 ..._pbx.map(
                   (p) {
@@ -1104,7 +1210,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                               setState(() => _freshToken = r['connector_token']?.toString());
                               await _load();
                             },
-                            child: const Text('توکن جدید'),
+                            child: Text(t.telephonyNewToken),
                           ),
                         ],
                       ),
@@ -1113,32 +1219,44 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 ),
                 const Divider(),
                 ListTile(
-                  title: const Text('داخلی‌ها'),
-                  trailing: TextButton(onPressed: _addExtension, child: const Text('افزودن')),
+                  title: Text(t.telephonyExtensions),
+                  subtitle: Text(
+                    t.telephonyExtensionsHint,
+                  ),
+                  trailing: TextButton(onPressed: _addExtension, child: Text(t.add)),
                 ),
                 ..._extensions.map(
                   (e) => ListTile(
                     leading: const Icon(Icons.phone_outlined),
-                    title: Text('${e['extension']}'),
-                    subtitle: Text('${e['display_name'] ?? ''}'),
+                    title: Text('${e['extension']} ${e['display_name'] ?? ''}'),
+                    subtitle: Text(
+                      [
+                        if ('${e['team_code'] ?? ''}'.isNotEmpty) t.telephonyTeamValue('${e['team_code']}'),
+                        e['allow_shared'] == true ? t.telephonyShareable : t.telephonyExclusive,
+                      ].join(' · '),
+                    ),
                   ),
                 ),
                 const Divider(),
                 ListTile(
-                  title: const Text('نگاشت کاربر ↔ داخلی / Softphone'),
-                  subtitle: const Text('حالت Relay برای Softphone داخل اپ، Desk برای تلفن رومیزی'),
-                  trailing: TextButton(onPressed: _mapMe, child: const Text('وصل کردن من (Relay)')),
+                  title: Text(t.telephonyUserExtMapping),
+                  subtitle: Text(t.telephonyUserExtMappingHint),
+                  trailing: TextButton(onPressed: _mapMe, child: Text(t.telephonyAssignExtension)),
                 ),
                 ..._userExt.map(
                   (e) => ListTile(
                     leading: const Icon(Icons.person_outline),
-                    title: Text('کاربر ${e['user_id']} → داخلی ${e['extension']}'),
+                    title: Text(t.telephonyUserToExtension('${e['user_name'] ?? t.telephonyUserId('${e['user_id']}')}', '${e['extension']}')),
                     subtitle: Text(
-                      '${e['is_primary'] == true ? 'اصلی' : 'فرعی'} · حالت ${e['endpoint_mode'] ?? 'desk'}'
-                      '${e['allow_mode_fallback'] == false ? ' · بدون fallback' : ''}',
+                      t.telephonyMappingLine(
+                        e['is_primary'] == true ? t.telephonyPrimary : t.telephonySecondary,
+                        '${e['endpoint_mode'] ?? 'desk'}',
+                        '${e['team_code'] ?? ''}'.isNotEmpty ? ' · ${t.telephonyTeamValue('${e['team_code']}')}' : '',
+                        e['allow_mode_fallback'] == false ? ' · ${t.telephonyNoFallback}' : '',
+                      ),
                     ),
                     trailing: IconButton(
-                      tooltip: 'ویرایش Softphone',
+                      tooltip: t.telephonyEditMapping,
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () => _editUserExtensionMapping(
                         userId: int.parse('${e['user_id']}'),
@@ -1148,14 +1266,15 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                         allowFallback: e['allow_mode_fallback'] != false,
                         isPrimary: e['is_primary'] == true,
                         directSipUser: e['direct_sip_user']?.toString(),
+                        canSuperviseTeam: e['can_supervise_team'] == true,
                       ),
                     ),
                   ),
                 ),
                 const Divider(),
                 ListTile(
-                  title: const Text('عملیات و سلامت'),
-                  subtitle: const Text('متریک‌ها و صف خطاهای Connector'),
+                  title: Text(t.telephonyOpsHealth),
+                  subtitle: Text(t.telephonyOpsHealthHint),
                   trailing: TextButton(
                     onPressed: () async {
                       try {
@@ -1173,9 +1292,9 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                                 height: MediaQuery.sizeOf(ctx).height * 0.7,
                                 child: ListView(
                                   children: [
-                                    Text('متریک‌ها', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                                    Text(t.telephonyMetrics, style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                                     Text('${metrics['metrics']}'),
-                                    Text('DLQ باز: ${metrics['open_dlq']}'),
+                                    Text(t.telephonyOpenDlq('${metrics['open_dlq']}')),
                                     const Divider(),
                                     Text('Dead letters', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                                     ...dlq.map(
@@ -1187,7 +1306,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                                             await _api.resolveDeadLetter(widget.businessId, int.parse('${d['id']}'));
                                             Navigator.pop(ctx);
                                           },
-                                          child: const Text('حل شد'),
+                                          child: Text(t.telephonyResolved),
                                         ),
                                       ),
                                     ),
@@ -1203,7 +1322,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                         }
                       }
                     },
-                    child: const Text('مشاهده'),
+                    child: Text(t.view),
                   ),
                 ),
                 const SizedBox(height: 80),

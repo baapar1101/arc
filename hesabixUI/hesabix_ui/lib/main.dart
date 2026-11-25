@@ -38,6 +38,7 @@ import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'widgets/support/operator_inbox_list.dart';
 import 'pages/profile/operator/operator_dashboard_page.dart';
+import 'pages/profile/operator/support_mcp_connections_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
 import 'pages/admin/storage_management_page.dart';
@@ -78,6 +79,8 @@ import 'pages/admin/support_billing_stats_admin_page.dart';
 import 'pages/profile/support_billing_page.dart';
 import 'pages/admin/document_monetization_page.dart';
 import 'pages/admin/share_link_settings_page.dart';
+import 'pages/admin/pay_page_system_settings_page.dart';
+import 'pages/admin/pay_page_abuse_reports_admin_page.dart';
 import 'pages/admin/marketplace_plugins_admin_page.dart';
 import 'pages/admin/wallet_payouts_admin_page.dart';
 import 'pages/business/invoices_list_page.dart';
@@ -108,6 +111,7 @@ import 'pages/business/stock_count_report_page.dart';
 import 'pages/business/warehouse_documents_summary_report_page.dart';
 import 'pages/business/slow_moving_items_report_page.dart';
 import 'pages/business/critical_stock_report_page.dart';
+import 'pages/business/expiry_stock_report_page.dart';
 import 'pages/business/inter_warehouse_transfers_report_page.dart';
 import 'pages/business/adjustment_documents_report_page.dart';
 import 'pages/business/warehouse_performance_report_page.dart';
@@ -156,6 +160,24 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/procurement/procurement_page.dart';
+import 'pages/business/advanced_production/advanced_production_page.dart';
+import 'pages/business/office_automation/oa_archive_page.dart';
+import 'pages/business/office_automation/oa_cartable_page.dart';
+import 'pages/business/office_automation/oa_external_orgs_page.dart';
+import 'pages/business/office_automation/oa_letter_page.dart';
+import 'pages/business/office_automation/oa_org_page.dart';
+import 'pages/business/office_automation/oa_my_desk_page.dart';
+import 'pages/business/office_automation/oa_documents_page.dart';
+import 'pages/business/office_automation/oa_enterprise_page.dart';
+import 'pages/business/office_automation/oa_processes_page.dart';
+import 'pages/business/office_automation/oa_reports_page.dart';
+import 'pages/business/office_automation/oa_settings_page.dart';
+import 'pages/public/public_oa_track_page.dart';
+import 'pages/public/public_procurement_page.dart';
+import 'pages/business/fixed_assets/fixed_assets_main_page.dart';
+import 'pages/business/fixed_assets/fixed_assets_reports_page.dart';
+import 'pages/business/fixed_assets/fixed_assets_settings_page.dart';
 import 'pages/business/payroll/payroll_reports_page.dart';
 import 'pages/business/payroll/payroll_run_edit_page.dart';
 import 'pages/business/payroll/payroll_settings_page.dart';
@@ -166,8 +188,13 @@ import 'pages/business/telephony/telephony_softphone_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
+import 'widgets/marketplace/procurement_plugin_gate.dart';
+import 'widgets/marketplace/advanced_production_plugin_gate.dart';
+import 'widgets/marketplace/office_automation_plugin_gate.dart';
+import 'widgets/marketplace/fixed_assets_plugin_gate.dart';
 import 'widgets/marketplace/telephony_plugin_gate.dart';
 import 'widgets/marketplace/barcode_label_plugin_gate.dart';
+import 'widgets/marketplace/advanced_accounting_plugin_gate.dart';
 import 'pages/business/barcode_labels/label_templates_page.dart';
 import 'pages/business/barcode_labels/label_studio_page.dart';
 import 'pages/business/barcode_labels/label_printers_page.dart';
@@ -178,6 +205,8 @@ import 'pages/business/advanced_plugins_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
 import 'pages/business/woocommerce/woocommerce_opening_inventory_bridge_page.dart';
 import 'pages/business/woocommerce/woocommerce_settings_page.dart';
+import 'pages/business/digipay/digipay_hub_page.dart';
+import 'widgets/marketplace/digipay_plugin_gate.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -203,6 +232,8 @@ import 'pages/warehouse/warehouse_document_details_page.dart';
 import 'pages/warehouse/stock_count_page.dart';
 import 'pages/warehouse/quick_sales_stock_discrepancies_page.dart';
 import 'pages/warehouse/goods_expense_income_list_page.dart';
+import 'pages/warehouse/production_orders_page.dart';
+import 'pages/warehouse/production_order_details_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
 import 'pages/business/business_ai_provider_settings_page.dart';
@@ -211,6 +242,7 @@ import 'pages/business/quick_sales_page.dart';
 import 'pages/business/document_numbering_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
 import 'pages/business/invoice_share_payment_settings_page.dart';
+import 'pages/business/pay_page_settings_page.dart';
 import 'pages/business/tax_settings_page.dart';
 import 'pages/business/fiscal_year_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
@@ -268,8 +300,11 @@ import 'pages/profile/delete_business_page.dart';
 import 'pages/business/fiscal_year_rollback_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
 import 'pages/public/public_invoice_share_link_page.dart';
+import 'pages/public/public_pay_page.dart';
 import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
+import 'pages/admin/ai_admin_hub_page.dart';
+import 'pages/admin/admin_operations_pages.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_models_admin_page.dart';
 import 'pages/admin/ai_voice_models_admin_page.dart';
@@ -280,10 +315,12 @@ import 'pages/admin/ai_marketplace_settings_page.dart';
 import 'pages/admin/ai_eval_admin_page.dart';
 import 'pages/admin/tax_product_codes_page.dart';
 import 'pages/admin/tax_provider_admin_page.dart';
+import 'pages/admin/motamed_asa_provider_admin_page.dart';
 import 'pages/admin/zohal_settings_page.dart';
 import 'pages/admin/zohal_services_admin_page.dart';
 import 'pages/admin/zohal_statistics_page.dart';
 import 'pages/business/ai_chat_page.dart';
+import 'pages/business/ai_mcp_connections_page.dart';
 import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
 import 'pages/business/zohal_inquiries_page.dart';
@@ -301,6 +338,7 @@ import 'pages/business/crm/crm_reports_page.dart';
 import 'pages/business/crm/crm_tasks_page.dart';
 import 'pages/business/crm/crm_customer_360_page.dart';
 import 'pages/business/crm/crm_sequences_page.dart';
+import 'pages/business/crm/crm_enterprise_page.dart';
 import 'pages/business/crm/crm_notes_calendar_page.dart';
 import 'pages/business/crm/crm_web_chat_page.dart';
 import 'pages/business/crm/business_crm_settings_page.dart';
@@ -581,6 +619,8 @@ class _MyAppState extends State<MyApp> {
       const AdminStorageManagementPage();
       const SystemConfigurationPage();
       const ShareLinkSettingsPage();
+      const PayPageSystemSettingsPage();
+      const PayPageAbuseReportsAdminPage();
       const UserManagementPage();
       const SystemReportsHubPage();
       const ActiveUsersStatsReportPage();
@@ -623,6 +663,11 @@ class _MyAppState extends State<MyApp> {
       CashRegistersPage(businessId: dummyBusinessId, authStore: authStore);
       WalletPage(businessId: dummyBusinessId, authStore: authStore);
       AISubscriptionPage(businessId: dummyBusinessId, authStore: authStore);
+      AiMcpConnectionsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
       AIUsagePage(businessId: dummyBusinessId, authStore: authStore);
       ZohalInquiriesPage(businessId: dummyBusinessId, authStore: authStore);
       InvoicesListPage(
@@ -789,6 +834,7 @@ class _MyAppState extends State<MyApp> {
       );
       WarehousesPage(businessId: dummyBusinessId);
       WarehouseDocsPage(businessId: dummyBusinessId);
+      ProductionOrdersPage(businessId: dummyBusinessId);
       DocumentsPage(
         businessId: dummyBusinessId,
         calendarController: calendarController,
@@ -930,7 +976,9 @@ class _MyAppState extends State<MyApp> {
         final currentPath = state.uri.path;
         final isPublicRoute = currentPath.startsWith('/public');
         final isShortPublicSharePath =
-            currentPath.startsWith('/i/') || currentPath.startsWith('/p/');
+            currentPath.startsWith('/i/') ||
+            currentPath.startsWith('/p/') ||
+            currentPath.startsWith('/u/');
 
         // SMS bank notification deep links map to /capture — not a real page.
         if (SmsBankLaunchNavigation.shouldRedirectAwayFromCapture(state.uri)) {
@@ -1053,6 +1101,47 @@ class _MyAppState extends State<MyApp> {
           },
         ),
         GoRoute(
+          path: '/public/pay/:username',
+          name: 'public_pay_page',
+          builder: (context, state) => PublicPayPage(
+            username: state.pathParameters['username'] ?? '',
+            requestToken: state.uri.queryParameters['token'],
+            paymentReturnQuery: state.uri.queryParameters,
+          ),
+        ),
+        GoRoute(
+          path: '/public/pay/:username/t/:token',
+          name: 'public_pay_page_token',
+          builder: (context, state) => PublicPayPage(
+            username: state.pathParameters['username'] ?? '',
+            requestToken: state.pathParameters['token'],
+            paymentReturnQuery: state.uri.queryParameters,
+          ),
+        ),
+        GoRoute(
+          path: '/u/:username',
+          name: 'short_pay_page_redirect',
+          redirect: (context, state) {
+            final u = state.pathParameters['username'] ?? '';
+            if (u.isEmpty) {
+              return '/';
+            }
+            return '/public/pay/${Uri.encodeComponent(u)}';
+          },
+        ),
+        GoRoute(
+          path: '/u/:username/t/:token',
+          name: 'short_pay_page_token_redirect',
+          redirect: (context, state) {
+            final u = state.pathParameters['username'] ?? '';
+            final tok = state.pathParameters['token'] ?? '';
+            if (u.isEmpty || tok.isEmpty) {
+              return '/';
+            }
+            return '/public/pay/${Uri.encodeComponent(u)}/t/${Uri.encodeComponent(tok)}';
+          },
+        ),
+        GoRoute(
           path: '/public/storage-file/:token',
           name: 'public_storage_file_share',
           builder: (context, state) => PublicStorageFileSharePage(
@@ -1100,6 +1189,30 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) {
             final linkCode = state.pathParameters['linkCode'] ?? '';
             return PublicWarrantyTrackingPage(linkCode: linkCode);
+          },
+        ),
+        GoRoute(
+          path: '/public/office-automation/track',
+          name: 'public_oa_track',
+          builder: (context, state) {
+            final token = state.uri.queryParameters['token'];
+            return PublicOaTrackPage(token: token);
+          },
+        ),
+        GoRoute(
+          path: '/public/office-automation/track/:token',
+          name: 'public_oa_track_token',
+          builder: (context, state) {
+            final token = state.pathParameters['token'] ?? '';
+            return PublicOaTrackPage(token: token);
+          },
+        ),
+        GoRoute(
+          path: '/public/procurement/:token',
+          name: 'public_procurement',
+          builder: (context, state) {
+            final token = state.pathParameters['token'] ?? '';
+            return PublicProcurementPage(token: token);
           },
         ),
         GoRoute(
@@ -1530,6 +1643,19 @@ class _MyAppState extends State<MyApp> {
                   : PermissionGuard.buildAccessDeniedPage(),
             ),
             GoRoute(
+              path: '/user/profile/operator/mcp-connections',
+              name: 'profile_operator_mcp_connections',
+              builder: (context, state) {
+                if (_authStore == null ||
+                    !_authStore!.canAccessSupportOperator) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                return SupportMcpConnectionsPage(
+                  calendarController: _calendarController,
+                );
+              },
+            ),
+            GoRoute(
               path: '/user/profile/system-settings',
               name: 'profile_system_settings',
               builder: (context, state) {
@@ -1636,6 +1762,157 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'operations',
+                  name: 'system_settings_operations',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminOperationsHomePage();
+                  },
+                ),
+                GoRoute(
+                  path: 'audit-log',
+                  name: 'system_settings_audit_log',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminAuditLogPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'schedules',
+                  name: 'system_settings_schedules',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminSchedulesPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'wallets',
+                  name: 'system_settings_wallets',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminWalletsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'hscript-runs',
+                  name: 'system_settings_hscript_runs',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminHscriptRunsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'license-expiry',
+                  name: 'system_settings_license_expiry',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminLicenseExpiryPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'notification-outbox',
+                  name: 'system_settings_notification_outbox',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationOutboxAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'ai',
+                  name: 'system_settings_ai_hub',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIAdminHubPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-storage',
+                  name: 'system_settings_reports_storage',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Storage usage' : 'مصرف ذخیره‌سازی',
+                      subtitle: en ? 'File volume by business' : 'حجم فایل به تفکیک کسب‌وکار',
+                      load: (ops) => ops.storageReport(),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-inactive-businesses',
+                  name: 'system_settings_reports_inactive_businesses',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Quiet businesses' : 'کسب‌وکارهای کم‌فعال',
+                      subtitle: en ? 'No update in the last 90 days' : 'بدون به‌روزرسانی در ۹۰ روز اخیر',
+                      load: (ops) => ops.inactiveBusinesses(),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-failed-logins',
+                  name: 'system_settings_reports_failed_logins',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Failed sign-ins' : 'شکست ورود',
+                      subtitle: en ? 'Failed authentication events' : 'رویدادهای ناموفق احراز هویت',
+                      load: (ops) => ops.failedLogins(),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-support-revenue',
+                  name: 'system_settings_reports_support_revenue',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Support revenue' : 'درآمد پشتیبانی',
+                      subtitle: en ? 'Subscriptions and invoices, last 30 days' : 'آمار اشتراک و صورت‌حساب ۳۰ روز اخیر',
+                      load: (ops) => ops.supportStats(),
+                    );
+                  },
+                ),
+                GoRoute(
                   path: 'storage',
                   name: 'system_settings_storage',
                   builder: (context, state) {
@@ -1681,6 +1958,38 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const ShareLinkSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'pay-page',
+                  name: 'system_settings_pay_page',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const PayPageSystemSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'pay-page-abuse',
+                  name: 'system_settings_pay_page_abuse',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const PayPageAbuseReportsAdminPage();
                   },
                 ),
                 GoRoute(
@@ -1826,7 +2135,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AISettingsPage();
+                    return const AIAdminHubPage();
                   },
                 ),
                 GoRoute(
@@ -1842,7 +2151,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIProviderCredentialsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 1);
                   },
                 ),
                 GoRoute(
@@ -1858,7 +2167,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIModelsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 2);
                   },
                 ),
                 GoRoute(
@@ -1874,7 +2183,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIVoiceModelsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 3);
                   },
                 ),
                 GoRoute(
@@ -1890,7 +2199,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIPlansAdminPage();
+                    return const AIAdminHubPage(initialIndex: 4);
                   },
                 ),
                 GoRoute(
@@ -1906,7 +2215,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIPromptsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 5);
                   },
                 ),
                 GoRoute(
@@ -1922,7 +2231,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AISkillsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 6);
                   },
                 ),
                 GoRoute(
@@ -1938,7 +2247,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIMarketplaceSettingsPage();
+                    return const AIAdminHubPage(initialIndex: 7);
                   },
                 ),
                 GoRoute(
@@ -1954,7 +2263,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIEvalAdminPage();
+                    return const AIAdminHubPage(initialIndex: 8);
                   },
                 ),
                 GoRoute(
@@ -1986,7 +2295,9 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const NotificationsSettingsPage();
+                    return const NotificationsSettingsPage(
+                      scope: NotificationsSettingsScope.systemChannels,
+                    );
                   },
                 ),
                 GoRoute(
@@ -2051,6 +2362,22 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const TaxProviderAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'tax-provider-motamed-asa',
+                  name: 'system_settings_tax_provider_motamed_asa',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const MotamedAsaProviderAdminPage();
                   },
                 ),
                 GoRoute(
@@ -2282,10 +2609,7 @@ class _MyAppState extends State<MyApp> {
                     if (_authStore == null) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    final allowed =
-                        _authStore!.isSuperAdmin ||
-                        _authStore!.hasAppPermission('system_settings');
-                    if (!allowed) {
+                    if (!_authStore!.isSuperAdmin) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const DatabaseBackupPage();
@@ -2414,9 +2738,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                YearEndClosingPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: YearEndClosingPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
                                 ),
                               );
                             },
@@ -2431,17 +2758,20 @@ class _MyAppState extends State<MyApp> {
                                   !_authStore!.isMultiCurrency) {
                                 return hesabixNoTransitionPage(
                                   state,
-                                  Scaffold(
-                                    appBar: AppBar(
-                                      title: const Text('تسعیر ارز'),
-                                    ),
-                                    body: const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(24),
-                                        child: Text(
-                                          'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.\n'
-                                          'از تنظیمات کسب‌وکار، یک ارز فرعی اضافه کنید.',
-                                          textAlign: TextAlign.center,
+                                  AdvancedAccountingPluginGate(
+                                    businessId: businessId,
+                                    child: Scaffold(
+                                      appBar: AppBar(
+                                        title: const Text('تسعیر ارز'),
+                                      ),
+                                      body: const Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(24),
+                                          child: Text(
+                                            'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.\n'
+                                            'از تنظیمات کسب‌وکار، یک ارز فرعی اضافه کنید.',
+                                            textAlign: TextAlign.center,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -2450,10 +2780,13 @@ class _MyAppState extends State<MyApp> {
                               }
                               return hesabixNoTransitionPage(
                                 state,
-                                CurrencyRevaluationPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  calendarController: _calendarController!,
+                                  child: CurrencyRevaluationPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -2539,10 +2872,13 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                LoanFacilitiesPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  calendarController: _calendarController!,
+                                  child: LoanFacilitiesPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -2579,6 +2915,22 @@ class _MyAppState extends State<MyApp> {
                                   authStore: _authStore!,
                                   calendarController: _calendarController,
                                   initialSessionId: sessionId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'ai/mcp-connections',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                AiMcpConnectionsPage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
+                                  calendarController: _calendarController,
                                 ),
                               );
                             },
@@ -2729,6 +3081,25 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'repair-shop/:order_id/edit',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final orderId = int.parse(
+                                state.pathParameters['order_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                RepairOrderFormPage(
+                                  businessId: businessId,
+                                  orderId: orderId,
+                                  calendarController: _calendarController!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'repair-shop/:order_id',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -2794,6 +3165,26 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'advanced-production',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                AdvancedProductionPluginGate(
+                                  businessId: businessId,
+                                  child: AdvancedProductionPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    initialReport: state.uri.queryParameters['report'],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'payroll',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -2804,6 +3195,256 @@ class _MyAppState extends State<MyApp> {
                                 PayrollPluginGate(
                                   businessId: businessId,
                                   child: PayrollMainPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'procurement',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProcurementPluginGate(
+                                  businessId: businessId,
+                                  child: ProcurementPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaCartablePage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/new',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final extra = state.extra;
+                              final positionId = extra is Map ? extra['positionId'] as int? : null;
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaLetterPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    positionId: positionId,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/org',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaOrgPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/external-orgs',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaExternalOrgsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/archive',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaArchivePage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/enterprise',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaEnterprisePage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/documents',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaDocumentsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/processes',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaProcessesPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/desk',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaMyDeskPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/reports',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaReportsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/letters/:letter_id',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final letterId = int.parse(
+                                state.pathParameters['letter_id']!,
+                              );
+                              final extra = state.extra;
+                              final positionId = extra is Map ? extra['positionId'] as int? : null;
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaLetterPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    letterId: letterId,
+                                    positionId: positionId,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'fixed-assets-native',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                FixedAssetsPluginGate(
+                                  businessId: businessId,
+                                  child: FixedAssetsMainPage(
                                     businessId: businessId,
                                     authStore: _authStore!,
                                     calendarController: _calendarController!,
@@ -3026,6 +3667,24 @@ class _MyAppState extends State<MyApp> {
                                 WoocommerceIntegrationPage(
                                   businessId: businessId,
                                   authStore: _authStore!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'digipay',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                DigipayPluginGate(
+                                  businessId: businessId,
+                                  child: DigipayHubPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
                                 ),
                               );
                             },
@@ -3343,6 +4002,21 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'crm/enterprise',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return MaterialPage(
+                                key: state.pageKey,
+                                child: CrmEnterprisePage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'crm/sequences',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -3454,6 +4128,13 @@ class _MyAppState extends State<MyApp> {
                                       personIdRaw.trim().isNotEmpty
                                   ? int.tryParse(personIdRaw.trim())
                                   : null;
+                              final productionOrderRaw =
+                                  state.uri.queryParameters['production_order_id'];
+                              final initialProductionOrderId =
+                                  productionOrderRaw != null &&
+                                      productionOrderRaw.trim().isNotEmpty
+                                  ? int.tryParse(productionOrderRaw.trim())
+                                  : null;
                               return hesabixNoTransitionPage(
                                 state,
                                 NewInvoicePage(
@@ -3462,6 +4143,8 @@ class _MyAppState extends State<MyApp> {
                                   calendarController: _calendarController!,
                                   copyFromInvoiceId: copyFromId,
                                   initialPersonId: initialPersonId,
+                                  initialProductionOrderId:
+                                      initialProductionOrderId,
                                 ),
                               );
                             },
@@ -3580,9 +4263,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ArAgingReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: ArAgingReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3595,9 +4281,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ApAgingReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: ApAgingReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3610,9 +4299,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                PersonBalancesByCurrencyReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: PersonBalancesByCurrencyReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3625,9 +4317,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                CashFlowReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: CashFlowReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3640,9 +4335,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                FxRevaluationReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: FxRevaluationReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3809,6 +4507,21 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'reports/expiry-stock',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ExpiryStockReportPage(
+                                  businessId: businessId,
+                                  calendarController: _calendarController!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'reports/inter-warehouse-transfers',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -3956,6 +4669,8 @@ class _MyAppState extends State<MyApp> {
                                   child: DistributionReportsDashboardPage(
                                     businessId: businessId,
                                     calendarController: _calendarController!,
+                                    canSelectVisitor: _authStore?.hasBusinessPermission('distribution', 'manage') == true ||
+                                        _authStore?.hasBusinessPermission('distribution', 'reports_team') == true,
                                   ),
                                 ),
                               );
@@ -4074,9 +4789,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                TrialBalanceReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: TrialBalanceReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4092,15 +4810,18 @@ class _MyAppState extends State<MyApp> {
                               final filters = reportFiltersFromQueryParams(qp);
                               return hesabixNoTransitionPage(
                                 state,
-                                GeneralLedgerReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
-                                  initialAccount: initialAccount,
-                                  initialFiscalYearId: filters.fiscalYearId,
-                                  initialDateFrom: filters.dateFrom,
-                                  initialDateTo: filters.dateTo,
-                                  initialCurrencyId: filters.currencyId,
-                                  initialProjectId: filters.projectId,
+                                  child: GeneralLedgerReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                    initialAccount: initialAccount,
+                                    initialFiscalYearId: filters.fiscalYearId,
+                                    initialDateFrom: filters.dateFrom,
+                                    initialDateTo: filters.dateTo,
+                                    initialCurrencyId: filters.currencyId,
+                                    initialProjectId: filters.projectId,
+                                  ),
                                 ),
                               );
                             },
@@ -4113,9 +4834,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                JournalLedgerReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: JournalLedgerReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4128,9 +4852,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                PnlPeriodReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: PnlPeriodReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4143,9 +4870,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                PnlCumulativeReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: PnlCumulativeReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4158,9 +4888,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                FinancialReportsPackagePage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: FinancialReportsPackagePage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4173,9 +4906,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                BalanceSheetReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: BalanceSheetReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4188,9 +4924,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                AccountReviewReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: AccountReviewReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4331,6 +5070,28 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'reports/fixed-assets',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final kind =
+                                  state.uri.queryParameters['kind'] ?? 'register';
+                              return hesabixNoTransitionPage(
+                                state,
+                                FixedAssetsPluginGate(
+                                  businessId: businessId,
+                                  child: FixedAssetsReportsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    initialKind: kind,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'settings',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -4362,18 +5123,20 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed = _authStore!.hasBusinessPermission(
                                 'settings',
                                 'join',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              );
                               return hesabixNoTransitionPage(
                                 state,
-                                BusinessBackupPage(businessId: businessId),
+                                AdvancedAccountingPluginGate(
+                                  businessId: businessId,
+                                  child: allowed
+                                      ? BusinessBackupPage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
+                                ),
                               );
                             },
                           ),
@@ -4383,15 +5146,6 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
-                                'settings',
-                                'join',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
                               final isOwner =
                                   _authStore!.currentBusiness?.id ==
                                       businessId &&
@@ -4400,16 +5154,21 @@ class _MyAppState extends State<MyApp> {
                                 'settings',
                                 'manage_ftp',
                               );
-                              if (!isOwner && !hasFtp) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              final allowed =
+                                  _authStore!.hasBusinessPermission(
+                                    'settings',
+                                    'join',
+                                  ) &&
+                                  (isOwner || hasFtp);
                               return hesabixNoTransitionPage(
                                 state,
-                                BusinessFtpBackupSettingsPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
+                                  child: allowed
+                                      ? BusinessFtpBackupSettingsPage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
                                 ),
                               );
                             },
@@ -4448,18 +5207,20 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed = _authStore!.hasBusinessPermission(
                                 'settings',
                                 'join',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              );
                               return hesabixNoTransitionPage(
                                 state,
-                                BusinessRestorePage(businessId: businessId),
+                                AdvancedAccountingPluginGate(
+                                  businessId: businessId,
+                                  child: allowed
+                                      ? BusinessRestorePage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
+                                ),
                               );
                             },
                           ),
@@ -4499,15 +5260,16 @@ class _MyAppState extends State<MyApp> {
                                     'fiscal_years',
                                     'rollback',
                                   );
-                              if (!canRollback) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
                               return hesabixNoTransitionPage(
                                 state,
-                                FiscalYearRollbackPage(businessId: businessId),
+                                AdvancedAccountingPluginGate(
+                                  businessId: businessId,
+                                  child: canRollback
+                                      ? FiscalYearRollbackPage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
+                                ),
                               );
                             },
                           ),
@@ -4564,20 +5326,20 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed = _authStore!.hasBusinessPermission(
                                 'settings',
                                 'business',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              );
                               return hesabixNoTransitionPage(
                                 state,
-                                FxRevaluationSettingsPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: allowed
+                                      ? FxRevaluationSettingsPage(
+                                          businessId: businessId,
+                                          authStore: _authStore!,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
                                 ),
                               );
                             },
@@ -4588,24 +5350,25 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed =
+                                  _authStore!.hasBusinessPermission(
                                     'settings',
                                     'business',
-                                  ) &&
-                                  !_authStore!.hasBusinessPermission(
+                                  ) ||
+                                  _authStore!.hasBusinessPermission(
                                     'currency_revaluation',
                                     'view',
-                                  )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                                  );
                               return hesabixNoTransitionPage(
                                 state,
-                                FxAutoSyncSettingsPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: allowed
+                                      ? FxAutoSyncSettingsPage(
+                                          businessId: businessId,
+                                          authStore: _authStore!,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
                                 ),
                               );
                             },
@@ -4616,26 +5379,23 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
+                              Widget child;
                               if (!_authStore!.isMultiCurrency) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  Scaffold(
-                                    appBar: AppBar(
-                                      title: const Text('تسعیر پایان دوره'),
-                                    ),
-                                    body: const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(24),
-                                        child: Text(
-                                          'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.',
-                                          textAlign: TextAlign.center,
-                                        ),
+                                child = Scaffold(
+                                  appBar: AppBar(
+                                    title: const Text('تسعیر پایان دوره'),
+                                  ),
+                                  body: const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(24),
+                                      child: Text(
+                                        'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.',
+                                        textAlign: TextAlign.center,
                                       ),
                                     ),
                                   ),
                                 );
-                              }
-                              if (!_authStore!.hasBusinessPermission(
+                              } else if (!_authStore!.hasBusinessPermission(
                                     'currency_revaluation',
                                     'view',
                                   ) &&
@@ -4643,16 +5403,18 @@ class _MyAppState extends State<MyApp> {
                                     'settings',
                                     'business',
                                   )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
+                                child = PermissionGuard.buildAccessDeniedPage();
+                              } else {
+                                child = PeriodEndFxRevaluationPage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
                                 );
                               }
                               return hesabixNoTransitionPage(
                                 state,
-                                PeriodEndFxRevaluationPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: child,
                                 ),
                               );
                             },
@@ -4874,6 +5636,45 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'settings/digipay',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              final canDigipay =
+                                  _authStore!.hasBusinessPermission(
+                                    'digipay',
+                                    'view',
+                                  ) ||
+                                  _authStore!.currentBusiness?.isOwner == true;
+                              if (!canDigipay) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                DigipayPluginGate(
+                                  businessId: businessId,
+                                  child: DigipayHubPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'settings/customer-club',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -4957,6 +5758,96 @@ class _MyAppState extends State<MyApp> {
                                 PayrollPluginGate(
                                   businessId: businessId,
                                   child: PayrollSettingsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/office-automation',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              final isOwner =
+                                  _authStore!.currentBusiness?.id ==
+                                      businessId &&
+                                  _authStore!.currentBusiness?.isOwner == true;
+                              final canAccess =
+                                  isOwner ||
+                                  _authStore!.hasBusinessPermission(
+                                    'office_automation',
+                                    'admin',
+                                  );
+                              if (!canAccess) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaSettingsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/fixed-assets',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              final isOwner =
+                                  _authStore!.currentBusiness?.id ==
+                                      businessId &&
+                                  _authStore!.currentBusiness?.isOwner == true;
+                              final canAccess =
+                                  isOwner ||
+                                  _authStore!.hasBusinessPermission(
+                                    'fixed_assets',
+                                    'view',
+                                  ) ||
+                                  _authStore!.hasBusinessPermission(
+                                    'fixed_assets',
+                                    'manage',
+                                  );
+                              if (!canAccess) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                FixedAssetsPluginGate(
+                                  businessId: businessId,
+                                  child: FixedAssetsSettingsPage(
                                     businessId: businessId,
                                     authStore: _authStore!,
                                   ),
@@ -5073,6 +5964,30 @@ class _MyAppState extends State<MyApp> {
                               return hesabixNoTransitionPage(
                                 state,
                                 InvoiceSharePaymentSettingsPage(
+                                  businessId: businessId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/pay-page',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final auth = _authStore!;
+                              final canOpenPayPage = auth.currentBusiness?.isOwner == true ||
+                                  auth.hasBusinessPermission('settings', 'join') ||
+                                  auth.canReadSection('people_transactions');
+                              if (!canOpenPayPage) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                PayPageSettingsPage(
                                   businessId: businessId,
                                 ),
                               );
@@ -5593,6 +6508,36 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'production-orders',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProductionOrdersPage(businessId: businessId),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'production-orders/:order_id',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final orderId = int.parse(
+                                state.pathParameters['order_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProductionOrderDetailsPage(
+                                  businessId: businessId,
+                                  orderId: orderId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'documents',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -5641,9 +6586,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplatesPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: ReportTemplatesPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
                                 ),
                               );
                             },
@@ -5725,11 +6673,14 @@ class _MyAppState extends State<MyApp> {
                               final q = state.uri.queryParameters;
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateStudioPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  moduleKey: q['module_key'],
-                                  subtype: q['subtype'],
+                                  child: ReportTemplateStudioPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    moduleKey: q['module_key'],
+                                    subtype: q['subtype'],
+                                  ),
                                 ),
                               );
                             },
@@ -5745,10 +6696,13 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateStudioPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  templateId: templateId,
+                                  child: ReportTemplateStudioPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    templateId: templateId,
+                                  ),
                                 ),
                               );
                             },
@@ -5766,12 +6720,15 @@ class _MyAppState extends State<MyApp> {
                                   : null;
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateHtmlEditorPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  moduleKey: q['module_key'] ?? seed?.moduleKey,
-                                  subtype: q['subtype'] ?? seed?.subtype,
-                                  seed: seed,
+                                  child: ReportTemplateHtmlEditorPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    moduleKey: q['module_key'] ?? seed?.moduleKey,
+                                    subtype: q['subtype'] ?? seed?.subtype,
+                                    seed: seed,
+                                  ),
                                 ),
                               );
                             },
@@ -5791,11 +6748,14 @@ class _MyAppState extends State<MyApp> {
                                   : null;
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateHtmlEditorPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  templateId: templateId,
-                                  seed: seed,
+                                  child: ReportTemplateHtmlEditorPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    templateId: templateId,
+                                    seed: seed,
+                                  ),
                                 ),
                               );
                             },
@@ -5918,10 +6878,13 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                CheckReconciliationPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  calendarController: _calendarController!,
+                                  child: CheckReconciliationPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },

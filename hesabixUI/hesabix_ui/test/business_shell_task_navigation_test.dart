@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hesabix_ui/l10n/app_localizations_fa.dart';
+import 'package:hesabix_ui/l10n/app_localizations_en.dart';
+import 'package:hesabix_ui/utils/business_menu_labels.dart';
 
 void main() {
   test('business sidebar exposes native project and task manager routes', () {
@@ -19,7 +22,12 @@ void main() {
 
     expect(appearance, contains("'projects',"));
     expect(appearance, contains("'tasks',"));
-    expect(appearance, contains("'projects': 'پروژه‌ها'"));
-    expect(appearance, contains("'tasks': 'مدیریت کارها'"));
+    // Labels moved to the shared resolver during the upstream sidebar refactor.
+    final fa = AppLocalizationsFa();
+    final en = AppLocalizationsEn();
+    expect(businessMenuItemLabel(fa, 'projects'), 'پروژه‌ها');
+    expect(businessMenuItemLabel(fa, 'tasks'), 'مدیریت کارها');
+    expect(businessMenuItemLabel(en, 'projects'), 'Projects');
+    expect(businessMenuItemLabel(en, 'tasks'), 'Task manager');
   });
 }

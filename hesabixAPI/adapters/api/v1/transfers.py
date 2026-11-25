@@ -46,7 +46,7 @@ router = APIRouter(tags=["اسناد انتقال", "مدیریت مالی"])
     "/businesses/{business_id}/transfers",
     summary="لیست اسناد انتقال",
     description="""
-    دریافت لیست اسناد انتقال با امکانات پیشرفته فیلتر، جستجو و صفحه‌بندی
+    دریافت لیست اسناد انتقال. ابزار MCP: `search_transfers`. Excel/PDF در MCP نیست.
     
     ### قابلیت‌های جستجو:
     - جستجو در کد سند، نام مبدا، نام مقصد و توضیحات
@@ -196,7 +196,7 @@ async def list_transfers_endpoint(
     "/businesses/{business_id}/transfers/create",
     summary="ایجاد سند انتقال",
     description="""
-    ایجاد سند انتقال جدید برای جابجایی وجه بین حساب‌های مختلف
+    ایجاد سند انتقال جدید. ابزار MCP: `create_transfer` (نیازمند تأیید). extra_info در MCP پذیرفته نمی‌شود.
     
     ### انواع حساب مبدا/مقصد:
     - `bank_account`: حساب بانکی - برای انتقال از/به حساب‌های بانکی
@@ -423,7 +423,7 @@ async def create_transfer_endpoint(
     "/transfers/{document_id}",
     summary="جزئیات سند انتقال",
     description="""
-    دریافت جزئیات کامل یک سند انتقال
+    دریافت جزئیات کامل یک سند انتقال. ابزار MCP: `get_transfer`. extra_info در MCP برنمی‌گردد. PDF جداست و در MCP نیست.
     
     ### اطلاعات برگشتی:
     - اطلاعات کامل مبدا و مقصد
@@ -538,7 +538,7 @@ async def get_transfer_endpoint(
 @router.get(
     "/transfers/{document_id}/pdf",
     summary="خروجی PDF تک سند انتقال",
-    description="خروجی PDF یک سند انتقال",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_transfer`.",
 )
 async def export_single_transfer_pdf(
     document_id: int,
@@ -851,7 +851,7 @@ async def export_single_transfer_pdf(
     "/transfers/{document_id}",
     summary="حذف سند انتقال",
     description="""
-    حذف یک سند انتقال موجود
+    حذف یک سند انتقال. ابزار MCP: `delete_transfer` (نیازمند تأیید).
     
     ### عملیات حذف:
     - سند از سیستم حذف می‌شود
@@ -980,7 +980,7 @@ async def delete_transfer_endpoint(
     "/transfers/{document_id}",
     summary="ویرایش سند انتقال",
     description="""
-    ویرایش و به‌روزرسانی یک سند انتقال موجود
+    ویرایش سند انتقال. ابزار MCP: `update_transfer` (نیازمند تأیید). extra_info در MCP پذیرفته نمی‌شود.
     
     ### فیلدهای قابل ویرایش:
     - مبدا و مقصد (نوع و شناسه)
@@ -1188,7 +1188,7 @@ async def update_transfer_endpoint(
 @router.post(
     "/businesses/{business_id}/transfers/export/excel",
     summary="خروجی Excel لیست اسناد انتقال",
-    description="خروجی Excel لیست اسناد انتقال با فیلتر و جستجو",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `search_transfers`.",
 )
 @require_business_access("business_id")
 async def export_transfers_excel(
@@ -1436,7 +1436,7 @@ async def export_transfers_excel(
 @router.post(
     "/businesses/{business_id}/transfers/export/pdf",
     summary="خروجی PDF لیست اسناد انتقال",
-    description="خروجی PDF لیست اسناد انتقال با فیلتر و جستجو",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `search_transfers`.",
 )
 @require_business_access("business_id")
 async def export_transfers_pdf(

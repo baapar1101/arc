@@ -225,7 +225,13 @@ async def _handle_client_control(
 			db.close()
 		return
 	if typ == "hangup_media":
-		await media_hub.stop_bridge(session_id, reason=str(payload.get("reason") or "client_hangup"))
+		raw_channels = payload.get("channels") if isinstance(payload.get("channels"), list) else None
+		await media_hub.stop_bridge(
+			session_id,
+			reason=str(payload.get("reason") or "client_hangup"),
+			channel=str(payload.get("channel") or "") or None,
+			channels=raw_channels,
+		)
 		return
 
 

@@ -30,6 +30,12 @@ from adapters.db.models.distribution import DistributionTerritory,DistributionRo
 from adapters.db.models.price_list import PriceList,PriceItem
 from adapters.db.models.system_setting import SystemSetting
 from adapters.db.models.customer_club import CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot
+from adapters.db.models.customer_club import (
+    CustomerClubPointLot, CustomerClubReward, CustomerClubVoucher,
+    CustomerClubCampaign, CustomerClubCampaignMember, CustomerClubMember,
+    CustomerClubSurveyResponse,
+)
+from adapters.db.models.inventory_lot import InventoryLot, InvoiceItemLineLotAllocation, WarehouseLineLotAllocation
 from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap, SepidarReconciliationAudit
 from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable, Projector
 from app.services.sepidar_native_service import account_report_prefix
@@ -53,7 +59,10 @@ def native_db():
               CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot,
               AdvancedPluginSetting,AdvancedPluginRecord,AdvancedPluginAudit)
     from adapters.db.models.advanced_plugins import AdvancedPluginPosting,AdvancedPluginPostingConfig
-    models=(*models,AdvancedPluginPostingConfig,AdvancedPluginPosting)
+    models=(*models,AdvancedPluginPostingConfig,AdvancedPluginPosting,
+            InventoryLot,InvoiceItemLineLotAllocation,WarehouseLineLotAllocation,
+            CustomerClubPointLot,CustomerClubReward,CustomerClubVoucher,
+            CustomerClubCampaign,CustomerClubCampaignMember,CustomerClubMember,CustomerClubSurveyResponse)
     for model in models:
         model.__table__.to_metadata(metadata)
     # Unrelated optional FKs (CRM, tax, banking, attachments) are not part of this fixture.

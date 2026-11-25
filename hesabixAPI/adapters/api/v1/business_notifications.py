@@ -66,7 +66,11 @@ class PreviewTemplateRequest(BaseModel):
 
 # ========== Event Types (لیست رویدادهای قابل استفاده) ==========
 
-@router.get("/event-types")
+@router.get(
+    "/event-types",
+    summary="انواع رویداد اعلان کسب‌وکار",
+    description="کاتالوگ رویدادهای فعال قابل قالب‌بندی (SMS/ایمیل) با متغیرهای موجود. ابزار MCP: `list_notification_event_types`.",
+)
 def list_event_types(
     request: Request,
     category: Optional[str] = Query(None),
@@ -100,7 +104,11 @@ def list_event_types(
 
 # ========== Templates Management (برای کسب‌وکار) ==========
 
-@router.get("/businesses/{business_id}/templates")
+@router.get(
+    "/businesses/{business_id}/templates",
+    summary="لیست قالب‌های اعلان کسب‌وکار",
+    description="ابزار MCP: `list_business_notification_templates`.",
+)
 def list_templates(
     request: Request,
     business_id: int,
@@ -157,7 +165,11 @@ def list_templates(
     }, request)
 
 
-@router.get("/businesses/{business_id}/templates/{template_id}")
+@router.get(
+    "/businesses/{business_id}/templates/{template_id}",
+    summary="جزئیات قالب اعلان کسب‌وکار",
+    description="ابزار MCP: `get_business_notification_template`.",
+)
 def get_template(
     request: Request,
     business_id: int,
@@ -203,7 +215,11 @@ def get_template(
     return success_response(data, request)
 
 
-@router.get("/businesses/{business_id}/templates/{template_id}/sms-cost-estimate")
+@router.get(
+    "/businesses/{business_id}/templates/{template_id}/sms-cost-estimate",
+    summary="برآورد هزینه پیامک قالب اعلان",
+    description="بر اساس متن خام قالب و قیمت‌گذاری سیستم. ابزار MCP: `estimate_sms_notification_cost`.",
+)
 def sms_cost_estimate(
     request: Request,
     business_id: int,
@@ -222,7 +238,11 @@ def sms_cost_estimate(
     return success_response(data, request)
 
 
-@router.post("/businesses/{business_id}/templates")
+@router.post(
+    "/businesses/{business_id}/templates",
+    summary="ایجاد قالب اعلان کسب‌وکار",
+    description="ابزار MCP: `create_business_notification_template` (نیازمند تأیید).",
+)
 def create_template(
     request: Request,
     business_id: int,
@@ -290,7 +310,11 @@ def create_template(
     }, request)
 
 
-@router.put("/businesses/{business_id}/templates/{template_id}")
+@router.put(
+    "/businesses/{business_id}/templates/{template_id}",
+    summary="ویرایش قالب اعلان کسب‌وکار",
+    description="ابزار MCP: `update_business_notification_template` (نیازمند تأیید).",
+)
 def update_template(
     request: Request,
     business_id: int,
@@ -349,7 +373,11 @@ def update_template(
     }, request)
 
 
-@router.post("/businesses/{business_id}/templates/{template_id}/submit-for-approval")
+@router.post(
+    "/businesses/{business_id}/templates/{template_id}/submit-for-approval",
+    summary="ارسال قالب اعلان برای تأیید",
+    description="ابزار MCP: `submit_business_notification_template` (نیازمند تأیید).",
+)
 def submit_for_approval(
     request: Request,
     business_id: int,
@@ -411,7 +439,11 @@ def submit_for_approval(
     }, request)
 
 
-@router.post("/businesses/{business_id}/templates/{template_id}/preview")
+@router.post(
+    "/businesses/{business_id}/templates/{template_id}/preview",
+    summary="پیش‌نمایش قالب اعلان",
+    description="ابزار MCP: `preview_business_notification_template`.",
+)
 def preview_template(
     request: Request,
     business_id: int,
@@ -430,7 +462,11 @@ def preview_template(
     return success_response(result, request)
 
 
-@router.post("/businesses/{business_id}/send")
+@router.post(
+    "/businesses/{business_id}/send",
+    summary="ارسال اعلان کسب‌وکار",
+    description="ابزار MCP: `send_business_notification` (نیازمند تأیید).",
+)
 def send_notification(
     request: Request,
     business_id: int,
@@ -463,7 +499,11 @@ def send_notification(
     return success_response(result, request)
 
 
-@router.get("/businesses/{business_id}/logs")
+@router.get(
+    "/businesses/{business_id}/logs",
+    summary="لاگ ارسال اعلان کسب‌وکار",
+    description="ابزار MCP: `list_business_notification_logs`.",
+)
 def list_send_logs(
     request: Request,
     business_id: int,

@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' as Hd;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/models/business_user_model.dart';
-import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -16,11 +13,13 @@ import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 class DistributionReportsDashboardPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
+  final bool canSelectVisitor;
 
   const DistributionReportsDashboardPage({
     super.key,
     required this.businessId,
     required this.calendarController,
+    this.canSelectVisitor = false,
   });
 
   @override
@@ -139,31 +138,36 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            FutureBuilder<BusinessUsersResponse>(
-              future: BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId),
-              builder: (context, snap) {
-                final users = snap.data?.users ?? const <BusinessUser>[];
-                return DropdownButtonFormField<int?>(
-                  value: _targetUserId,
-                  isDense: true,
-                  decoration: InputDecoration(
-                    labelText: t.distributionSelectVisitor,
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('—')),
-                    ...users.map(
-                      (u) => DropdownMenuItem<int?>(
-                        value: u.userId,
-                        child: Text(u.userName.isNotEmpty ? u.userName : '${u.userId}'),
-                      ),
+            if (widget.canSelectVisitor) ...[
+              const SizedBox(height: 8),
+              FutureBuilder<List<dynamic>>(
+                future: _svc.listTeamMembers(businessId: widget.businessId),
+                builder: (context, snap) {
+                  final users = snap.data ?? const <dynamic>[];
+                  return DropdownButtonFormField<int?>(
+                    value: _targetUserId,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      labelText: t.distributionSelectVisitor,
+                      border: const OutlineInputBorder(),
                     ),
-                  ],
-                  onChanged: (v) => setState(() => _targetUserId = v),
-                );
-              },
-            ),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                      ...users.map((raw) {
+                        final m = Map<String, dynamic>.from(raw as Map);
+                        final id = int.tryParse('${m['user_id']}');
+                        final name = (m['user_name'] ?? id ?? '').toString();
+                        return DropdownMenuItem<int?>(
+                          value: id,
+                          child: Text(name.isNotEmpty ? name : '$id'),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) => setState(() => _targetUserId = v),
+                  );
+                },
+              ),
+            ],
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: _loading ? null : _load,

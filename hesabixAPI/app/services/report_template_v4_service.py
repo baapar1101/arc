@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 from typing import Any, Iterable
 
 from app.services.report_template_gallery import get_family
@@ -38,6 +39,8 @@ _FREEFORM_COMPONENTS = {
 	"divider",
 	"spacer",
 }
+_ANCHOR_POINTS = {"top", "right", "bottom", "left", "center_x", "center_y"}
+_PIN_EDGES = {"top", "right", "bottom", "left", "center_x", "center_y"}
 
 
 def is_v4_design(design: dict[str, Any]) -> bool:
@@ -155,6 +158,13 @@ def studio_v4_contract(module_key: str, subtype: str | None) -> dict[str, Any]:
 			"snap_targets": ["grid", "safe_margin", "sibling_edge", "sibling_center"],
 			"position_unit": "mm",
 			"dynamic_components_allowed": True,
+			"persistent_anchors": {
+				"points": sorted(_ANCHOR_POINTS),
+				"link_targets": ["node"],
+				"offset_unit": "mm",
+				"responsive_offsets": True,
+				"page_pins": sorted(_PIN_EDGES),
+			},
 		},
 		"components": component_catalog(module_key, subtype),
 		"bindings": binding_catalog(module_key, subtype),
@@ -196,7 +206,53 @@ def _json_schema() -> dict[str, Any]:
 					"component": {"type": "string"},
 					"layout": {"type": "object"},
 					"placement": {"type": "object"},
+					"constraints": {"$ref": "#/$defs/constraints"},
 				},
+			},
+			"anchor_target": {
+				"type": "object",
+				"required": ["type", "id", "anchor"],
+				"properties": {
+					"type": {"const": "node"},
+					"id": {"type": "string", "pattern": "^[a-zA-Z0-9_-]{1,80}$"},
+					"anchor": {"enum": sorted(_ANCHOR_POINTS)},
+				},
+				"additionalProperties": False,
+			},
+			"anchor_link": {
+				"type": "object",
+				"required": ["axis", "source_anchor", "target"],
+				"properties": {
+					"id": {"type": "string"},
+					"axis": {"enum": ["horizontal", "vertical"]},
+					"source_anchor": {"enum": sorted(_ANCHOR_POINTS)},
+					"target": {"$ref": "#/$defs/anchor_target"},
+					"offset_mm": {"type": "number", "minimum": -1000, "maximum": 1000},
+					"variant_offsets": {
+						"type": "object",
+						"additionalProperties": {"type": "number", "minimum": -1000, "maximum": 1000},
+					},
+				},
+				"additionalProperties": False,
+			},
+			"constraints": {
+				"type": "object",
+				"properties": {
+					"links": {"type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/anchor_link"}},
+					"pins": {
+						"type": "object",
+						"properties": {key: {"type": "boolean"} for key in sorted(_PIN_EDGES)},
+						"additionalProperties": False,
+					},
+					"pin_offsets_mm": {"type": "object", "additionalProperties": {"type": "number"}},
+					"variant_pin_offsets": {
+						"type": "object",
+						"additionalProperties": {"type": "object", "additionalProperties": {"type": "number"}},
+					},
+					"bottom_mode": {"enum": ["last_page", "every_page"]},
+					"keep_together": {"type": "boolean"},
+				},
+				"additionalProperties": False,
 			},
 			"variant": {
 				"type": "object",
@@ -481,10 +537,142 @@ def resolved_root(design: dict[str, Any]) -> dict[str, Any]:
 	overrides = variant.get("node_overrides") or {}
 	for node in _iter_nodes(root):
 		override = overrides.get(str(node.get("id") or "")) or {}
-		for key in ("layout", "placement", "style"):
+		for key in ("layout", "placement", "style", "constraints"):
 			if isinstance(override.get(key), dict):
 				node[key] = {**(node.get(key) or {}), **deepcopy(override[key])}
 	return root
+
+
+def _validate_constraints(root: dict[str, Any], component_ids: set[str]) -> tuple[list[str], list[str]]:
+	errors: list[str] = []
+	warnings: list[str] = []
+	dependencies: dict[str, list[str]] = {}
+	dynamic_followers: dict[str, list[str]] = {}
+	for node in _iter_nodes(root):
+		if node.get("kind") != "component":
+			continue
+		node_id = str(node.get("id") or "")
+		constraints = node.get("constraints") or {}
+		if not isinstance(constraints, dict):
+			errors.append(f"Component '{node_id}' constraints must be an object")
+			continue
+		unknown_constraint_keys = set(constraints).difference(
+			{"links", "pins", "pin_offsets_mm", "variant_pin_offsets", "bottom_mode", "keep_together"}
+		)
+		if unknown_constraint_keys:
+			errors.append(f"Unknown constraint field in '{node_id}'")
+		links = constraints.get("links") or []
+		if not isinstance(links, list):
+			errors.append(f"Component '{node_id}' constraint links must be a list")
+			continue
+		seen_axes: set[str] = set()
+		for link in links:
+			if not isinstance(link, dict):
+				errors.append(f"Invalid anchor link in '{node_id}'")
+				continue
+			axis = str(link.get("axis") or "")
+			if axis not in ("horizontal", "vertical"):
+				errors.append(f"Invalid anchor axis in '{node_id}'")
+				continue
+			if axis in seen_axes:
+				errors.append(f"Component '{node_id}' has more than one {axis} anchor")
+			seen_axes.add(axis)
+			source_anchor = str(link.get("source_anchor") or "")
+			target = link.get("target") or {}
+			target_anchor = str(target.get("anchor") or "") if isinstance(target, dict) else ""
+			if source_anchor not in _ANCHOR_POINTS or target_anchor not in _ANCHOR_POINTS:
+				errors.append(f"Invalid anchor point in '{node_id}'")
+				continue
+			if axis == "horizontal" and (
+				source_anchor not in {"left", "right", "center_x"}
+				or target_anchor not in {"left", "right", "center_x"}
+			):
+				errors.append(f"Horizontal anchor uses a vertical point in '{node_id}'")
+			if axis == "vertical" and (
+				source_anchor not in {"top", "bottom", "center_y"}
+				or target_anchor not in {"top", "bottom", "center_y"}
+			):
+				errors.append(f"Vertical anchor uses a horizontal point in '{node_id}'")
+			if not isinstance(target, dict) or target.get("type") != "node":
+				errors.append(f"Anchor target in '{node_id}' must be a node")
+				continue
+			target_id = str(target.get("id") or "")
+			if target_id == node_id or target_id not in component_ids:
+				errors.append(f"Invalid anchor target '{target_id}' in '{node_id}'")
+				continue
+			dependencies.setdefault(node_id, []).append(target_id)
+			if axis == "vertical" and source_anchor == "top" and target_anchor == "bottom":
+				dynamic_followers.setdefault(target_id, []).append(node_id)
+			for raw_offset in [link.get("offset_mm"), *((link.get("variant_offsets") or {}).values() if isinstance(link.get("variant_offsets"), dict) else [])]:
+				try:
+					offset = float(raw_offset or 0)
+				except (TypeError, ValueError):
+					offset = 1001
+				if not math.isfinite(offset) or abs(offset) > 1000:
+					errors.append(f"Invalid anchor offset in '{node_id}'")
+		pins = constraints.get("pins") or {}
+		if not isinstance(pins, dict):
+			errors.append(f"Component '{node_id}' pins must be an object")
+		else:
+			unknown_pins = set(pins).difference(_PIN_EDGES)
+			if unknown_pins:
+				errors.append(f"Unknown page pin in '{node_id}'")
+			if any(not isinstance(value, bool) for value in pins.values()):
+				errors.append(f"Page pins in '{node_id}' must be booleans")
+			if pins.get("left") and pins.get("right") and pins.get("center_x"):
+				errors.append(f"Conflicting horizontal page pins in '{node_id}'")
+			if pins.get("top") and pins.get("bottom") and pins.get("center_y"):
+				errors.append(f"Conflicting vertical page pins in '{node_id}'")
+			if pins.get("top") and pins.get("bottom") and node.get("component") in {
+				"invoice_lines",
+				"invoice_totals",
+				"payments",
+				"note",
+			}:
+				warnings.append(
+					f"Dynamic component '{node_id}' is stretched between top and bottom pins"
+				)
+		for offsets in [
+			constraints.get("pin_offsets_mm") or {},
+			*((constraints.get("variant_pin_offsets") or {}).values() if isinstance(constraints.get("variant_pin_offsets"), dict) else []),
+		]:
+			if not isinstance(offsets, dict):
+				errors.append(f"Invalid page pin offsets in '{node_id}'")
+				continue
+			for key, raw_offset in offsets.items():
+				if key not in _PIN_EDGES:
+					errors.append(f"Unknown page pin offset in '{node_id}'")
+					continue
+				try:
+					offset = float(raw_offset)
+				except (TypeError, ValueError):
+					offset = math.inf
+				if not math.isfinite(offset) or abs(offset) > 5000:
+					errors.append(f"Invalid page pin offset in '{node_id}'")
+		bottom_mode = str(constraints.get("bottom_mode") or "last_page")
+		if bottom_mode not in ("last_page", "every_page"):
+			errors.append(f"Invalid bottom pin mode in '{node_id}'")
+	for target_id, followers in dynamic_followers.items():
+		if len(followers) > 1:
+			errors.append(
+				f"Multiple dynamic followers of '{target_id}' must be chained explicitly"
+			)
+	visiting: set[str] = set()
+	visited: set[str] = set()
+	def visit(node_id: str) -> None:
+		if node_id in visited:
+			return
+		if node_id in visiting:
+			errors.append("Anchor constraints contain a cycle")
+			return
+		visiting.add(node_id)
+		for target_id in dependencies.get(node_id, []):
+			visit(target_id)
+		visiting.remove(node_id)
+		visited.add(node_id)
+	for node_id in dependencies:
+		visit(node_id)
+	return errors, warnings
 
 
 def v4_to_v3_projection(design: dict[str, Any]) -> dict[str, Any]:
@@ -619,7 +807,7 @@ def validate_v4_design(module_key: str, subtype: str | None, design: dict[str, A
 					errors.append("Page grid size must be 1, 3 or 5 millimeters")
 		elif kind == "component":
 			component = str(node.get("component") or "")
-			for field in ("props", "style", "placement"):
+			for field in ("props", "style", "placement", "constraints"):
 				if node.get(field) is not None and not isinstance(node.get(field), dict):
 					errors.append(f"Component '{node_id}' {field} must be an object")
 			definition = definitions.get(component)
@@ -629,6 +817,14 @@ def validate_v4_design(module_key: str, subtype: str | None, design: dict[str, A
 				component_counts[component] = component_counts.get(component, 0) + 1
 		else:
 			errors.append(f"Invalid node kind in '{node_id}'")
+	component_ids = {
+		str(node.get("id") or "")
+		for node in _iter_nodes(root)
+		if node.get("kind") == "component"
+	}
+	constraint_errors, constraint_warnings = _validate_constraints(root, component_ids)
+	errors.extend(constraint_errors)
+	warnings.extend(constraint_warnings)
 	variants = design.get("variants")
 	if not isinstance(variants, dict):
 		errors.append("variants must be an object")

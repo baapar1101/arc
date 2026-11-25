@@ -21,7 +21,7 @@ void main() {
 
   test('parked sale round-trips cart, customer and totals', () {
     final sale = QuickSalesParkedSale(
-      id: 'sale-1',
+      id: 'sale-000000000001',
       createdAt: DateTime.utc(2026, 8, 15, 8),
       updatedAt: DateTime.utc(2026, 8, 15, 9),
       customer: const Customer(id: 42, name: 'علی رضایی', phone: '09120000000'),
@@ -50,7 +50,7 @@ void main() {
     );
 
     final parsed = QuickSalesParkedSale.fromJson(sale.toJson());
-    expect(parsed.id, 'sale-1');
+    expect(parsed.id, 'sale-000000000001');
     expect(parsed.customer?.id, 42);
     expect(parsed.customer?.phone, '09120000000');
     expect(parsed.cartItems, hasLength(1));
@@ -82,15 +82,47 @@ void main() {
       isNull,
     );
     final sale = QuickSalesParkedSale(
-      id: 'a',
+      id: 'sale-active-0001',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       documentDate: DateTime.now(),
     );
-    final bundle = QuickSalesParkedSalesBundle(activeId: 'a', sales: [sale]);
+    final bundle = QuickSalesParkedSalesBundle(
+      activeId: sale.id,
+      sales: [sale],
+    );
     final parsed = QuickSalesParkedSalesBundle.tryParse(bundle.toJson());
-    expect(parsed?.activeId, 'a');
+    expect(parsed?.activeId, sale.id);
     expect(parsed?.sales, hasLength(1));
+  });
+
+  test('invalid stored active id is migrated without losing its basket', () {
+    final parsed = QuickSalesParkedSalesBundle.tryParse({
+      'version': 1,
+      'active_id': 'a',
+      'sales': [
+        {
+          'id': 'a',
+          'created_at': DateTime.utc(2026, 10, 31, 8).toIso8601String(),
+          'updated_at': DateTime.utc(2026, 10, 31, 9).toIso8601String(),
+          'document_date': '2026-10-31',
+          'document_description': 'سبد ذخیره‌شده موبایل',
+        },
+      ],
+    });
+
+    expect(parsed, isNotNull);
+    expect(parsed!.sales, hasLength(1));
+    expect(parsed.activeId, parsed.sales.single.id);
+    expect(
+      QuickSalesParkedSale.isValidRequestId(parsed.activeId),
+      isTrue,
+    );
+    expect(parsed.activeId, isNot('a'));
+    expect(
+      parsed.sales.single.documentDescription,
+      'سبد ذخیره‌شده موبایل',
+    );
   });
 
   test(
@@ -150,7 +182,7 @@ void main() {
 
   test('parked sale preserves split change resolution', () {
     final sale = QuickSalesParkedSale(
-      id: 'change-sale',
+      id: 'change-sale-00001',
       createdAt: DateTime.utc(2026, 10, 14, 8),
       updatedAt: DateTime.utc(2026, 10, 14, 9),
       documentDate: DateTime.utc(2026, 10, 14),

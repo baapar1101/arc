@@ -3,9 +3,11 @@ from urllib.parse import quote_plus
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.runtime_paths import settings_env_file, voice_data_dir
+
 
 class Settings(BaseSettings):
-	model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+	model_config = SettingsConfigDict(env_file=None, env_file_encoding="utf-8", extra="ignore")
 
 	app_name: str = "Hesabix API"
 	app_version: str = "0.1.0"
@@ -161,7 +163,9 @@ class Settings(BaseSettings):
 	voice_tts_model_path: str | None = None
 	# Piper (پیش‌فرض برای Python 3.12+)
 	voice_tts_piper_voice_fa: str = "fa_IR-ganji-medium"
-	voice_tts_piper_models_dir: str = "/var/lib/hesabix/voice-data/piper"
+	voice_tts_piper_models_dir: str = Field(
+		default_factory=lambda: str(voice_data_dir() / "piper")
+	)
 	# Coqui (legacy؛ روی Python 3.12 در PyPI موجود نیست)
 	voice_tts_coqui_model_fa: str = "tts_models/fa/cv/vits/glow-tts"
 	voice_tts_output_sample_rate_hz: int = 16000
@@ -169,7 +173,7 @@ class Settings(BaseSettings):
 
 	# Data collection (اختیاری، برای بهبود کیفیت در آینده)
 	voice_data_collection_enabled: bool = False
-	voice_data_collection_dir: str = "/var/lib/hesabix/voice-data"
+	voice_data_collection_dir: str = Field(default_factory=lambda: str(voice_data_dir()))
 	voice_max_concurrent_sessions_per_user: int = 2
 	voice_stt_max_seconds: int = 30
 
@@ -182,4 +186,4 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-	return Settings()
+	return Settings(_env_file=settings_env_file(), _env_file_encoding="utf-8")

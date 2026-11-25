@@ -68,7 +68,7 @@ def _workflow_to_api_dict(workflow: Workflow, request: Request) -> Dict[str, Any
     return format_datetime_fields(raw, request)
 
 
-@router.get("/workflows/marketplace/packages", summary="لیست ورک‌فلوهای منتشرشده در مخزن")
+@router.get("/workflows/marketplace/packages", summary="لیست ورک‌فلوهای منتشرشده در مخزن", description="ابزار MCP: `list_workflow_marketplace_packages`.")
 async def marketplace_list_packages(
     request: Request,
     db: Session = Depends(get_db),
@@ -87,7 +87,11 @@ async def marketplace_list_packages(
     )
 
 
-@router.get("/workflows/marketplace/packages/{package_id}", summary="جزئیات یک بسته (شامل گراف ورک‌فلو)")
+@router.get(
+    "/workflows/marketplace/packages/{package_id}",
+    summary="جزئیات یک بسته منتشرشده مخزن ورک‌فلو",
+    description="گراف و تنظیمات بسته منتشرشده را برمی‌گرداند. بسته باید status=published باشد. ابزار MCP: get_workflow_marketplace_package.",
+)
 async def marketplace_get_package(
     request: Request,
     package_id: int,
@@ -103,7 +107,8 @@ async def marketplace_get_package(
 
 @router.get(
     "/businesses/{business_id}/workflows/marketplace/my-packages",
-    summary="بسته‌های منتشرشده توسط من در این کسب‌وکار",
+    summary="بسته‌های مخزن ورک‌فلو منتشرشده توسط کاربر جاری",
+    description="فهرست بسته‌هایی که همین کاربر در همین کسب‌وکار منتشر کرده، شامل مخفی‌شده‌ها. ابزار MCP: list_my_workflow_marketplace_packages.",
 )
 @require_business_access("business_id")
 async def marketplace_my_packages(
@@ -131,7 +136,8 @@ async def marketplace_my_packages(
 
 @router.get(
     "/businesses/{business_id}/workflows/marketplace/my-packages/{package_id}",
-    summary="جزئیات بستهٔ منتشرشده توسط من (شامل گراف)",
+    summary="جزئیات بسته مخزن ورک‌فلو متعلق به ناشر جاری",
+    description="فقط بسته با ناشر همین کاربر و کسب‌وکار. شامل گراف. ابزار MCP: get_my_workflow_marketplace_package.",
 )
 @require_business_access("business_id")
 async def marketplace_my_package_detail(
@@ -151,6 +157,7 @@ async def marketplace_my_package_detail(
 @router.post(
     "/businesses/{business_id}/workflows/marketplace/publish",
     summary="انتشار ورک‌فلو در مخزن",
+    description="ابزار MCP: `publish_workflow_to_marketplace` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def marketplace_publish(
@@ -201,6 +208,7 @@ async def marketplace_publish(
 @router.post(
     "/businesses/{business_id}/workflows/marketplace/my-packages/{package_id}/unpublish",
     summary="خروج از انتشار در مخزن (مخفی برای دیگران، در فهرست من مانده)",
+    description="ابزار MCP: `unpublish_workflow_marketplace_package` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def marketplace_unpublish(
@@ -234,7 +242,8 @@ async def marketplace_unpublish(
 
 @router.post(
     "/businesses/{business_id}/workflows/marketplace/my-packages/{package_id}/republish",
-    summary="انتشار مجدد بسته مخفی در مخزن",
+    summary="انتشار مجدد بسته مخفی در مخزن ورک‌فلو",
+    description="فقط بسته‌های Hidden متعلق به ناشر جاری دوباره Published می‌شوند. نیازمند workflows.edit. ابزار MCP: republish_workflow_marketplace_package.",
 )
 @require_business_access("business_id")
 async def marketplace_republish(
@@ -269,6 +278,7 @@ async def marketplace_republish(
 @router.post(
     "/businesses/{business_id}/workflows/marketplace/install",
     summary="افزودن ورک‌فلو از مخزن به این کسب‌وکار",
+    description="بدنه: package_id الزامی، name اختیاری. ورک‌فلو به‌صورت پیش‌نویس کپی می‌شود. ابزار MCP: install_workflow_marketplace_package.",
 )
 @require_business_access("business_id")
 async def marketplace_install(

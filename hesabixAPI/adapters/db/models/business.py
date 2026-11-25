@@ -37,6 +37,9 @@ class Business(Base):
     business_field: Mapped[BusinessField] = mapped_column(SQLEnum(BusinessField), nullable=False)
     owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     default_currency_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=True, index=True)
+
+    product_dimension_unit: Mapped[str] = mapped_column(String(2), default="mm", server_default="mm")
+    product_weight_unit: Mapped[str] = mapped_column(String(2), default="g", server_default="g")
     
     # فیلدهای جدید
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -75,6 +78,13 @@ class Business(Base):
         default="purchase_price",
         server_default="purchase_price",
         comment="مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, weighted_average, moving_weighted_average, standard_cost, actual_cost",
+    )
+    invoice_profit_missing_purchase_price_policy: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="zero_cost",
+        server_default="zero_cost",
+        comment="رفتار قیمت خرید نامشخص: zero_cost, use_line_cost_price, block_calculation",
     )
     invoice_profit_include_overhead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
     invoice_profit_overhead_type: Mapped[str | None] = mapped_column(String(30), nullable=True, default="none", server_default="none", comment="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
@@ -115,6 +125,13 @@ class Business(Base):
     invoice_sync_purchase_price_basis: Mapped[str | None] = mapped_column(
         String(40), nullable=True, default="net_after_line_discount", server_default="net_after_line_discount",
         comment="مبنای قیمت خرید: unit_price, net_after_line_discount, net_with_tax, cost_price",
+    )
+    invoice_sync_purchase_price_multi_line_policy: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="weighted_average",
+        server_default="weighted_average",
+        comment="سیاست چند ردیف خرید یک محصول: weighted_average, last_line, highest_price, lowest_price",
     )
     # حواله انبار پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)
     invoice_warehouse_release_mode: Mapped[str] = mapped_column(

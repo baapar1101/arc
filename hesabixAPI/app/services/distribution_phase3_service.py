@@ -17,6 +17,7 @@ from adapters.db.models.distribution import (
 	DistributionRouteAssignment,
 	DistributionRouteStop,
 	DistributionUserLiveLocation,
+	DistributionUserPreference,
 	DistributionVan,
 )
 from adapters.db.models.person import Person
@@ -31,6 +32,23 @@ from app.services.warehouse_service import create_manual_warehouse_document, get
 
 
 _MAP_TILE_SOURCES = frozenset({"osm", "memaps"})
+
+
+def _van_available_qty(
+	db: Session,
+	business_id: int,
+	product_id: int,
+	warehouse_id: int,
+	as_of: date,
+	*,
+	sellable: bool,
+) -> float:
+	from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+	product = db.get(Product, int(product_id))
+	if sellable and product is not None and is_expiry_tracked_product(product):
+		return float(sellable_quantity(db, business_id, product, warehouse_id, as_of) or 0)
+	return float(get_physical_stock(db, business_id, product_id, warehouse_id, as_of) or 0)
 
 
 def normalize_map_tile_source(value: Any) -> str:
@@ -54,7 +72,7 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"enable_suggested_order": True,
 			"map_tile_source": "osm",
 			"memaps_api_key": None,
-			"share_live_location": True,
+			"share_live_location": False,
 			"carry_over_missed_visits": True,
 			"carry_over_days": 7,
 			"require_pod_signature": False,
@@ -64,6 +82,12 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"auto_apply_promotions": True,
 			"enable_perfect_store": True,
 			"near_expiry_days": 14,
+			"exclusive_assignments": True,
+			"exclusive_territories": False,
+			"exclusive_customer_ownership": True,
+			"require_location_consent": True,
+			"lock_published_plans": False,
+			"require_published_plan": False,
 		}
 	key = getattr(row, "memaps_api_key", None)
 	key_s = str(key).strip() if key else None
@@ -81,7 +105,7 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 		"enable_suggested_order": bool(getattr(row, "enable_suggested_order", True)),
 		"map_tile_source": normalize_map_tile_source(getattr(row, "map_tile_source", "osm")),
 		"memaps_api_key": key_s or None,
-		"share_live_location": bool(getattr(row, "share_live_location", True)),
+		"share_live_location": bool(getattr(row, "share_live_location", False)),
 		"carry_over_missed_visits": bool(getattr(row, "carry_over_missed_visits", True)),
 		"carry_over_days": int(getattr(row, "carry_over_days", 7) or 7),
 		"require_pod_signature": bool(getattr(row, "require_pod_signature", False)),
@@ -91,6 +115,12 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 		"auto_apply_promotions": bool(getattr(row, "auto_apply_promotions", True)),
 		"enable_perfect_store": bool(getattr(row, "enable_perfect_store", True)),
 		"near_expiry_days": int(getattr(row, "near_expiry_days", 14) or 14),
+		"exclusive_assignments": bool(getattr(row, "exclusive_assignments", True)),
+		"exclusive_territories": bool(getattr(row, "exclusive_territories", False)),
+		"exclusive_customer_ownership": bool(getattr(row, "exclusive_customer_ownership", True)),
+		"require_location_consent": bool(getattr(row, "require_location_consent", True)),
+		"lock_published_plans": bool(getattr(row, "lock_published_plans", False)),
+		"require_published_plan": bool(getattr(row, "require_published_plan", False)),
 	}
 
 
@@ -135,11 +165,7 @@ def list_vans(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str,
 	from app.services.distribution_documents import user_label
 
 	q = db.query(DistributionVan).filter(DistributionVan.business_id == business_id)
-	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
-		uid = ctx.get_user_id()
-		if uid is None:
-			return []
-		q = q.filter(DistributionVan.user_id == uid)
+	q = dist_svc.apply_user_id_scope(q, DistributionVan.user_id, db, business_id, ctx)
 	rows = q.order_by(DistributionVan.code.asc()).all()
 	out = []
 	for v in rows:
@@ -243,17 +269,27 @@ def get_van_for_user(db: Session, business_id: int, user_id: int) -> Optional[Di
 	)
 
 
-def get_van_stock(db: Session, business_id: int, van_id: int) -> Dict[str, Any]:
+def get_van_stock(db: Session, business_id: int, van_id: int, ctx: Optional[AuthContext] = None) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
 	if not van:
 		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			van.user_id,
+			write=False,
+			message="موجودی این ون در دسترس شما نیست.",
+			db=db,
+		)
 	from app.services.distribution_documents import _resolve_unit_price
 
 	products = db.query(Product).filter(Product.business_id == business_id, Product.track_inventory == True).all()  # noqa: E712
 	items = []
 	for p in products:
-		qty = get_physical_stock(db, business_id, p.id, van.warehouse_id, business_today(business_id))
+		as_of = business_today(business_id)
+		qty = get_physical_stock(db, business_id, p.id, van.warehouse_id, as_of)
 		if qty and float(qty) > 0:
 			unit_price = _resolve_unit_price(db, business_id, p, None)
 			tax_rate = float(p.sales_tax_rate or 0) if bool(getattr(p, "is_sales_taxable", False)) else 0.0
@@ -262,6 +298,9 @@ def get_van_stock(db: Session, business_id: int, van_id: int) -> Dict[str, Any]:
 					"product_id": p.id,
 					"product_name": p.name,
 					"quantity": float(qty),
+					"sellable_quantity": _van_available_qty(
+						db, business_id, int(p.id), int(van.warehouse_id), as_of, sellable=True
+					),
 					"unit_price": unit_price,
 					"tax_rate": tax_rate,
 					"is_sales_taxable": bool(getattr(p, "is_sales_taxable", False)),
@@ -299,18 +338,34 @@ def load_van(
 	van_id: int,
 	lines: List[Dict[str, Any]],
 	source_warehouse_id: Optional[int] = None,
+	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
 	if not van:
 		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			van.user_id,
+			write=True,
+			message="بارگیری این ون برای شما مجاز نیست.",
+			db=db,
+		)
 	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
 	src = source_warehouse_id or getattr(settings, "default_source_warehouse_id", None)
 	if not src:
 		raise ApiError("VALIDATION_ERROR", "source_warehouse_id required", http_status=400)
 	if not lines:
 		raise ApiError("VALIDATION_ERROR", "lines required", http_status=400)
+	from adapters.db.models.product import Product
+	from app.services.inventory_lot_service import is_expiry_tracked_product, suggest_fefo
+	from decimal import Decimal as _Dec
+
+	today = business_today(business_id)
 	wh_lines = []
+	van_lot_lines = []
 	for i, ln in enumerate(lines):
 		if not isinstance(ln, dict):
 			raise ApiError("VALIDATION_ERROR", f"lines[{i}] invalid", http_status=400)
@@ -318,11 +373,56 @@ def load_van(
 		qty = float(ln.get("quantity") or 0)
 		if pid <= 0 or qty <= 0:
 			raise ApiError("VALIDATION_ERROR", f"lines[{i}] product_id and quantity required", http_status=400)
-		wh_lines.append({"product_id": pid, "quantity": qty})
-	today = business_today(business_id)
-	# پیش‌بررسی موجودی مبدأ
-	for ln in wh_lines:
-		avail = float(get_physical_stock(db, business_id, int(ln["product_id"]), int(src), today) or 0)
+		product = db.query(Product).filter(Product.id == pid, Product.business_id == business_id).first()
+		payload_line = {"product_id": pid, "quantity": qty, "extra_info": dict(ln.get("extra_info") or {})}
+		if product is not None and is_expiry_tracked_product(product) and str(product.inventory_mode or "bulk") != "unique":
+			if ln.get("lot_code") or ln.get("expiry_date") or ln.get("lot_allocations"):
+				payload_line["lot_code"] = ln.get("lot_code")
+				payload_line["expiry_date"] = ln.get("expiry_date")
+				payload_line["manufacturing_date"] = ln.get("manufacturing_date")
+				payload_line["lot_allocations"] = ln.get("lot_allocations")
+			else:
+				extra = dict(ln.get("extra_info") or {})
+				variant_id = extra.get("variant_id")
+				if variant_id is None:
+					allocs = extra.get("allocations")
+					if isinstance(allocs, list) and allocs and isinstance(allocs[0], dict):
+						variant_id = allocs[0].get("variant_id")
+				picked = suggest_fefo(
+					db,
+					business_id,
+					product,
+					int(src),
+					_Dec(str(qty)),
+					today,
+					variant_id=int(variant_id) if variant_id else None,
+				)
+				payload_line["lot_allocations"] = [
+					{
+						"lot_id": int(lot.id),
+						"lot_code": lot.lot_code,
+						"manufacturing_date": lot.manufacturing_date.isoformat() if lot.manufacturing_date else None,
+						"expiry_date": lot.expiry_date.isoformat() if lot.expiry_date else None,
+						"quantity": float(take),
+					}
+					for lot, take in picked
+				]
+		wh_lines.append(payload_line)
+		van_lot_lines.append(payload_line)
+	# پیش‌بررسی موجودی مبدأ — کالای تاریخ‌دار با FEFO خودکار فقط موجودی قابل‌فروش
+	for orig, ln in zip(lines, wh_lines):
+		explicit_lots = bool(
+			isinstance(orig, dict)
+			and (orig.get("lot_allocations") or orig.get("lot_code") or orig.get("expiry_date"))
+		)
+		avail = _van_available_qty(
+			db,
+			business_id,
+			int(ln["product_id"]),
+			int(src),
+			today,
+			sellable=not explicit_lots,
+		)
 		if avail + 1e-9 < float(ln["quantity"]):
 			raise ApiError(
 				"INSUFFICIENT_STOCK",
@@ -348,8 +448,38 @@ def load_van(
 
 	from app.services.distribution_field_ops_service import add_van_lot, assert_van_capacity
 
-	for ln in lines:
-		if not isinstance(ln, dict):
+	for ln in van_lot_lines:
+		allocs = ln.get("lot_allocations") if isinstance(ln.get("lot_allocations"), list) else None
+		if allocs:
+			for alloc in allocs:
+				if not isinstance(alloc, dict):
+					continue
+				exp = None
+				raw_exp = alloc.get("expiry_date")
+				if raw_exp:
+					try:
+						exp = _date.fromisoformat(str(raw_exp)[:10])
+					except ValueError:
+						exp = None
+				mfg = None
+				raw_mfg = alloc.get("manufacturing_date")
+				if raw_mfg:
+					try:
+						mfg = _date.fromisoformat(str(raw_mfg)[:10])
+					except ValueError:
+						mfg = None
+				add_van_lot(
+					db,
+					business_id,
+					int(van.id),
+					int(ln.get("product_id") or 0),
+					float(alloc.get("quantity") or 0),
+					lot_code=alloc.get("lot_code"),
+					expiry_date=exp,
+					manufacturing_date=mfg,
+					unit_weight_kg=float(ln["unit_weight_kg"]) if ln.get("unit_weight_kg") else None,
+					unit_volume_m3=float(ln["unit_volume_m3"]) if ln.get("unit_volume_m3") else None,
+				)
 			continue
 		exp = None
 		raw_exp = ln.get("expiry_date")
@@ -385,12 +515,22 @@ def unload_van(
 	van_id: int,
 	lines: List[Dict[str, Any]],
 	dest_warehouse_id: Optional[int] = None,
+	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	"""تخلیهٔ موجودی ون به انبار مرکزی."""
 	dist_svc._ensure_plugin(db, business_id)
 	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
 	if not van:
 		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			van.user_id,
+			write=True,
+			message="تخلیهٔ این ون برای شما مجاز نیست.",
+			db=db,
+		)
 	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
 	dest = dest_warehouse_id or getattr(settings, "default_source_warehouse_id", None)
 	if not dest:
@@ -399,6 +539,9 @@ def unload_van(
 		raise ApiError("VALIDATION_ERROR", "destination must differ from van warehouse", http_status=400)
 	if not lines:
 		raise ApiError("VALIDATION_ERROR", "lines required", http_status=400)
+	from adapters.db.models.distribution import DistributionVanLot
+	from app.services.distribution_field_ops_service import NO_EXPIRY
+
 	wh_lines = []
 	for i, ln in enumerate(lines):
 		if not isinstance(ln, dict):
@@ -410,7 +553,38 @@ def unload_van(
 		avail = get_physical_stock(db, business_id, pid, van.warehouse_id, business_today(business_id))
 		if float(avail or 0) < qty:
 			raise ApiError("INSUFFICIENT_VAN_STOCK", f"Insufficient stock for product {pid}", http_status=400)
-		wh_lines.append({"product_id": pid, "quantity": qty})
+		payload: Dict[str, Any] = {"product_id": pid, "quantity": qty}
+		van_lots = (
+			db.query(DistributionVanLot)
+			.filter(
+				DistributionVanLot.van_id == int(van.id),
+				DistributionVanLot.product_id == pid,
+				DistributionVanLot.quantity > 0,
+			)
+			.order_by(DistributionVanLot.expiry_date.asc().nullslast(), DistributionVanLot.id.asc())
+			.all()
+		)
+		if van_lots:
+			allocs = []
+			need = float(qty)
+			for row in van_lots:
+				if need <= 1e-9:
+					break
+				take = min(float(row.quantity or 0), need)
+				if take <= 0:
+					continue
+				exp = row.expiry_date
+				allocs.append({
+					"lot_code": row.lot_code,
+					"expiry_date": None if exp == NO_EXPIRY else (exp.isoformat() if exp else None),
+					"manufacturing_date": row.manufacturing_date.isoformat() if getattr(row, "manufacturing_date", None) else None,
+					"quantity": take,
+				})
+				need -= take
+			if allocs:
+				payload["lot_allocations"] = allocs
+				payload["extra_info"] = {"lot_allocations": allocs}
+		wh_lines.append(payload)
 	wh_doc = create_manual_warehouse_document(
 		db,
 		business_id,
@@ -428,7 +602,15 @@ def unload_van(
 	from app.services.distribution_field_ops_service import consume_van_lots_fefo
 
 	for ln in wh_lines:
-		consume_van_lots_fefo(db, int(van.id), int(ln["product_id"]), float(ln["quantity"]))
+		allocs = ln.get("lot_allocations") or (ln.get("extra_info") or {}).get("lot_allocations")
+		consume_van_lots_fefo(
+			db,
+			int(van.id),
+			int(ln["product_id"]),
+			float(ln["quantity"]),
+			skip_expired=False,
+			allocations=allocs if isinstance(allocs, list) else None,
+		)
 	db.commit()
 	return {"van_id": van_id, "warehouse_document_id": wh_doc.id, "status": "posted"}
 
@@ -446,6 +628,7 @@ def apply_route_optimize(
 	items = result.get("items") or []
 	if not result.get("optimized"):
 		return {**result, "persisted": False, "persist_mode": "day_override"}
+	dist_svc.assert_plan_unlocked_for_route(db, business_id, route_id, plan_date)
 	route = db.query(DistributionRoute).filter(
 		DistributionRoute.id == route_id,
 		DistributionRoute.business_id == business_id,
@@ -495,7 +678,14 @@ def record_van_sale_issue(
 		qty = float(ln.get("quantity") or 0)
 		if pid <= 0 or qty <= 0:
 			continue
-		avail = get_physical_stock(db, business_id, pid, van.warehouse_id, business_today(business_id))
+		avail = _van_available_qty(
+			db,
+			business_id,
+			pid,
+			int(van.warehouse_id),
+			business_today(business_id),
+			sellable=True,
+		)
 		if float(avail or 0) < qty:
 			raise ApiError("INSUFFICIENT_VAN_STOCK", f"Insufficient stock for product {pid}", http_status=400)
 		wh_lines.append({"product_id": pid, "quantity": qty})
@@ -616,14 +806,14 @@ def get_team_map(
 	plan_date: Optional[date] = None,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
-	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
+	if not dist_svc._can_see_team_distribution(ctx, business_id):
 		raise ApiError("FORBIDDEN", "Team map requires manage or reports_team", http_status=403)
 	from app.services.distribution_documents import user_label
 
 	d = plan_date or business_today(business_id)
 	start_utc, end_utc = business_day_utc_bounds(business_id, d)
 	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
-	share_live = bool(getattr(settings, "share_live_location", True))
+	share_live = bool(getattr(settings, "share_live_location", False))
 
 	user_ids: set[int] = set()
 	assigns = (
@@ -674,6 +864,22 @@ def get_team_map(
 	)
 	live_by_user = {int(r.user_id): r for r in live_rows}
 	user_ids.update(live_by_user.keys())
+	allowed_users = dist_svc.scoped_user_ids_for_ctx(db, business_id, ctx)
+	if allowed_users is not None:
+		user_ids = {uid for uid in user_ids if uid in allowed_users}
+
+	require_consent = bool(getattr(settings, "require_location_consent", True))
+	consent_by_user: Dict[int, bool] = {}
+	if user_ids:
+		pref_rows = (
+			db.query(DistributionUserPreference)
+			.filter(
+				DistributionUserPreference.business_id == business_id,
+				DistributionUserPreference.user_id.in_(user_ids),
+			)
+			.all()
+		)
+		consent_by_user = {int(r.user_id): bool(r.location_consent) for r in pref_rows}
 
 	visitors: List[Dict[str, Any]] = []
 	customers: List[Dict[str, Any]] = []
@@ -702,7 +908,8 @@ def get_team_map(
 		lat = lng = None
 		loc_source = None
 		updated_at = None
-		if share_live and live is not None:
+		live_ok = share_live and ((not require_consent) or consent_by_user.get(uid, False))
+		if live_ok and live is not None:
 			lat = float(live.latitude)
 			lng = float(live.longitude)
 			updated_at = live.recorded_at
@@ -710,7 +917,7 @@ def get_team_map(
 		elif visit:
 			extra = visit.extra_info if isinstance(visit.extra_info, dict) else {}
 			live_ex = extra.get("live_location") if isinstance(extra.get("live_location"), dict) else {}
-			if share_live and live_ex.get("latitude") is not None and live_ex.get("longitude") is not None:
+			if live_ok and live_ex.get("latitude") is not None and live_ex.get("longitude") is not None:
 				lat = float(live_ex["latitude"])
 				lng = float(live_ex["longitude"])
 				updated_at = _parse_utc_ts(live_ex.get("updated_at"))
@@ -720,11 +927,6 @@ def get_team_map(
 				lng = float(visit.end_longitude) if visit.end_longitude is not None else None
 				loc_source = "end"
 				updated_at = visit.ended_at or visit.updated_at
-			elif visit.start_latitude is not None:
-				lat = float(visit.start_latitude)
-				lng = float(visit.start_longitude) if visit.start_longitude is not None else None
-				loc_source = "start"
-				updated_at = visit.started_at
 
 		current = in_progress.get(uid)
 		started = current.started_at if current else (visit.started_at if visit else None)
@@ -735,6 +937,8 @@ def get_team_map(
 				"latitude": lat,
 				"longitude": lng,
 				"location_source": loc_source,
+				"location_consent": consent_by_user.get(uid, False),
+				"live_allowed": live_ok,
 				"presence": _presence_from_age(updated_at),
 				"live_updated_at": updated_at.isoformat() + "Z" if updated_at else None,
 				"visit_id": current.id if current else (visit.id if visit else None),
@@ -764,6 +968,8 @@ def get_team_map(
 			"visit_latitude": v["latitude"],
 			"visit_longitude": v["longitude"],
 			"location_source": v["location_source"],
+			"location_consent": v.get("location_consent"),
+			"live_allowed": v.get("live_allowed"),
 			"live_updated_at": v["live_updated_at"],
 			"customer_latitude": v["customer_latitude"],
 			"customer_longitude": v["customer_longitude"],
@@ -776,6 +982,7 @@ def get_team_map(
 	return {
 		"plan_date": d.isoformat(),
 		"share_live_location": share_live,
+		"require_location_consent": require_consent,
 		"visitors": visitors,
 		"customers": customers,
 		"markers": markers,
@@ -797,6 +1004,7 @@ def process_offline_sync(
 		db.query(DistributionOfflineSyncBatch)
 		.filter(
 			DistributionOfflineSyncBatch.business_id == business_id,
+			DistributionOfflineSyncBatch.user_id == user_id,
 			DistributionOfflineSyncBatch.client_batch_id == batch_id,
 		)
 		.first()
@@ -835,12 +1043,14 @@ def process_offline_sync(
 				)
 				results.append({"client_ref": client_ref, "ok": True, "visit_id": data.get("id")})
 			elif op == "create_return":
-				data = dist_svc.create_return_request(db, business_id, user_id, payload)
+				data = dist_svc.create_return_request(db, business_id, user_id, payload, ctx=ctx)
 				results.append({"client_ref": client_ref, "ok": True, "return_request_id": data.get("id")})
 			elif op == "create_presell_order":
 				from app.services import distribution_commercial_service as dist_c
 
-				data = dist_c.create_visit_order(db, business_id, user_id, payload, auto_confirm=bool(payload.get("confirm")))
+				data = dist_c.create_visit_order(
+					db, business_id, user_id, payload, auto_confirm=bool(payload.get("confirm")), ctx=ctx,
+				)
 				results.append({"client_ref": client_ref, "ok": True, "order_id": data.get("id"), "document_id": data.get("document_id")})
 			elif op == "complete_visit_with_presell":
 				# سفارش پیش‌فروش + تکمیل ویزیت در یک عمل آفلاین
@@ -850,7 +1060,7 @@ def process_offline_sync(
 				visit_payload = payload.get("visit") if isinstance(payload.get("visit"), dict) else {}
 				vid = int(visit_payload.get("visit_id") or payload.get("visit_id") or 0)
 				order_data = dist_c.create_visit_order(
-					db, business_id, user_id, order_payload, auto_confirm=bool(order_payload.get("confirm", True)),
+					db, business_id, user_id, order_payload, auto_confirm=bool(order_payload.get("confirm", True)), ctx=ctx,
 				)
 				if order_data.get("document_id") and not visit_payload.get("document_id"):
 					visit_payload = dict(visit_payload)

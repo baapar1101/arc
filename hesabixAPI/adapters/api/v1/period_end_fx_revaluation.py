@@ -30,6 +30,7 @@ class PeriodEndFxCreateBody(BaseModel):
 @router.get(
 	"/businesses/{business_id}/period-end-fx-revaluation/preview",
 	summary="پیش‌نمایش تسعیر پایان دوره",
+	description="اقلام تسعیر حساب‌های پولی (بانک/صندوق/شخص/چک) نسبت به نرخ روز بدون ثبت سند. کسب‌وکار باید چندارزی باشد. ابزار MCP: preview_period_end_fx_revaluation.",
 )
 @require_business_access("business_id")
 async def preview_period_end_fx(
@@ -49,6 +50,7 @@ async def preview_period_end_fx(
 @router.post(
 	"/businesses/{business_id}/period-end-fx-revaluation",
 	summary="ایجاد سند تسعیر پایان دوره",
+	description="ساخت سند دستی قابل بازبینی از پیش‌نمایش جاری. اگر مانده نیازمند تسعیر نباشد خطا می‌دهد. ابزار MCP: create_period_end_fx_revaluation.",
 )
 @require_business_access("business_id")
 async def create_period_end_fx(

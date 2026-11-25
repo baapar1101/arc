@@ -26,7 +26,7 @@ router = APIRouter(prefix="/petty-cash", tags=["مدیریت مالی"])
 @router.post(
     "/businesses/{business_id}/petty-cash",
     summary="لیست تنخواه گردان‌ها",
-    description="دریافت لیست تنخواه گردان‌های یک کسب و کار با امکان جستجو و فیلتر",
+    description="ابزار MCP: `list_petty_cash`. دریافت لیست تنخواه گردان‌های یک کسب و کار با امکان جستجو و فیلتر.",
 )
 @require_business_access("business_id")
 async def list_petty_cash_endpoint(
@@ -69,7 +69,7 @@ async def list_petty_cash_endpoint(
 @router.post(
     "/businesses/{business_id}/petty-cash/create",
     summary="ایجاد تنخواه گردان جدید",
-    description="ایجاد تنخوان گردان برای یک کسب‌وکار مشخص",
+    description="ابزار MCP: `create_petty_cash` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_petty_cash_endpoint(
@@ -88,7 +88,7 @@ async def create_petty_cash_endpoint(
 @router.get(
     "/petty-cash/{petty_cash_id}",
     summary="جزئیات تنخواه گردان",
-    description="دریافت جزئیات تنخواه گردان بر اساس شناسه",
+    description="ابزار MCP: `get_petty_cash`.",
 )
 async def get_petty_cash_endpoint(
     request: Request,
@@ -112,7 +112,7 @@ async def get_petty_cash_endpoint(
 @router.put(
     "/petty-cash/{petty_cash_id}",
     summary="ویرایش تنخواه گردان",
-    description="ویرایش اطلاعات تنخواه گردان",
+    description="ابزار MCP: `update_petty_cash` (نیازمند تأیید).",
 )
 async def update_petty_cash_endpoint(
     request: Request,
@@ -138,7 +138,7 @@ async def update_petty_cash_endpoint(
 @router.delete(
     "/petty-cash/{petty_cash_id}",
     summary="حذف تنخواه گردان",
-    description="حذف یک تنخواه گردان",
+    description="ابزار MCP: `delete_petty_cash` (نیازمند تأیید).",
 )
 async def delete_petty_cash_endpoint(
     request: Request,
@@ -168,7 +168,7 @@ async def delete_petty_cash_endpoint(
 @router.post(
     "/businesses/{business_id}/petty-cash/bulk-delete",
     summary="حذف گروهی تنخواه گردان‌ها",
-    description="حذف چندین تنخواه گردان بر اساس شناسه‌ها",
+    description="ابزار MCP: `bulk_delete_petty_cash` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def bulk_delete_petty_cash_endpoint(
@@ -195,7 +195,7 @@ async def bulk_delete_petty_cash_endpoint(
 @router.post(
     "/businesses/{business_id}/petty-cash/export/excel",
     summary="خروجی Excel لیست تنخواه گردان‌ها",
-    description="خروجی Excel لیست تنخواه گردان‌ها با قابلیت فیلتر و مرتب‌سازی",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_petty_cash_excel(
@@ -321,7 +321,7 @@ async def export_petty_cash_excel(
 @router.post(
     "/businesses/{business_id}/petty-cash/export/pdf",
     summary="خروجی PDF لیست تنخواه گردان‌ها",
-    description="خروجی PDF لیست تنخواه گردان‌ها با قابلیت فیلتر و مرتب‌سازی",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_petty_cash_pdf(

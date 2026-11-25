@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/product_form_data.dart';
+import '../models/product_measurement.dart';
 import '../services/product_service.dart';
 import '../services/opening_balance_service.dart';
 import '../services/category_service.dart';
@@ -9,6 +10,7 @@ import '../services/tax_service.dart';
 import '../services/price_list_service.dart';
 import '../services/currency_service.dart';
 import '../services/warehouse_service.dart';
+import '../services/product_variant_service.dart';
 import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../utils/product_form_auto_save.dart';
@@ -32,11 +34,16 @@ class ProductFormController extends ChangeNotifier {
   late final OpeningBalanceService _openingBalanceService;
 
   ProductFormData _formData = ProductFormData();
+  ProductMeasurementUnit? _dimensionUnit;
+  ProductMeasurementUnit? _weightUnit;
+  Map<ProductMeasurement, String?> _originalMeasurements = const {};
+  final _measurementInputs = <ProductMeasurement, String>{};
   bool _isLoading = false;
   String? _errorMessage;
   int? _editingProductId;
   int? _lastCreatedProductId;
   String? _originalInventoryMode; // برای تشخیص تغییر از bulk به unique
+  Set<int> _originalDimensionIds = <int>{};
   
   // Reference data
   List<Map<String, dynamic>> _categories = [];
@@ -64,9 +71,15 @@ class ProductFormController extends ChangeNotifier {
   bool _obEligibilityLoading = false;
   String _openingBalanceQuantity = '';
   String _openingBalanceCostPrice = '';
+  String _openingBalanceLotCode = '';
+  DateTime? _openingBalanceManufacturingDate;
+  DateTime? _openingBalanceExpiryDate;
   double? _obInitialQuantity;
   double? _obInitialCostPrice;
   int? _obInitialWarehouseId;
+  String? _obInitialLotCode;
+  DateTime? _obInitialManufacturingDate;
+  DateTime? _obInitialExpiryDate;
   bool _obInitialHadLine = false;
 
   ProductFormController({
@@ -108,6 +121,9 @@ class ProductFormController extends ChangeNotifier {
   bool get obEligibilityLoading => _obEligibilityLoading;
   String get openingBalanceQuantity => _openingBalanceQuantity;
   String get openingBalanceCostPrice => _openingBalanceCostPrice;
+  String get openingBalanceLotCode => _openingBalanceLotCode;
+  DateTime? get openingBalanceManufacturingDate => _openingBalanceManufacturingDate;
+  DateTime? get openingBalanceExpiryDate => _openingBalanceExpiryDate;
   bool get obEditable => _obEligibility?['editable'] == true;
   /// نمایش بخش تعداد اولیه — حتی بدون دسترسی ویرایش (فقط‌خواندنی با هشدار).
   bool get showOpeningBalanceSection {
@@ -122,6 +138,21 @@ class ProductFormController extends ChangeNotifier {
 
   void setOpeningBalanceCostPrice(String value) {
     _openingBalanceCostPrice = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceLotCode(String value) {
+    _openingBalanceLotCode = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceManufacturingDate(DateTime? value) {
+    _openingBalanceManufacturingDate = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceExpiryDate(DateTime? value) {
+    _openingBalanceExpiryDate = value;
     notifyListeners();
   }
 
@@ -150,6 +181,9 @@ class ProductFormController extends ChangeNotifier {
     _obInitialQuantity = null;
     _obInitialCostPrice = null;
     _obInitialWarehouseId = null;
+    _obInitialLotCode = null;
+    _obInitialManufacturingDate = null;
+    _obInitialExpiryDate = null;
     if (pob is Map) {
       final qty = (pob['quantity'] as num?)?.toDouble();
       final cost = (pob['cost_price'] as num?)?.toDouble();
@@ -168,14 +202,36 @@ class ProductFormController extends ChangeNotifier {
         _openingBalanceCostPrice = formatNumberForInput(cost);
         _obInitialCostPrice = cost;
       }
+      final lotCode = pob['lot_code']?.toString() ?? '';
+      _openingBalanceLotCode = lotCode;
+      _obInitialLotCode = lotCode.isEmpty ? null : lotCode;
+      _openingBalanceManufacturingDate = _parseObDate(pob['manufacturing_date']);
+      _obInitialManufacturingDate = _openingBalanceManufacturingDate;
+      _openingBalanceExpiryDate = _parseObDate(pob['expiry_date']);
+      _obInitialExpiryDate = _openingBalanceExpiryDate;
     } else if (_obInitialHadLine) {
       _obInitialHadLine = false;
     }
     if (!_obInitialHadLine) {
       _openingBalanceQuantity = '';
       _openingBalanceCostPrice = '';
+      _openingBalanceLotCode = '';
+      _openingBalanceManufacturingDate = null;
+      _openingBalanceExpiryDate = null;
       _obInitialWarehouseId = null;
     }
+  }
+
+  DateTime? _parseObDate(dynamic raw) {
+    if (raw == null) return null;
+    final s = raw.toString().trim();
+    if (s.isEmpty) return null;
+    return DateTime.tryParse(s.split('T').first);
+  }
+
+  DateTime? _dateOnly(DateTime? value) {
+    if (value == null) return null;
+    return DateTime(value.year, value.month, value.day);
   }
 
   bool _openingBalanceChanged() {
@@ -196,7 +252,19 @@ class ProductFormController extends ChangeNotifier {
             double.tryParse(rawCost.replaceAll(',', '')) ??
             0.0);
     final initialCost = _obInitialCostPrice ?? 0.0;
-    return qty != _obInitialQuantity || cost != initialCost;
+    if (qty != _obInitialQuantity || cost != initialCost) return true;
+    if (_formData.trackExpiry) {
+      if (_openingBalanceLotCode.trim() != (_obInitialLotCode ?? '')) return true;
+      if (_dateOnly(_openingBalanceManufacturingDate) !=
+          _dateOnly(_obInitialManufacturingDate)) {
+        return true;
+      }
+      if (_dateOnly(_openingBalanceExpiryDate) !=
+          _dateOnly(_obInitialExpiryDate)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   int? _resolveOpeningBalanceWarehouseId() {
@@ -246,6 +314,9 @@ class ProductFormController extends ChangeNotifier {
         costPrice: cost,
         warehouseId: warehouseId,
         fiscalYearId: fiscalYearId,
+        lotCode: _obLotCodeOrNull(),
+        manufacturingDate: _obManufacturingDateOrNull(),
+        expiryDate: _obExpiryDateOrNull(),
       );
     }
 
@@ -274,7 +345,24 @@ class ProductFormController extends ChangeNotifier {
       costPrice: cost,
       warehouseId: warehouseId,
       fiscalYearId: fiscalYearId,
+      lotCode: _obLotCodeOrNull(),
+      manufacturingDate: _obManufacturingDateOrNull(),
+      expiryDate: _obExpiryDateOrNull(),
     );
+  }
+
+  String? _obLotCodeOrNull() {
+    if (!_formData.trackExpiry) return null;
+    final code = _openingBalanceLotCode.trim();
+    return code.isEmpty ? null : code;
+  }
+
+  DateTime? _obManufacturingDateOrNull() {
+    return _formData.trackExpiry ? _openingBalanceManufacturingDate : null;
+  }
+
+  DateTime? _obExpiryDateOrNull() {
+    return _formData.trackExpiry ? _openingBalanceExpiryDate : null;
   }
 
   void addOrUpdateDraftPriceItem(Map<String, dynamic> item) {
@@ -326,6 +414,7 @@ class ProductFormController extends ChangeNotifier {
         _loadReferenceData(),
         _loadPriceListsAndCurrencies(),
         _loadWarehouses(),
+        _loadMeasurementUnits(),
       ]);
 
       if (cloneSourceProductId != null) {
@@ -364,6 +453,7 @@ class ProductFormController extends ChangeNotifier {
         _formData = ProductFormData.fromProduct(productMap);
         // ذخیره inventory_mode اولیه برای تشخیص تغییر
         _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
+        _originalDimensionIds = Set<int>.from(_formData.inventoryDimensionAttributeIds);
         if (_editingProductId != null) {
           await _loadExistingPriceItems(productId: _editingProductId!);
         }
@@ -385,6 +475,9 @@ class ProductFormController extends ChangeNotifier {
         _originalInventoryMode = 'bulk';
       }
 
+      _originalMeasurements = _formData.physicalMeasurements;
+      _measurementInputs.clear();
+
       // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
       // کاربر می‌تواند عنوان واحد را در فرم وارد کند و در صورت تطبیق با لیست، آیدی ست می‌شود
       
@@ -396,6 +489,77 @@ class ProductFormController extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  Future<void> _loadMeasurementUnits() async {
+    try {
+      final business = await BusinessApiService.getBusiness(
+        businessId,
+        apiClient: _apiClient,
+      );
+      _dimensionUnit = ProductMeasurementUnit.dimensionFromCode(
+        business.productDimensionUnit,
+      );
+      _weightUnit = ProductMeasurementUnit.weightFromCode(
+        business.productWeightUnit,
+      );
+    } catch (_) {
+      _dimensionUnit = null;
+      _weightUnit = null;
+    }
+  }
+
+  ProductMeasurementUnit? measurementUnit(ProductMeasurement field) =>
+      field == ProductMeasurement.weight ? _weightUnit : _dimensionUnit;
+
+  String measurementInput(ProductMeasurement field) =>
+      _measurementInputs[field] ??
+      measurementUnit(field)?.display(_formData.physicalMeasurements[field]) ??
+      '';
+
+  bool isMeasurementApproximate(ProductMeasurement field) {
+    final display = measurementUnit(field)!.format(_originalMeasurements[field]);
+    return display.approximate && (_measurementInputs[field] ?? display.value) == display.value;
+  }
+
+  String? _measurementBaseValue(ProductMeasurement field, String input) =>
+      measurementUnit(field)!.toBaseValue(input, original: _originalMeasurements[field]);
+
+  String? measurementError(ProductMeasurement field, String input) {
+    try {
+      _measurementBaseValue(field, input);
+      return null;
+    } on FormatException catch (error) {
+      return error.message;
+    }
+  }
+
+  void updateMeasurement(ProductMeasurement field, String input) {
+    _measurementInputs[field] = input;
+    try {
+      final value = _measurementBaseValue(field, input);
+      updateFormData(_formData.copyWith(physicalMeasurements: {
+        ..._formData.physicalMeasurements,
+        field: value,
+      }));
+    } on FormatException {
+      // Keep the raw input for validation, including when the user switches tabs.
+    }
+  }
+
+  Map<String, String?> _measurementPayload({required bool editing}) {
+    if (_formData.itemType != 'کالا' || _dimensionUnit == null) return {};
+    final values = <String, String?>{};
+    for (final field in ProductMeasurement.values) {
+      final input = _measurementInputs[field];
+      if (editing && input == null) continue;
+      final value = input == null
+          ? _formData.physicalMeasurements[field]
+          : _measurementBaseValue(field, input);
+      if (editing ? value == _originalMeasurements[field] : value == null) continue;
+      values[field.apiKey] = value;
+    }
+    return values;
   }
 
   // Load all reference data (موازی برای بهبود عملکرد)
@@ -532,8 +696,16 @@ class ProductFormController extends ChangeNotifier {
       _setError(firstError);
       return false;
     }
-    
-    return isValid;
+    if (!isValid) return false;
+
+    try {
+      _measurementPayload(editing: isEditingProduct);
+    } on FormatException catch (error) {
+      _setError(error.message);
+      return false;
+    }
+
+    return true;
   }
 
   Future<bool> _ensureCatalogBusinessContactReady() async {
@@ -575,7 +747,8 @@ class ProductFormController extends ChangeNotifier {
         return false;
       }
 
-      final payload = _formData.toPayload();
+      final payload = _formData.toPayload()
+        ..addAll(_measurementPayload(editing: false));
       if (openingBalanceInput != null) {
         payload['opening_balance'] = openingBalanceInput.toJson();
       }
@@ -606,6 +779,7 @@ class ProductFormController extends ChangeNotifier {
       _lastCreatedProductId = newId;
       if (newId != null) {
         await _saveDraftPriceItems(productId: newId);
+        await _syncInventoryDimensions(newId);
       }
       
       // پاک کردن عکس انتخابی بعد از آپلود موفق
@@ -678,7 +852,8 @@ class ProductFormController extends ChangeNotifier {
         return false;
       }
 
-      final payload = _formData.toPayload();
+      final payload = _formData.toPayload()
+        ..addAll(_measurementPayload(editing: true));
       if (openingBalanceInput != null) {
         payload['opening_balance'] = openingBalanceInput.toJson();
       }
@@ -705,6 +880,7 @@ class ProductFormController extends ChangeNotifier {
         imageFilename: _selectedImageFilename,
       );
       await _saveDraftPriceItems(productId: productId);
+      await _syncInventoryDimensions(productId);
       
       // پاک کردن عکس انتخابی بعد از آپلود موفق
       _selectedImageBytes = null;
@@ -829,9 +1005,36 @@ class ProductFormController extends ChangeNotifier {
     }
   }
 
+  Future<void> _syncInventoryDimensions(int productId) async {
+    if ((_formData.inventoryMode ?? 'bulk') == 'unique') return;
+    final ids = _formData.inventoryDimensionAttributeIds.toList()..sort();
+    final original = _originalDimensionIds.toList()..sort();
+    if (ids.isEmpty && original.isEmpty) return;
+    if (ids.length == original.length &&
+        ids.asMap().entries.every((e) => e.value == original[e.key])) {
+      return;
+    }
+    final svc = ProductVariantService(apiClient: _apiClient);
+    await svc.replaceDimensions(
+      businessId: businessId,
+      productId: productId,
+      dimensions: [
+        for (var i = 0; i < ids.length; i++)
+          {
+            'attribute_id': ids[i],
+            'is_required': true,
+            'sort_order': i + 1,
+          },
+      ],
+    );
+    _originalDimensionIds = ids.toSet();
+  }
+
   // Reset form
   void resetForm() {
     _formData = ProductFormData();
+    _originalMeasurements = const {};
+    _measurementInputs.clear();
     _clearError();
     // حذف draft ذخیره شده
     _autoSave.clearFormData(businessId, _editingProductId);

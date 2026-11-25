@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Dict
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     ADAPTIVE_DISCOVERY_K,
     ADAPTIVE_K_ROLLOUT_PERCENT,
@@ -20,7 +20,7 @@ from app.services.ai.ai_tool_canary import recommend_indexed_promotion
 from app.services.ai.ai_tool_discovery_telemetry import telemetry_snapshot
 from app.services.ai.ai_tool_phase11_eval import run_phase11_evaluation
 
-PHASE12_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/phase-12")
+PHASE12_DIR = docs_root() / "ai-agent" / "evals" / "phase-12"
 
 
 def run_phase12_evaluation(*, write_files: bool = False) -> Dict[str, Any]:

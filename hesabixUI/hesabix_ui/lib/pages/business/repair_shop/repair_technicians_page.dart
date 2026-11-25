@@ -1,7 +1,6 @@
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
-import '../../../services/person_service.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
@@ -9,6 +8,8 @@ import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../widgets/invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
@@ -61,7 +62,9 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
     } catch (e) {
       setState(() {
         _errorMessage =
-            'خطا در بارگذاری تعمیرکاران: ${ErrorExtractor.forContext(e, context)}';
+            AppLocalizations.of(context).repairShopLoadTechniciansError(
+          ErrorExtractor.forContext(e, context),
+        );
         _isLoading = false;
       });
     }
@@ -101,24 +104,27 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
   Future<void> _deleteTechnician(RepairTechnician technician) async {
     final confirm = await showGlassDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('غیرفعال کردن تعمیرکار'),
+      builder: (context) {
+        final t = AppLocalizations.of(context);
+        return AlertDialog(
+        title: Text(t.repairShopDeactivateTechnician),
         content: Text(
-            'آیا مطمئن هستید که می‌خواهید "${technician.personName}" را غیرفعال کنید؟'),
+            t.repairShopDeactivateTechnicianConfirm(technician.personName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('خیر'),
+            child: Text(t.no),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: SemanticColorResolver.negative(context),
             ),
-            child: const Text('بله، غیرفعال کن'),
+            child: Text(t.repairShopDeactivateYes),
           ),
         ],
-      ),
+      );
+      },
     );
 
     if (confirm != true) return;
@@ -130,12 +136,20 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
       );
 
       if (mounted) {
-        SnackBarHelper.show(context, message: 'تعمیرکار غیرفعال شد');
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).repairShopTechnicianDeactivated,
+        );
         _loadTechnicians();
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+        );
       }
     }
   }
@@ -144,10 +158,11 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final t = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('مدیریت تعمیرکاران'),
+        title: Text(t.repairShopTechniciansTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
@@ -159,8 +174,8 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               _loadTechnicians();
             },
             tooltip: _showInactive
-                ? 'مخفی کردن غیرفعال‌ها'
-                : 'نمایش غیرفعال‌ها',
+                ? t.repairShopHideInactive
+                : t.repairShopShowInactive,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -181,7 +196,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadTechnicians,
-                        child: const Text('تلاش مجدد'),
+                        child: Text(t.retry),
                       ),
                     ],
                   ),
@@ -197,12 +212,12 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
                             color: colorScheme.primary.withValues(alpha: 0.3),
                           ),
                           const SizedBox(height: 16),
-                          const Text('هنوز تعمیرکاری ثبت نشده است'),
+                          Text(t.repairShopNoTechnicians),
                           const SizedBox(height: 24),
                           ElevatedButton.icon(
                             onPressed: _createTechnician,
                             icon: const Icon(Icons.add),
-                            label: const Text('افزودن تعمیرکار'),
+                            label: Text(t.repairShopAddTechnician),
                           ),
                         ],
                       ),
@@ -219,7 +234,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createTechnician,
         icon: const Icon(Icons.add),
-        label: const Text('تعمیرکار جدید'),
+        label: Text(t.repairShopNewTechnician),
       ),
     );
   }
@@ -229,6 +244,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    final t = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -237,8 +253,10 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               ? colorScheme.primary
               : Colors.grey,
           child: Text(
-            technician.personName[0].toUpperCase(),
-            style: TextStyle(color: Colors.white),
+            technician.personName.trim().isNotEmpty
+                ? technician.personName.trim()[0].toUpperCase()
+                : '?',
+            style: const TextStyle(color: Colors.white),
           ),
         ),
         title: Text(
@@ -251,9 +269,9 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('کد: ${technician.code}'),
+            Text(t.repairShopCodeWithValue(technician.code)),
             Text(
-              '${technician.commissionTypeLabel}: ${technician.formattedCommission}',
+              '${technician.commissionTypeLabel(t)}: ${technician.formattedCommission(t)}',
               style: TextStyle(
                 color: colorScheme.primary,
                 fontSize: 12,
@@ -261,7 +279,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
             ),
             if (!technician.isActive)
               Text(
-                'غیرفعال',
+                t.inactive,
                 style: TextStyle(color: SemanticColorResolver.negative(context), fontSize: 12),
               ),
           ],
@@ -278,13 +296,13 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
             }
           },
           itemBuilder: (context) => [
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'edit',
               child: Row(
                 children: [
-                  Icon(Icons.edit, size: 20),
-                  SizedBox(width: 8),
-                  Text('ویرایش'),
+                  const Icon(Icons.edit, size: 20),
+                  const SizedBox(width: 8),
+                  Text(t.edit),
                 ],
               ),
             ),
@@ -295,7 +313,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
                   children: [
                     Icon(Icons.delete, size: 20, color: SemanticColorResolver.negative(context)),
                     SizedBox(width: 8),
-                    Text('غیرفعال کردن', style: TextStyle(color: SemanticColorResolver.negative(context))),
+                    Text(t.repairShopDeactivateTechnician, style: TextStyle(color: SemanticColorResolver.negative(context))),
                   ],
                 ),
               ),
@@ -323,7 +341,6 @@ class _TechnicianFormDialog extends StatefulWidget {
 class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final RepairShopService _service;
-  late final PersonService _personService;
 
   Person? _selectedPerson;
   final TextEditingController _codeController = TextEditingController();
@@ -338,7 +355,6 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     super.initState();
     final apiClient = ApiClient();
     _service = RepairShopService(apiClient);
-    _personService = PersonService(apiClient: apiClient);
     if (widget.technician != null) {
       _loadTechnician();
     }
@@ -351,8 +367,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     _commissionValueController.text = tech.commissionValue.toString();
     _isActive = tech.isActive;
 
-    // بارگذاری Person - فعلاً skip می‌کنیم چون تنها نام می‌خواهیم
-    setState(() => _selectedPerson = null);
+    setState(() {});
   }
 
   @override
@@ -362,54 +377,32 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     super.dispose();
   }
 
-  Future<void> _selectPerson() async {
-    final response = await _personService.getPersons(
-      businessId: widget.businessId,
-    );
-
-    final items = response['items'] as List<dynamic>;
-    final persons = items.map((e) => Person.fromJson(e as Map<String, dynamic>)).toList();
-
-    if (!mounted) return;
-
-    final selected = await showGlassDialog<Person>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('انتخاب فرد'),
-        children: persons.map((person) {
-          return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, person),
-            child: Text(person.aliasName),
-          );
-        }).toList(),
-      ),
-    );
-
-    if (selected != null) {
-      setState(() => _selectedPerson = selected);
-    }
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedPerson == null && widget.technician == null) {
-      SnackBarHelper.show(context, message: 'لطفاً فرد را انتخاب کنید');
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).repairShopSelectPerson,
+      );
       return;
     }
 
     setState(() => _isSaving = true);
 
     try {
-      final data = {
-        'code': _codeController.text,
+      final data = <String, dynamic>{
         'commission_type': _commissionType,
-        'commission_value': double.parse(_commissionValueController.text),
+        'commission_value': _commissionType == 'case_by_case'
+            ? 0
+            : double.parse(_commissionValueController.text),
         'is_active': _isActive,
       };
+      if (_codeController.text.trim().isNotEmpty) {
+        data['code'] = _codeController.text.trim();
+      }
 
       if (widget.technician == null) {
-        // ایجاد جدید
         data['person_id'] = _selectedPerson!.id!;
         await _service.createTechnician(
           businessId: widget.businessId,
@@ -429,7 +422,12 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).repairShopErrorWithDetails(
+            ErrorExtractor.forContext(e, context),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -440,10 +438,11 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(
-            widget.technician == null ? 'تعمیرکار جدید' : 'ویرایش تعمیرکار'),
+            widget.technician == null ? t.repairShopNewTechnician : t.repairShopEditTechnician),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (_isSaving)
@@ -471,19 +470,25 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
             children: [
               // انتخاب فرد (فقط برای ایجاد جدید)
               if (widget.technician == null)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Text(_selectedPerson?.aliasName ?? 'انتخاب فرد'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: _selectPerson,
-                  ),
+                PersonComboboxWidget(
+                  businessId: widget.businessId,
+                  selectedPerson: _selectedPerson,
+                  label: t.person,
+                  hintText: t.repairShopPersonHint,
+                  isRequired: true,
+                  onChanged: (person) {
+                    setState(() => _selectedPerson = person);
+                  },
                 )
               else
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.person),
-                    title: Text(_selectedPerson?.aliasName ?? widget.technician?.personName ?? 'در حال بارگذاری...'),
+                    title: Text(
+                      _selectedPerson?.displayName ??
+                          widget.technician?.personName ??
+                          '',
+                    ),
                   ),
                 ),
 
@@ -492,17 +497,12 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
               // کد تعمیرکار
               TextFormField(
                 controller: _codeController,
-                decoration: const InputDecoration(
-                  labelText: 'کد تعمیرکار',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.qr_code),
+                decoration: InputDecoration(
+                  labelText: t.repairShopTechnicianCodeOptional,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.qr_code),
+                  helperText: t.repairShopTechnicianCodeHelper,
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'کد الزامی است';
-                  }
-                  return null;
-                },
               ),
 
               const SizedBox(height: 16),
@@ -510,18 +510,18 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
               // نوع حق‌الزحمه
               DropdownButtonFormField<String>(
                 initialValue: _commissionType,
-                decoration: const InputDecoration(
-                  labelText: 'نوع حق‌الزحمه',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.payments),
+                decoration: InputDecoration(
+                  labelText: t.repairShopCommissionType,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.payments),
                 ),
-                items: const [
+                items: [
                   DropdownMenuItem(
-                      value: 'fixed', child: Text('مبلغ ثابت')),
+                      value: 'fixed', child: Text(t.repairShopCommissionFixed)),
                   DropdownMenuItem(
-                      value: 'percentage', child: Text('درصدی')),
+                      value: 'percentage', child: Text(t.repairShopCommissionPercentage)),
                   DropdownMenuItem(
-                      value: 'case_by_case', child: Text('موردی')),
+                      value: 'case_by_case', child: Text(t.repairShopCommissionCaseByCase)),
                 ],
                 onChanged: (value) {
                   setState(() => _commissionType = value!);
@@ -536,21 +536,21 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
                   controller: _commissionValueController,
                   decoration: InputDecoration(
                     labelText: _commissionType == 'percentage'
-                        ? 'درصد حق‌الزحمه'
-                        : 'مبلغ حق‌الزحمه',
+                        ? t.repairShopCommissionPercentValue
+                        : t.repairShopCommissionFixedValue,
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.percent),
                     helperText: _commissionType == 'percentage' 
-                        ? 'درصد از دستمزد تعمیر'
-                        : 'مبلغ ثابت به واحد ارز پیش‌فرض کسب‌وکار',
+                        ? t.repairShopCommissionPercentHelper
+                        : t.repairShopCommissionFixedHelper,
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'مقدار الزامی است';
+                      return t.repairShopValueRequired;
                     }
                     if (double.tryParse(value) == null) {
-                      return 'عدد معتبر وارد کنید';
+                      return t.repairShopEnterValidNumber;
                     }
                     return null;
                   },
@@ -560,8 +560,8 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
 
               // وضعیت فعال/غیرفعال
               SwitchListTile(
-                title: const Text('فعال'),
-                subtitle: const Text('تعمیرکار فعال برای اختصاص سفارش'),
+                title: Text(t.active),
+                subtitle: Text(t.repairShopTechnicianActive),
                 value: _isActive,
                 onChanged: (value) {
                   setState(() => _isActive = value);
@@ -580,7 +580,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.check),
-                label: Text(_isSaving ? 'در حال ذخیره...' : 'ذخیره'),
+                label: Text(_isSaving ? t.saving : t.save),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.all(16),
                 ),

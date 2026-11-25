@@ -9,6 +9,7 @@ from .base_repo import BaseRepository
 from ..models.product import Product
 from ..models.product_general_barcode_alias import ProductGeneralBarcodeAlias
 from ..models.product_instance import ProductInstance
+from ..models.product_variant import ProductVariant
 from ..models.product_attribute_link import ProductAttributeLink
 from ..models.category import BusinessCategory
 
@@ -42,6 +43,7 @@ class ProductRepository(BaseRepository[Product]):
             if "barcode" in field_set:
                 field_set.add("general_barcodes")
                 field_set.add("unique_instance_codes")
+                field_set.add("variant_barcodes")
             if "serial" in field_set or "serial_number" in field_set:
                 field_set.add("unique_instance_codes")
 
@@ -120,6 +122,33 @@ class ProductRepository(BaseRepository[Product]):
                         )
                     ors.append(and_(*per_row))
 
+            if "variant_barcodes" in field_set:
+                if len(tokens) == 1:
+                    like_1 = f"%{tokens[0]}%"
+                    ors.append(
+                        exists(
+                            select(1).select_from(ProductVariant).where(
+                                ProductVariant.business_id == business_id,
+                                ProductVariant.product_id == Product.id,
+                                ProductVariant.barcode.isnot(None),
+                                ProductVariant.barcode.ilike(like_1),
+                            )
+                        )
+                    )
+                else:
+                    per_row = [
+                        exists(
+                            select(1).select_from(ProductVariant).where(
+                                ProductVariant.business_id == business_id,
+                                ProductVariant.product_id == Product.id,
+                                ProductVariant.barcode.isnot(None),
+                                ProductVariant.barcode.ilike(f"%{t}%"),
+                            )
+                        )
+                        for t in tokens
+                    ]
+                    ors.append(and_(*per_row))
+
             if ors:
                 stmt = stmt.where(or_(*ors))
 
@@ -185,14 +214,17 @@ class ProductRepository(BaseRepository[Product]):
             from decimal import Decimal
             
             # تبدیل تاریخ
-            as_of_date_obj = date_type.today()
+            from app.services.inventory_lot_service import business_as_of, is_expiry_tracked_product, sellable_quantity
+
+            explicit_as_of = None
             if inventory_as_of_date:
                 try:
                     # پشتیبانی از فرمت YYYY-MM-DD و YYYY/MM/DD
                     date_str = inventory_as_of_date.replace('/', '-')
-                    as_of_date_obj = date_type.fromisoformat(date_str)
+                    explicit_as_of = date_type.fromisoformat(date_str)
                 except Exception:
                     pass
+            as_of_date_obj = business_as_of(business_id, explicit_as_of)
             
             # موجودی حسابداری و انبارداری برای همهٔ کالاهای با track_inventory
             all_tracked_product_ids = [p.id for p in rows if p.track_inventory]
@@ -231,6 +263,16 @@ class ProductRepository(BaseRepository[Product]):
                     for pid, stock in warehouse_stocks.items():
                         inventory_data.setdefault(pid, {})
                         inventory_data[pid]["warehouse"] = float(stock)
+                except Exception:
+                    pass
+                try:
+                    for p in rows:
+                        if not is_expiry_tracked_product(p):
+                            continue
+                        inventory_data.setdefault(p.id, {})
+                        inventory_data[p.id]["sellable"] = float(
+                            sellable_quantity(self.db, business_id, p, None, as_of_date_obj)
+                        )
                 except Exception:
                     pass
 
@@ -285,8 +327,19 @@ class ProductRepository(BaseRepository[Product]):
                 "min_order_qty": p.min_order_qty,
                 "lead_time_days": p.lead_time_days,
                 "inventory_mode": getattr(p, 'inventory_mode', None) or "bulk",
+                "variant_mode": getattr(p, "variant_mode", None) or "none",
                 "track_serial": p.track_serial,
                 "track_barcode": p.track_barcode,
+                "track_expiry": bool(getattr(p, "track_expiry", False)),
+                "lot_policy": getattr(p, "lot_policy", None) or "optional",
+                "expired_sale_policy": getattr(p, "expired_sale_policy", None) or "block",
+                "shelf_life_days": getattr(p, "shelf_life_days", None),
+                "best_before_offset_days": getattr(p, "best_before_offset_days", None),
+                "removal_offset_days": getattr(p, "removal_offset_days", None),
+                "alert_offset_days": getattr(p, "alert_offset_days", None),
+                "min_remaining_shelf_life_days": int(
+                    getattr(p, "min_remaining_shelf_life_days", 0) or 0
+                ),
                 "general_barcodes": getattr(p, "general_barcodes", None),
                 "barcode": legacy_barcode,
                 "is_sales_taxable": p.is_sales_taxable,
@@ -318,14 +371,20 @@ class ProductRepository(BaseRepository[Product]):
                     # استفاده از get با مقدار پیش‌فرض 0.0 برای اطمینان از برگرداندن عدد
                     result["inventory_stock_accounting"] = inventory_data[pid].get("accounting", 0.0)
                     result["inventory_stock_warehouse"] = inventory_data[pid].get("warehouse", 0.0)
+                    sellable = inventory_data[pid].get("sellable")
+                    result["inventory_stock_sellable"] = (
+                        float(sellable) if sellable is not None else result["inventory_stock_warehouse"]
+                    )
                 else:
                     # اگر در inventory_data نیست، یعنی موجودی 0 است (نه null)
                     result["inventory_stock_accounting"] = 0.0
                     result["inventory_stock_warehouse"] = 0.0
+                    result["inventory_stock_sellable"] = 0.0
             elif include_inventory:
                 # اگر track_inventory false باشد، موجودی null است
                 result["inventory_stock_accounting"] = None
                 result["inventory_stock_warehouse"] = None
+                result["inventory_stock_sellable"] = None
             
             return result
 
@@ -358,12 +417,17 @@ class ProductRepository(BaseRepository[Product]):
             return None
         # اجازه بده فیلدهای خاص حتی اگر None باشند هم ست شوند
         nullable_overrides = {
+            "length_mm",
+            "width_mm",
+            "height_mm",
+            "weight_g",
             "main_unit_id",
             "secondary_unit_id",
             "unit_conversion_factor",
             "default_warehouse_id",
             "base_sales_price",
             "base_purchase_price",
+            "base_purchase_price_sync_meta",
             "general_barcodes",
             "sales_tax_rate",
             "purchase_tax_rate",

@@ -194,6 +194,10 @@ def compute_leaf_balances(
 ) -> Dict[int, AccountBalance]:
     """مانده هر حساب برگ (بدون جمع‌زدن فرزندان).
 
+    سند ``opening_balance`` سال مالی فقط در ستون مانده افتتاحیه می‌آید؛
+    گردش دوره و مانده‌های قبل از ``date_from`` آن را تکرار نمی‌کنند.
+    در غیر این صورت مانده نهایی دو برابر می‌شود.
+
     amounts_in_base:
       - True: جمع از debit_base/credit_base (با fallback به debit/credit)
       - False: جمع بومی debit/credit
@@ -280,6 +284,8 @@ def compute_leaf_balances(
             and_(
                 Document.business_id == business_id,
                 Document.is_proforma == False,  # noqa: E712
+                # سند افتتاحیه فقط در ستون مانده افتتاحیه لحاظ می‌شود
+                Document.document_type != "opening_balance",
                 DocumentLine.account_id.isnot(None),
                 DocumentLine.account_id.in_(account_ids),
                 Document.document_date >= date_from_obj,

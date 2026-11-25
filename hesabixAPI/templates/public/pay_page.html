@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="robots" content="noindex,nofollow">
+    <title>{{ page_title }}</title>
+    {% include "public/_persian_fonts.html" %}
+    <style>
+        :root {
+            --teal: #0f766e;
+            --teal-dark: #115e59;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --bg: #f0fdfa;
+            --card: #ffffff;
+            --danger: #dc2626;
+            --warn: #b45309;
+            --ok: #059669;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, button, input, textarea, select {
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+        }
+        body {
+            min-height: 100vh;
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 500px at 100% -10%, #99f6e4 0%, transparent 55%),
+                linear-gradient(180deg, #ecfdf5 0%, var(--bg) 40%, #e2e8f0 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 14px 28px;
+        }
+        .wrap { width: 100%; max-width: 480px; }
+        .card {
+            background: var(--card);
+            border-radius: 22px;
+            box-shadow: 0 20px 50px rgba(15, 118, 110, 0.14);
+            overflow: hidden;
+        }
+        .hero {
+            background: linear-gradient(135deg, #0f766e 0%, #0e7490 100%);
+            color: #fff;
+            text-align: center;
+            padding: 26px 22px 28px;
+        }
+        .logo {
+            width: 88px; height: 88px; border-radius: 22px; object-fit: cover;
+            background: #fff; margin: 0 auto 12px; display: block;
+            box-shadow: 0 10px 24px rgba(0,0,0,.18);
+        }
+        .logo-fallback {
+            width: 88px; height: 88px; border-radius: 22px; margin: 0 auto 12px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,.16); font-size: 34px;
+        }
+        .hero h1 { font-size: 21px; font-weight: 800; line-height: 1.45; }
+        .intro { margin-top: 8px; font-size: 13px; line-height: 1.7; color: rgba(255,255,255,.9); }
+        .body { padding: 18px 18px 22px; }
+        .section-title { font-size: 13px; font-weight: 800; margin: 4px 0 10px; color: #334155; }
+        .identity {
+            background: #f8fafc; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+        }
+        .id-row {
+            display: flex; justify-content: space-between; gap: 10px;
+            padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13px;
+        }
+        .id-row:last-child { border-bottom: 0; }
+        .id-row span:first-child { color: var(--muted); flex: 0 0 auto; }
+        .id-row span:last-child { font-weight: 700; text-align: left; word-break: break-word; }
+        .id-row .ltr { direction: ltr; unicode-bidi: isolate; }
+        .warn {
+            background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
+            border-radius: 14px; padding: 12px 13px; margin-bottom: 12px; font-size: 13px; line-height: 1.75;
+        }
+        .warn strong { display: block; margin-bottom: 4px; }
+        .warn ul { margin: 6px 18px 0 0; }
+        .legal {
+            background: #f8fafc; color: #334155; border: 1px solid var(--line);
+            border-radius: 14px; padding: 12px 13px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.8;
+        }
+        .legal strong { display: block; margin-bottom: 4px; color: #0f172a; }
+        .alert { border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.6; }
+        .alert-error { background: #fef2f2; color: #991b1b; }
+        .alert-ok { background: #ecfdf5; color: #065f46; }
+        .alert-info { background: #f1f5f9; color: #334155; }
+        .hint { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 12px; }
+        label { display: block; font-size: 13px; font-weight: 700; margin: 12px 0 6px; color: #334155; }
+        input, textarea, select {
+            width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px;
+            font-size: 16px; background: #fff; color: var(--ink); outline: none;
+        }
+        input:focus, textarea:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 4px rgba(15,118,110,.12); }
+        input[readonly] { background: #f1f5f9; color: #0f172a; cursor: default; }
+        textarea { min-height: 80px; resize: vertical; }
+        .check {
+            display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 4px;
+            font-size: 13px; line-height: 1.6; color: #334155;
+        }
+        .check input { width: 18px; height: 18px; margin-top: 2px; flex: 0 0 auto; }
+        .btn {
+            display: block; width: 100%; margin-top: 16px; border: 0; border-radius: 14px;
+            padding: 14px 16px; font-size: 16px; font-weight: 800; cursor: pointer;
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, var(--teal) 0%, #0e7490 100%);
+            color: #fff; text-decoration: none; text-align: center;
+        }
+        .btn:disabled { opacity: .65; cursor: wait; }
+        .btn-ghost {
+            background: #f1f5f9; color: #334155; box-shadow: none;
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #b91c1c 0%, #9f1239 100%);
+            color: #fff; margin-top: 10px;
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+        }
+        .btn-security {
+            background: #fffbeb; color: #92400e; box-shadow: none;
+            border: 1px solid #fde68a; margin-top: 4px; margin-bottom: 8px;
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+        }
+        .trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+        .report-link {
+            display: block; width: 100%; margin-top: 16px; padding: 10px 8px;
+            border: 0; background: transparent; cursor: pointer;
+            color: #b91c1c; font-weight: 700; font-size: 13px; text-align: center;
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+        }
+        .footer { text-align: center; margin-top: 16px; color: #64748b; font-size: 12px; line-height: 1.7; }
+        dialog.modal {
+            border: 0;
+            border-radius: 20px;
+            padding: 0;
+            width: min(420px, calc(100% - 28px));
+            height: fit-content;
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            margin: auto;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+            color: var(--ink);
+        }
+        dialog.modal::backdrop { background: rgba(15, 23, 42, 0.45); }
+        .modal-head {
+            padding: 16px 18px 10px;
+            border-bottom: 1px solid var(--line);
+        }
+        .modal-head h2 { font-size: 16px; font-weight: 800; }
+        .modal-head p { margin-top: 6px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+        .modal-body { padding: 8px 18px 18px; }
+        .thanks { text-align: center; padding: 8px 4px 4px; }
+        .thanks-icon {
+            width: 56px; height: 56px; border-radius: 18px; margin: 8px auto 12px;
+            display: flex; align-items: center; justify-content: center;
+            background: #ecfdf5; color: #047857; font-size: 26px;
+        }
+        .thanks h2 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+        .thanks p { font-size: 13.5px; color: #334155; line-height: 1.8; }
+        #url-mismatch { display: none; }
+        #url-mismatch.is-visible { display: block; }
+    </style>
+</head>
+<body data-expected-host="{{ expected_host or '' }}">
+    <div class="wrap">
+        <div class="card">
+            <div class="hero">
+                {% if show_logo and logo_url %}
+                <img class="logo" src="{{ logo_url }}" alt="{{ display_title }}" onerror="this.style.display='none'">
+                {% else %}
+                <div class="logo-fallback" aria-hidden="true">🏪</div>
+                {% endif %}
+                <h1>{{ heading }}</h1>
+                {% if intro_text %}
+                <p class="intro">{{ intro_text }}</p>
+                {% endif %}
+            </div>
+            <div class="body">
+                {% if not_found %}
+                <div class="alert alert-error">{{ not_found_message }}</div>
+                {% else %}
+                    {% if business_rows %}
+                    <div class="section-title">مشخصات کسب‌وکاری که به آن واریز می‌کنید</div>
+                    <div class="identity">
+                        {% for row in business_rows %}
+                        <div class="id-row"><span>{{ row.label }}</span><span>{{ row.value }}</span></div>
+                        {% endfor %}
+                        {% if expected_page_url %}
+                        <div class="id-row"><span>آدرس همین صفحه</span><span class="ltr">{{ expected_page_url }}</span></div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-error" id="url-mismatch">
+                        آدرس مرورگر با صفحه امن این کسب‌وکار یکی نیست یا اتصال https ندارد. پرداخت نکنید و لینک را فقط از خود فروشنده بگیرید.
+                    </div>
+
+                    <button type="button" class="btn btn-security" id="open-security">هشدارها و موارد امنیتی پلیس فتا</button>
+
+                    {% if error_message %}
+                    <div class="alert alert-error">{{ error_message }}</div>
+                    {% endif %}
+
+                    {% if is_enabled %}
+                    {% if currency_hint %}<p class="hint">{{ currency_hint }}</p>{% endif %}
+                    {% if amount_locked and amount_locked_hint %}<p class="hint">{{ amount_locked_hint }}</p>{% endif %}
+                    <form method="post" action="{{ form_action or ('/u/' ~ username) }}" id="pay-form" novalidate>
+                        {% if request_token %}<input type="hidden" name="request_token" value="{{ request_token }}">{% endif %}
+                        <label for="amount">{{ amount_label }}</label>
+                        <input id="amount" name="amount" inputmode="numeric" autocomplete="off" required placeholder="{{ min_amount_hint }}" value="{{ form_amount }}"{% if amount_locked %} readonly{% endif %}>
+                        <label for="name">{{ name_label }}</label>
+                        <input id="name" name="name" maxlength="30" value="{{ form_name }}" autocomplete="name">
+                        <label for="mobile">{{ mobile_label }}</label>
+                        <input id="mobile" name="mobile" inputmode="numeric" maxlength="11" placeholder="09xxxxxxxxx" value="{{ form_mobile }}" autocomplete="tel">
+                        <label for="note">{{ note_label }}</label>
+                        <textarea id="note" name="note" maxlength="1000">{{ form_note }}</textarea>
+                        <label class="check">
+                            <input type="checkbox" name="confirm_business" value="1" required>
+                            <span>این کسب‌وکار همان جایی است که قصد واریز وجه به آن را دارم، آدرس https صفحه را دیده‌ام و مشخصاتش را بررسی کردم.</span>
+                        </label>
+                        <button class="btn" type="submit" id="pay-btn">{{ pay_button }}</button>
+                    </form>
+                    <div class="trust"><span aria-hidden="true">🔒</span><span>پرداخت امن از طریق درگاه بانکی</span></div>
+                    {% else %}
+                    <div class="alert alert-info">{{ disabled_message }}</div>
+                    {% endif %}
+
+                    <button type="button" class="report-link" id="open-report">گزارش تخلف یا صفحه مشکوک</button>
+                {% endif %}
+            </div>
+        </div>
+        <p class="footer">{{ footer_credit | default('نرم افزار مدیریت کسب و کار حسابیکس') }}</p>
+    </div>
+
+    <dialog class="modal" id="security-dialog">
+        <div class="modal-head">
+            <h2>هشدارها و موارد امنیتی پلیس فتا</h2>
+            <p>قبل از پرداخت این موارد را بخوانید. لینک جعلی در پیامک و شبکه‌های اجتماعی رایج است.</p>
+        </div>
+        <div class="modal-body">
+            <div class="warn">
+                <strong>قبل از واریز، آدرس و لینک را بررسی کنید</strong>
+                لینک را فقط از خود فروشنده بگیرید. در پیامک، شبکه‌های اجتماعی و پیام‌رسان‌ها لینک جعلی برای کلاهبرداری زیاد فرستاده می‌شود و گمراه‌کننده است.
+                <ul>
+                    <li>نوار آدرس مرورگر باید با <b>https</b> شروع شود و دقیقاً با آدرس همین صفحه یکی باشد.</li>
+                    <li>نام، لوگو، تلفن و نشانی را با اطلاعاتی که خود فروشنده به شما داده مقایسه کنید.</li>
+                    <li>رمز کارت، CVV2 و رمز پویا را فقط در درگاه بانکی وارد کنید؛ این صفحه آن‌ها را نمی‌پرسد.</li>
+                    <li>اگر لینک را از پیامک، دایرکت یا تبلیغ دیدید و فروشنده تأیید نکرده، پرداخت نکنید.</li>
+                </ul>
+            </div>
+            <div class="legal">
+                <strong>استفاده قانونی از این روش پرداخت</strong>
+                این صفحه فقط برای انتقال وجه و پرداخت‌هایی است که خلاف قوانین نباشد. در صورت مشاهده یا کشف تخلف، اطلاعات کسب‌وکار و پرداخت در صورت درخواست مراجع قضایی ارائه خواهد شد.
+            </div>
+            <button class="btn" type="button" id="close-security">متوجه شدم</button>
+        </div>
+    </dialog>
+
+    <dialog class="modal" id="report-dialog"{% if report_open %} data-open="1"{% endif %}>
+        <form method="post" action="{{ report_action or ('/u/' ~ username ~ '/report') }}" id="report-form">
+            <div class="modal-head">
+                <h2>گزارش تخلف یا صفحه مشکوک</h2>
+                <p>اگر این صفحه با کسب‌وکار واقعی همخوانی ندارد یا لینک جعلی به نظر می‌رسد، موضوع را برای بررسی بفرستید.</p>
+            </div>
+            <div class="modal-body">
+                {% if report_error %}
+                <div class="alert alert-error">{{ report_error }}</div>
+                {% endif %}
+                <label for="reason">نوع گزارش</label>
+                <select id="reason" name="reason" required>
+                    <option value="wrong_business">کسب‌وکار مورد نظر من نیست</option>
+                    <option value="phishing">فیشینگ / صفحه جعلی</option>
+                    <option value="impersonation">سوءاستفاده از نام کسب‌وکار</option>
+                    <option value="fraud">کلاهبرداری</option>
+                    <option value="other">سایر</option>
+                </select>
+                <label for="details">توضیح (حداقل ۲۰ نویسه)</label>
+                <textarea id="details" name="details" required minlength="20" maxlength="2000">{{ report_details }}</textarea>
+                <label for="reporter_name">نام شما (اختیاری)</label>
+                <input id="reporter_name" name="reporter_name" maxlength="30" value="{{ report_name }}">
+                <label for="reporter_mobile">موبایل برای پیگیری (اختیاری)</label>
+                <input id="reporter_mobile" name="reporter_mobile" maxlength="11" inputmode="numeric" value="{{ report_mobile }}">
+                <button class="btn btn-danger" type="submit">ارسال گزارش</button>
+                <button class="btn btn-ghost" type="button" id="close-report">انصراف</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="modal" id="thanks-dialog"{% if report_submitted %} data-open="1"{% endif %}>
+        <div class="modal-body">
+            <div class="thanks">
+                <div class="thanks-icon" aria-hidden="true">✓</div>
+                <h2>گزارش شما ثبت شد</h2>
+                <p>از اطلاع‌رسانی شما سپاسگزاریم. موضوع بررسی می‌شود و در صورت نیاز پیگیری خواهد شد.</p>
+                <button class="btn" type="button" id="close-thanks">بستن</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+        (function () {
+            var input = document.getElementById('amount');
+            var form = document.getElementById('pay-form');
+            var btn = document.getElementById('pay-btn');
+            function toEn(s) {
+                var fa = '۰۱۲۳۴۵۶۷۸۹';
+                var ar = '٠١٢٣٤٥٦٧٨٩';
+                return String(s || '').replace(/[۰-۹]/g, function (ch) { return fa.indexOf(ch); })
+                    .replace(/[٠-٩]/g, function (ch) { return ar.indexOf(ch); });
+            }
+            function format(s) {
+                var digits = toEn(s).replace(/[^\d]/g, '');
+                if (!digits) return '';
+                return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+            if (input) {
+                input.addEventListener('input', function () {
+                    var pos = input.selectionStart;
+                    var before = input.value.length;
+                    input.value = format(input.value);
+                    var after = input.value.length;
+                    try { input.setSelectionRange(pos + (after - before), pos + (after - before)); } catch (e) {}
+                });
+                if (input.value) input.value = format(input.value);
+            }
+            if (form) {
+                form.addEventListener('submit', function () {
+                    if (input) input.value = toEn(input.value).replace(/[^\d]/g, '');
+                    if (btn) { btn.disabled = true; btn.textContent = 'در حال انتقال به درگاه…'; }
+                });
+            }
+
+            var expectedHost = (document.body.getAttribute('data-expected-host') || '').toLowerCase();
+            var mismatch = document.getElementById('url-mismatch');
+            if (mismatch && expectedHost) {
+                var host = String(location.hostname || '').toLowerCase();
+                if (location.protocol !== 'https:' || (host && host !== expectedHost)) {
+                    mismatch.classList.add('is-visible');
+                }
+            }
+
+            function openDialog(el) {
+                if (!el) return;
+                if (typeof el.showModal === 'function') el.showModal();
+                else el.setAttribute('open', '');
+            }
+            function closeDialog(el) {
+                if (!el) return;
+                if (typeof el.close === 'function') el.close();
+                else el.removeAttribute('open');
+            }
+            var reportDlg = document.getElementById('report-dialog');
+            var thanksDlg = document.getElementById('thanks-dialog');
+            var securityDlg = document.getElementById('security-dialog');
+            var openBtn = document.getElementById('open-report');
+            var closeBtn = document.getElementById('close-report');
+            var closeThanks = document.getElementById('close-thanks');
+            var openSecurity = document.getElementById('open-security');
+            var closeSecurity = document.getElementById('close-security');
+            if (openBtn) openBtn.addEventListener('click', function () { openDialog(reportDlg); });
+            if (closeBtn) closeBtn.addEventListener('click', function () { closeDialog(reportDlg); });
+            if (closeThanks) closeThanks.addEventListener('click', function () { closeDialog(thanksDlg); });
+            if (openSecurity) openSecurity.addEventListener('click', function () { openDialog(securityDlg); });
+            if (closeSecurity) closeSecurity.addEventListener('click', function () { closeDialog(securityDlg); });
+            if (reportDlg && reportDlg.getAttribute('data-open') === '1') openDialog(reportDlg);
+            if (thanksDlg && thanksDlg.getAttribute('data-open') === '1') openDialog(thanksDlg);
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+"""وابستگی FastAPI برای بررسی فعال بودن افزونه کنترل اموال و دارایی ثابت."""
+
+from __future__ import annotations
+
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
+
+from adapters.db.session import get_db
+from adapters.db.models.advanced_plugins import AdvancedPluginSetting
+from app.core.auth_dependency import get_current_user
+from app.core.plugin_license import is_plugin_active
+from app.core.responses import ApiError
+
+PLUGIN_CODE = "fixed_assets"
+
+
+def check_fixed_assets_plugin_active(db: Session, business_id: int) -> bool:
+	# Upgrading to the native assets module must retain a manager's explicit
+	# disabled state in the existing Sepidar specialist workspace, even when
+	# a marketplace entitlement is active or globally enabled.
+	policy = db.query(AdvancedPluginSetting).filter(
+		AdvancedPluginSetting.business_id == business_id,
+		AdvancedPluginSetting.plugin_code == PLUGIN_CODE,
+	).first()
+	if policy is not None and getattr(policy, "enabled", None) is False:
+		return False
+	return is_plugin_active(db, business_id, PLUGIN_CODE)
+
+
+def require_fixed_assets_plugin_active(business_id_param: str = "business_id"):
+	def dependency(
+		request: Request,
+		_ctx=Depends(get_current_user),
+		db: Session = Depends(get_db),
+	) -> None:
+		business_id = None
+		if hasattr(request, "path_params") and business_id_param in request.path_params:
+			try:
+				business_id = int(request.path_params[business_id_param])
+			except (TypeError, ValueError):
+				pass
+		if business_id is None and hasattr(request, "query_params"):
+			try:
+				business_id = int(request.query_params.get(business_id_param) or 0)
+			except (TypeError, ValueError):
+				pass
+		if not business_id:
+			raise ApiError(
+				"INVALID_BUSINESS_ID",
+				f"Invalid business identifier ({business_id_param}).",
+				http_status=400,
+			)
+		if not check_fixed_assets_plugin_active(db, business_id):
+			raise ApiError(
+				"FIXED_ASSETS_PLUGIN_NOT_ACTIVE",
+				"افزونه کنترل اموال و دارایی ثابت برای این کسب‌وکار فعال نیست.",
+				http_status=403,
+				details={
+					"plugin_code": PLUGIN_CODE,
+					"required_action": "activate_plugin",
+					"marketplace_url": "/marketplace",
+				},
+			)
+		return None
+
+	return dependency

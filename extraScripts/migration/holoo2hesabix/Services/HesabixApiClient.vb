@@ -511,6 +511,82 @@ Friend Class HesabixApiClient
         Return GetInt(GetDataToken(root), "id")
     End Function
 
+    Public Async Function UpdateManualDocumentAsync(documentId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task
+        Await SendJsonAsync(
+            HttpMethod.Put,
+            "api/v1/documents/" & documentId.ToString(),
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function DeleteManualDocumentAsync(documentId As Integer, Optional ct As CancellationToken = Nothing) As Task
+        Await DeleteIgnoringMissingAsync("api/v1/documents/" & documentId.ToString(), ct).ConfigureAwait(False)
+    End Function
+
+    Public Async Function DeleteInvoiceAsync(businessId As Integer, invoiceId As Integer, Optional ct As CancellationToken = Nothing) As Task
+        Await DeleteIgnoringMissingAsync(
+            "api/v1/invoices/business/" & businessId.ToString() & "/" & invoiceId.ToString(),
+            ct).ConfigureAwait(False)
+    End Function
+
+    Public Async Function BulkDeleteInvoicesAsync(businessId As Integer, invoiceIds As IEnumerable(Of Integer), Optional ct As CancellationToken = Nothing) As Task
+        Dim ids As New JArray()
+        For Each id In invoiceIds
+            If id > 0 Then ids.Add(id)
+        Next
+        If ids.Count = 0 Then Return
+        Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/invoices/business/" & businessId.ToString() & "/bulk-delete",
+            New JObject From {{"invoice_ids", ids}},
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function DeleteReceiptPaymentAsync(documentId As Integer, Optional ct As CancellationToken = Nothing) As Task
+        Await DeleteIgnoringMissingAsync("api/v1/receipts-payments/" & documentId.ToString(), ct).ConfigureAwait(False)
+    End Function
+
+    Public Async Function DeleteExpenseIncomeAsync(documentId As Integer, Optional ct As CancellationToken = Nothing) As Task
+        Await DeleteIgnoringMissingAsync("api/v1/expense-income/" & documentId.ToString(), ct).ConfigureAwait(False)
+    End Function
+
+    Public Async Function UpdateCheckAsync(checkId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task
+        Await SendJsonAsync(
+            HttpMethod.Put,
+            "api/v1/checks/checks/" & checkId.ToString(),
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function DeleteCheckAsync(checkId As Integer, Optional ct As CancellationToken = Nothing) As Task
+        Await DeleteIgnoringMissingAsync("api/v1/checks/checks/" & checkId.ToString(), ct).ConfigureAwait(False)
+    End Function
+
+    Private Async Function DeleteIgnoringMissingAsync(relativeUrl As String, ct As CancellationToken) As Task
+        Try
+            Await SendJsonAsync(HttpMethod.Delete, relativeUrl, Nothing, includeAuth:=True, ct:=ct).ConfigureAwait(False)
+        Catch ex As HesabixApiException
+            If IsMissingEntity(ex) Then Return
+            Throw
+        End Try
+    End Function
+
+    Private Shared Function IsMissingEntity(ex As HesabixApiException) As Boolean
+        If ex Is Nothing Then Return False
+        If ex.StatusCode = 404 Then Return True
+        Dim code = If(ex.ErrorCode, "")
+        If code.IndexOf("NOT_FOUND", StringComparison.OrdinalIgnoreCase) >= 0 Then Return True
+        Dim msg = If(ex.Message, "")
+        Return msg.IndexOf("یافت نشد", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
     Public Async Function ClearCheckAsync(checkId As Integer, bankAccountId As Integer, Optional documentDate As Date? = Nothing, Optional ct As CancellationToken = Nothing) As Task
         Dim body As New JObject From {{"bank_account_id", bankAccountId}}
         If documentDate.HasValue Then body("document_date") = ApiDateFormat.ToIsoDate(documentDate.Value)

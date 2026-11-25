@@ -32,7 +32,8 @@ def _ensure_business_access(ctx: AuthContext, business_id: int) -> None:
 
 @router.get(
 	"/overview",
-	summary="نمای کلی سناریو",
+	summary="نمای کلی سناریو درآمدزایی اسناد",
+	description="سیاست‌های فعال و ۲۰ صورتحساب اخیر کسب‌وکار. ابزار MCP: get_document_monetization_overview.",
 )
 def document_monetization_overview(
 	business_id: int,
@@ -55,6 +56,7 @@ def document_monetization_overview(
 @router.get(
 	"/plans",
 	summary="لیست پکیج‌ها و اشتراک فعال کسب‌وکار",
+	description="ابزار MCP: `list_document_monetization_plans`.",
 )
 def list_business_subscription_plans(
 	business_id: int,
@@ -77,6 +79,7 @@ def list_business_subscription_plans(
 @router.post(
 	"/subscriptions",
 	summary="فعال‌سازی پکیج توسط کسب‌وکار",
+	description="ابزار MCP: `activate_document_monetization_plan` (نیازمند تأیید).",
 )
 def activate_business_subscription(
 	business_id: int,
@@ -104,6 +107,7 @@ def activate_business_subscription(
 @router.get(
 	"/charges",
 	summary="لیست صورتحساب‌ها",
+	description="ابزار MCP: `list_document_monetization_charges`.",
 )
 def document_monetization_charges(
 	business_id: int,
@@ -130,7 +134,7 @@ def document_monetization_charges(
 @router.post(
 	"/charges/table",
 	summary="لیست صورتحساب‌ها برای جدول (پگینیشن استاندارد)",
-	description="سازگار با DataTableWidget: ورودی QueryInfo و خروجی items/total/page/limit",
+	description="ابزار MCP: `list_document_monetization_charges`.",
 )
 def document_monetization_charges_table(
 	business_id: int,
@@ -181,6 +185,7 @@ def document_monetization_charges_table(
 @router.post(
 	"/charges/{charge_id}/pay",
 	summary="پرداخت صورتحساب سناریو",
+	description="ابزار MCP: `pay_document_monetization_charge` (نیازمند تأیید).",
 )
 def pay_document_monetization_charge(
 	business_id: int,
@@ -197,6 +202,7 @@ def pay_document_monetization_charge(
 @router.post(
 	"/documents/{document_id}/process",
 	summary="پردازش دستی سند برای سناریو",
+	description="ابزار MCP: `process_document_monetization_document` (نیازمند تأیید).",
 )
 def process_document_usage_endpoint(
 	business_id: int,
@@ -213,6 +219,7 @@ def process_document_usage_endpoint(
 @router.post(
 	"/finalize-volume",
 	summary="نهایی‌سازی دوره‌های حجمی",
+	description="بستن دوره‌های باز درآمدزایی حجمی اسناد این کسب‌وکار. ابزار MCP: `finalize_document_monetization_volume` (نیازمند تأیید).",
 )
 def finalize_volume_endpoint(
 	business_id: int,
@@ -228,6 +235,7 @@ def finalize_volume_endpoint(
 @router.post(
 	"/validate",
 	summary="بررسی مجوز ثبت سند قبل از ذخیره",
+	description="ابزار MCP: `evaluate_document_monetization_amount`.",
 )
 def validate_document_policy_endpoint(
 	business_id: int,

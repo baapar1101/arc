@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Union, Generic, TypeVar, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, validator
 from enum import Enum
 from datetime import datetime, date
+from app.core.product_measurements import ProductDimensionUnit, ProductWeightUnit
 
 T = TypeVar('T')
 
@@ -344,11 +345,11 @@ class KardexListQuery(QueryInfo):
 	include_running_balance: Optional[bool] = False
 	currency_id: Optional[int] = Field(
 		default=None,
-		description="فیلتر ارز سند؛ خالی = همه ارزها (مبالغ می‌توانند معادل پایه باشند)",
+		description="واحد نمایش مبالغ؛ همه اسناد نمایش داده می‌شوند و مقادیر به این ارز تبدیل می‌شوند؛ خالی = ارز پایه",
 	)
 	amounts_in_base: Optional[bool] = Field(
 		default=None,
-		description="اگر true (یا ارز خالی) مبالغ از debit_base/credit_base نمایش داده شوند",
+		description="پارامتر سازگاری؛ وقتی currency_id خالی باشد مبالغ به ارز پایه نمایش داده می‌شوند",
 	)
 
 
@@ -782,6 +783,9 @@ class BusinessCreateRequest(BaseModel):
 
 
 class BusinessUpdateRequest(BaseModel):
+	product_dimension_unit: ProductDimensionUnit = "mm"
+	product_weight_unit: ProductWeightUnit = "g"
+
 	name: Optional[str] = Field(default=None, min_length=1, max_length=255, description="نام کسب و کار")
 	business_type: Optional[BusinessType] = Field(default=None, description="نوع کسب و کار")
 	business_field: Optional[BusinessField] = Field(default=None, description="زمینه فعالیت")
@@ -822,6 +826,10 @@ class BusinessUpdateRequest(BaseModel):
 			"lifo, weighted_average, moving_weighted_average (WMA دائمی), standard_cost, actual_cost"
 		),
 	)
+	invoice_profit_missing_purchase_price_policy: Optional[str] = Field(
+		default=None,
+		description="رفتار قیمت خرید نامشخص: zero_cost, use_line_cost_price, block_calculation",
+	)
 	invoice_profit_include_overhead: Optional[bool] = Field(default=None, description="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد هزینه‌های سربار (0-100) - فقط برای custom_percent")
@@ -850,6 +858,10 @@ class BusinessUpdateRequest(BaseModel):
 	invoice_sync_purchase_price_basis: Optional[str] = Field(
 		default=None,
 		description="مبنای محاسبه: unit_price | net_after_line_discount | net_with_tax | cost_price",
+	)
+	invoice_sync_purchase_price_multi_line_policy: Optional[str] = Field(
+		default=None,
+		description="سیاست چند ردیف خرید یک محصول: weighted_average, last_line, highest_price, lowest_price",
 	)
 	invoice_warehouse_release_mode: Optional[str] = Field(
 		default=None,
@@ -1098,6 +1110,26 @@ class BusinessUpdateRequest(BaseModel):
 			raise ValueError("مبنای محاسبه سود نامعتبر است")
 		return value
 
+	@validator("invoice_profit_missing_purchase_price_policy")
+	def _validate_invoice_profit_missing_purchase_price_policy(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		value = str(v).strip().lower()
+		allowed = {"zero_cost", "use_line_cost_price", "block_calculation"}
+		if value not in allowed:
+			raise ValueError("سیاست قیمت خرید نامشخص نامعتبر است")
+		return value
+
+	@validator("invoice_sync_purchase_price_multi_line_policy")
+	def _validate_invoice_sync_purchase_price_multi_line_policy(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		value = str(v).strip().lower()
+		allowed = {"weighted_average", "last_line", "highest_price", "lowest_price"}
+		if value not in allowed:
+			raise ValueError("سیاست چند ردیف قیمت خرید نامعتبر است")
+		return value
+
 	@validator("invoice_profit_overhead_type")
 	def _validate_invoice_profit_overhead_type(cls, v):  # noqa: N805
 		if v is None or v == "":
@@ -1147,6 +1179,9 @@ class BusinessUpdateRequest(BaseModel):
 
 
 class BusinessResponse(BaseModel):
+	product_dimension_unit: ProductDimensionUnit = "mm"
+	product_weight_unit: ProductWeightUnit = "g"
+
 	id: int = Field(..., description="شناسه کسب و کار")
 	name: str = Field(..., description="نام کسب و کار")
 	business_type: str = Field(..., description="نوع کسب و کار")
@@ -1182,6 +1217,7 @@ class BusinessResponse(BaseModel):
 	# تنظیمات محاسبه سود فاکتور
 	invoice_profit_calculation_method: Optional[str] = Field(default=None, description="روش محاسبه سود فاکتور")
 	invoice_profit_calculation_basis: Optional[str] = Field(default=None, description="مبنای محاسبه سود")
+	invoice_profit_missing_purchase_price_policy: str = Field(default="zero_cost", description="سیاست قیمت خرید نامشخص")
 	invoice_profit_include_overhead: Optional[bool] = Field(default=None, description="آیا هزینه‌های سربار در محاسبه سود لحاظ می‌شود")
 	invoice_profit_overhead_type: Optional[str] = Field(default=None, description="نوع هزینه‌های سربار")
 	invoice_profit_overhead_percent: Optional[float] = Field(default=None, description="درصد هزینه‌های سربار")
@@ -1198,6 +1234,7 @@ class BusinessResponse(BaseModel):
 	invoice_sync_update_purchase_price_enabled: bool = Field(default=False, description="همگام‌سازی قیمت خرید از فاکتور")
 	invoice_sync_sales_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت فروش")
 	invoice_sync_purchase_price_basis: Optional[str] = Field(default=None, description="مبنای قیمت خرید")
+	invoice_sync_purchase_price_multi_line_policy: str = Field(default="weighted_average", description="سیاست چند ردیف خرید یک محصول")
 	invoice_warehouse_release_mode: str = Field(
 		default="draft",
 		description="حواله پس از ثبت فاکتور: none، draft، posted",

@@ -372,6 +372,8 @@ class TaxWorkspaceMobileCard extends StatelessWidget {
 
     final canSend = status != 'sent' && status != 'finalized' && item['tax_cancelled_in_modian'] != true;
     final hasFailure = status == 'failed' || (err != null && err.isNotEmpty);
+    final workspaceStatus = taxWorkspaceStatusLabel(t, item['tax_workspace_status']);
+    final article6 = taxArticle6Label(t, item['tax_article6_status']);
 
     return Container(
       width: double.infinity,
@@ -439,6 +441,10 @@ class TaxWorkspaceMobileCard extends StatelessWidget {
                 _miniMeta(theme, Icons.payments_outlined, '$amount $currency'),
               if (tracking != null && tracking.isNotEmpty)
                 _miniMeta(theme, Icons.tag, tracking),
+              if (workspaceStatus != null)
+                _miniMeta(theme, Icons.fact_check_outlined, workspaceStatus),
+              if (article6 != null)
+                _miniMeta(theme, Icons.rule, '${t.taxArticle6Column}: $article6'),
             ],
           ),
           if (hasFailure && err != null && err.isNotEmpty) ...[
@@ -744,4 +750,40 @@ class TaxErrorPlaybookCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// «وضعیت کارپوشه» صورت‌حساب (واکنش خریدار در سامانه مودیان)؛ مقدار ناشناخته همان‌طور نشان داده می‌شود.
+String? taxWorkspaceStatusLabel(AppLocalizations t, Object? raw) {
+  final value = raw?.toString().trim() ?? '';
+  if (value.isEmpty) return null;
+  switch (value.toUpperCase()) {
+    case 'NO_NEED_REACTION':
+      return t.taxWorkspaceStatusNoNeedReaction;
+    case 'AWAITING_REACTION':
+      return t.taxWorkspaceStatusAwaitingReaction;
+    case 'APPROVED':
+      return t.taxWorkspaceStatusApproved;
+    case 'SYSTEMIC_APPROVED':
+      return t.taxWorkspaceStatusSystemicApproved;
+    case 'IMPOSSIBLE_REACTION':
+      return t.taxWorkspaceStatusImpossibleReaction;
+    case 'REJECTED':
+      return t.taxWorkspaceStatusRejected;
+    case 'SYSTEMIC_REJECTED':
+      return t.taxWorkspaceStatusSystemicRejected;
+    case 'CANCELED':
+    case 'CANCELLED':
+      return t.taxWorkspaceStatusCanceled;
+    default:
+      return value;
+  }
+}
+
+/// وضعیت ماده ۶ (عدول / عدم عدول)؛ مقدار ناشناخته همان‌طور نشان داده می‌شود.
+String? taxArticle6Label(AppLocalizations t, Object? raw) {
+  final value = raw?.toString().trim() ?? '';
+  if (value.isEmpty) return null;
+  if (value == 'violated') return t.taxArticle6Violated;
+  if (value == 'not_violated') return t.taxArticle6NotViolated;
+  return value;
 }

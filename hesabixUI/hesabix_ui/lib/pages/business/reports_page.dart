@@ -8,7 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/business_nav.dart';
 import '../../core/auth_store.dart';
 import '../../services/marketplace_service.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../widgets/permission/access_denied_page.dart';
+import '../../theme/tokens/extensions.dart';
 
 /// شناسهٔ سکشن «گزارش‌های ووکامرس» در فهرست گزارش‌ها؛ با `?section=` در مسیر `reports` هماهنگ است.
 const String kReportsSectionWooCommerce = 'woocommerce_reports';
@@ -99,13 +101,7 @@ class _ReportsPageState extends State<ReportsPage> {
     try {
       final svc = MarketplaceService();
       final list = await svc.listBusinessPlugins(businessId: widget.businessId);
-      final codes = <String>{};
-      for (final e in list) {
-        final code = e['plugin_code']?.toString();
-        if (code != null && code.isNotEmpty && e['is_active'] == true) {
-          codes.add(code);
-        }
-      }
+      final codes = activeMarketplacePluginCodes(list);
       if (!mounted) return;
       setState(() {
         _activeMarketplacePluginCodes
@@ -275,8 +271,9 @@ class _ReportsPageState extends State<ReportsPage> {
         for (final it in s.items) it.key: s.title,
     };
 
+    final catalog = context.reportsCatalog;
     final content = Padding(
-      padding: const EdgeInsets.all(16),
+      padding: catalog.pagePadding,
       child: Column(
         children: [
           Expanded(
@@ -286,7 +283,9 @@ class _ReportsPageState extends State<ReportsPage> {
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _PinnedHeaderDelegate(
-                      height: isSearching ? 64 : 120,
+                      height: isSearching
+                          ? catalog.pinnedHeaderSearchOnly
+                          : catalog.pinnedHeaderWithChips,
                       child: _buildDesktopPinnedHeader(
                         context,
                         data,
@@ -296,7 +295,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   )
                 else ...[
                   SliverToBoxAdapter(child: _buildSearchBar(context)),
-                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  SliverToBoxAdapter(child: SizedBox(height: catalog.headerGap)),
                 ],
 
                 if (_prefsLoaded && !isSearching) ...[
@@ -312,7 +311,7 @@ class _ReportsPageState extends State<ReportsPage> {
                           .toList(),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  SliverToBoxAdapter(child: SizedBox(height: catalog.sectionGap)),
                   SliverToBoxAdapter(
                     child: _buildQuickAccessSection(
                       context,
@@ -325,7 +324,7 @@ class _ReportsPageState extends State<ReportsPage> {
                           .toList(),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  SliverToBoxAdapter(child: SizedBox(height: catalog.blockGap)),
                 ],
 
                 if (isSearching) ...[
@@ -335,7 +334,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       count: filteredItems.length,
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                  SliverToBoxAdapter(child: SizedBox(height: catalog.headerGap)),
                   if (filteredItems.isEmpty)
                     SliverToBoxAdapter(
                       child: _buildEmptyState(
@@ -380,7 +379,7 @@ class _ReportsPageState extends State<ReportsPage> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
+            constraints: BoxConstraints(maxWidth: catalog.pageMaxWidth),
             child: content,
           ),
         ),
@@ -391,25 +390,39 @@ class _ReportsPageState extends State<ReportsPage> {
   Widget _buildSearchBar(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final catalog = context.reportsCatalog;
     final hasText = _searchController.text.trim().isNotEmpty;
-    return TextField(
-      controller: _searchController,
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        hintText: t.reportsSearchHint,
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: !hasText
-            ? null
-            : IconButton(
-                tooltip: t.clear,
-                onPressed: () => _searchController.clear(),
-                icon: const Icon(Icons.clear),
-              ),
-        filled: true,
-        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+    return SizedBox(
+      height: catalog.searchHeight,
+      child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        style: catalog.titleStyle(Theme.of(context).textTheme, color: cs.onSurface),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: t.reportsSearchHint,
+          hintStyle: catalog.subtitleStyle(Theme.of(context).textTheme, color: cs.onSurfaceVariant),
+          prefixIcon: Icon(Icons.search, size: catalog.itemIconSize),
+          prefixIconConstraints: BoxConstraints.tightFor(
+            width: catalog.sortButtonSize,
+            height: catalog.searchHeight,
+          ),
+          suffixIcon: !hasText
+              ? null
+              : IconButton(
+                  tooltip: t.clear,
+                  visualDensity: VisualDensity.compact,
+                  style: catalog.iconButtonStyle(),
+                  onPressed: () => _searchController.clear(),
+                  icon: Icon(Icons.clear, size: catalog.itemIconSize),
+                ),
+          contentPadding: catalog.searchContentPadding,
+          filled: true,
+          fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(catalog.searchRadius),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
@@ -418,13 +431,15 @@ class _ReportsPageState extends State<ReportsPage> {
   Widget _buildSearchResultsHeader(BuildContext context, {required int count}) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
-        Icon(Icons.manage_search, color: cs.primary),
-        const SizedBox(width: 8),
+        Icon(Icons.manage_search, color: cs.primary, size: catalog.itemIconSize),
+        SizedBox(width: catalog.headerGap),
         Text(
           t.reportsSearchResults(count),
-          style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
+          style: catalog.sectionTitleStyle(textTheme, color: cs.onSurface),
         ),
       ],
     );
@@ -432,10 +447,14 @@ class _ReportsPageState extends State<ReportsPage> {
 
   Widget _buildEmptyState(BuildContext context, {required String message}) {
     final cs = Theme.of(context).colorScheme;
+    final catalog = context.reportsCatalog;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: EdgeInsets.symmetric(vertical: catalog.emptyStateVertical),
       child: Center(
-        child: Text(message, style: TextStyle(color: cs.onSurfaceVariant)),
+        child: Text(
+          message,
+          style: catalog.subtitleStyle(Theme.of(context).textTheme, color: cs.onSurfaceVariant),
+        ),
       ),
     );
   }
@@ -448,29 +467,31 @@ class _ReportsPageState extends State<ReportsPage> {
     required List<_ReportLink> items,
   }) {
     final cs = Theme.of(context).colorScheme;
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: catalog.cardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, color: cs.primary),
-                const SizedBox(width: 8),
+                Icon(icon, color: cs.primary, size: catalog.itemIconSize),
+                SizedBox(width: catalog.headerGap),
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: catalog.sectionTitleStyle(textTheme, color: cs.onSurface),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: catalog.headerGap),
             if (items.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.symmetric(vertical: catalog.headerGap),
                 child: Text(
                   emptyMessage,
-                  style: TextStyle(color: cs.onSurfaceVariant),
+                  style: catalog.subtitleStyle(textTheme, color: cs.onSurfaceVariant),
                 ),
               )
             else
@@ -495,46 +516,44 @@ class _ReportsPageState extends State<ReportsPage> {
   Widget _buildSectionTile(BuildContext context, _ReportSection section) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
     final width = MediaQuery.of(context).size.width;
-    final columns = width >= 1200 ? 3 : (width >= 900 ? 2 : 1);
+    final columns = catalog.gridColumns(width);
 
     return Card(
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          tilePadding: catalog.expansionTilePadding,
+          childrenPadding: catalog.expansionChildrenPadding,
           initiallyExpanded: section.initiallyExpanded,
-          leading: Icon(section.icon, color: cs.primary),
+          leading: Icon(section.icon, color: cs.primary, size: catalog.itemIconSize),
           title: Text(
             section.title,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: catalog.sectionTitleStyle(textTheme, color: cs.onSurface),
           ),
           subtitle: Text(
             t.reportsSectionCount(section.items.length),
-            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+            style: catalog.subtitleStyle(textTheme, color: cs.onSurfaceVariant),
           ),
           children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 8, right: 8, bottom: 12),
-              child: columns == 1
-                  ? Column(
-                      children: section.items
-                          .map((e) => _buildReportTile(context, e))
-                          .toList(),
-                    )
-                  : GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: section.items.length,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        mainAxisSpacing: 8,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 3.2,
-                      ),
-                      itemBuilder: (ctx, i) =>
-                          _buildReportCardCompact(ctx, section.items[i]),
-                    ),
-            ),
+            columns == 1
+                ? Column(
+                    children: section.items
+                        .map((e) => _buildReportTile(context, e))
+                        .toList(),
+                  )
+                : GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: section.items.length,
+                    gridDelegate: catalog.gridDelegate(width),
+                    itemBuilder: (ctx, i) =>
+                        _buildReportCardCompact(ctx, section.items[i]),
+                  ),
           ],
         ),
       ),
@@ -548,26 +567,28 @@ class _ReportsPageState extends State<ReportsPage> {
   }) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
     final canOpen = _canOpen(item);
     final disabledFg = cs.onSurfaceVariant.withValues(alpha: 0.75);
     final fg = canOpen ? cs.onSurface : disabledFg;
     final iconColor = canOpen ? cs.primary : disabledFg;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(catalog.itemRadius),
       onTap: canOpen
           ? () => _openReport(context, item)
           : () => _showAccessDenied(context, t),
       child: Container(
         decoration: BoxDecoration(
           color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(catalog.itemRadius),
           border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: catalog.itemPadding,
         child: Row(
           children: [
-            Icon(item.icon, color: iconColor),
-            const SizedBox(width: 10),
+            Icon(item.icon, color: iconColor, size: catalog.itemIconSize),
+            SizedBox(width: catalog.headerGap),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -577,14 +598,13 @@ class _ReportsPageState extends State<ReportsPage> {
                     item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.w600, color: fg),
+                    style: catalog.titleStyle(textTheme, color: fg),
                   ),
-                  const SizedBox(height: 2),
                   Text(
                     subtitleOverride ?? item.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: disabledFg, fontSize: 12),
+                    style: catalog.subtitleStyle(textTheme, color: disabledFg),
                   ),
                 ],
               ),
@@ -592,18 +612,21 @@ class _ReportsPageState extends State<ReportsPage> {
             if (!canOpen) ...[
               Tooltip(
                 message: t.accessDenied,
-                child: Icon(Icons.lock_outline, color: disabledFg),
+                child: Icon(Icons.lock_outline, color: disabledFg, size: catalog.lockIconSize),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: catalog.headerGap),
             ],
             IconButton(
               tooltip: _favorites.contains(item.key)
                   ? t.reportsRemoveFromFavorites
                   : t.reportsAddToFavorites,
+              visualDensity: VisualDensity.compact,
+              style: catalog.iconButtonStyle(),
               onPressed: canOpen ? () => _toggleFavorite(item.key) : null,
               icon: Icon(
                 _favorites.contains(item.key) ? Icons.star : Icons.star_border,
                 color: cs.primary,
+                size: catalog.starIconSize,
               ),
             ),
           ],
@@ -619,31 +642,34 @@ class _ReportsPageState extends State<ReportsPage> {
   }) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
     final canOpen = _canOpen(item);
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final chevron = isRtl ? Icons.chevron_left : Icons.chevron_right;
+    final titleColor = canOpen
+        ? cs.onSurface
+        : cs.onSurfaceVariant.withValues(alpha: 0.9);
     final tile = ListTile(
       enabled: canOpen,
-      dense: !wrapInCard,
-      contentPadding: wrapInCard ? null : EdgeInsets.zero,
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      minLeadingWidth: catalog.itemIconSize + 4,
+      contentPadding: wrapInCard ? catalog.tileContentPadding : EdgeInsets.zero,
       leading: Icon(
         item.icon,
+        size: catalog.itemIconSize,
         color: canOpen
             ? cs.primary
             : cs.onSurfaceVariant.withValues(alpha: 0.8),
       ),
       title: Text(
         item.title,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: canOpen
-              ? cs.onSurface
-              : cs.onSurfaceVariant.withValues(alpha: 0.9),
-        ),
+        style: catalog.titleStyle(textTheme, color: titleColor),
       ),
       subtitle: Text(
         item.subtitle,
-        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+        style: catalog.subtitleStyle(textTheme, color: cs.onSurfaceVariant),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -653,23 +679,26 @@ class _ReportsPageState extends State<ReportsPage> {
               message: t.accessDenied,
               child: Icon(
                 Icons.lock_outline,
-                size: 18,
+                size: catalog.lockIconSize,
                 color: cs.onSurfaceVariant,
               ),
             ),
-            const SizedBox(width: 6),
+            SizedBox(width: catalog.headerGap),
           ],
           IconButton(
             tooltip: _favorites.contains(item.key)
                 ? t.reportsRemoveFromFavorites
                 : t.reportsAddToFavorites,
+            visualDensity: VisualDensity.compact,
+            style: catalog.iconButtonStyle(),
             onPressed: canOpen ? () => _toggleFavorite(item.key) : null,
             icon: Icon(
               _favorites.contains(item.key) ? Icons.star : Icons.star_border,
               color: cs.primary,
+              size: catalog.starIconSize,
             ),
           ),
-          Icon(chevron, size: 18, color: cs.onSurfaceVariant),
+          Icon(chevron, size: catalog.chevronSize, color: cs.onSurfaceVariant),
         ],
       ),
       onTap: canOpen
@@ -678,7 +707,10 @@ class _ReportsPageState extends State<ReportsPage> {
     );
 
     if (!wrapInCard) return tile;
-    return Card(margin: const EdgeInsets.only(bottom: 8), child: tile);
+    return Card(
+      margin: EdgeInsets.only(bottom: catalog.sectionGap),
+      child: tile,
+    );
   }
 
   void _openReport(BuildContext context, _ReportLink item) {
@@ -700,29 +732,43 @@ class _ReportsPageState extends State<ReportsPage> {
   ) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
 
-    final chips = <Widget>[
-      FilterChip(
-        label: Text(t.all),
-        selected: _selectedSectionId == 'all',
-        onSelected: (_) => setState(() => _selectedSectionId = 'all'),
+    Widget chip(String id, String label) {
+      final selected = _selectedSectionId == id;
+      return FilterChip(
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: catalog.chipPadding,
+        labelPadding: catalog.chipLabelPadding,
+        label: Text(
+          label,
+          style: catalog.chipLabelStyle(
+            textTheme,
+            color: selected ? cs.onPrimaryContainer : cs.onSurface,
+          ),
+        ),
+        selected: selected,
+        onSelected: (_) => setState(() => _selectedSectionId = id),
         selectedColor: cs.primaryContainer,
         checkmarkColor: cs.onPrimaryContainer,
-      ),
-      ...sections.map(
-        (s) => FilterChip(
-          label: Text(s.title),
-          selected: _selectedSectionId == s.id,
-          onSelected: (_) => setState(() => _selectedSectionId = s.id),
-          selectedColor: cs.primaryContainer,
-          checkmarkColor: cs.onPrimaryContainer,
-        ),
-      ),
+      );
+    }
+
+    final chips = <Widget>[
+      chip('all', t.all),
+      ...sections.map((s) => chip(s.id, s.title)),
     ];
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+    return SizedBox(
+      height: catalog.chipRowHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chips.length,
+        separatorBuilder: (_, __) => SizedBox(width: catalog.chipSpacing),
+        itemBuilder: (_, i) => chips[i],
+      ),
     );
   }
 
@@ -733,13 +779,14 @@ class _ReportsPageState extends State<ReportsPage> {
   }) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final catalog = context.reportsCatalog;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(child: _buildSearchBar(context)),
-            const SizedBox(width: 8),
+            SizedBox(width: catalog.headerGap),
             PopupMenuButton<_DesktopSort>(
               tooltip: t.reportsSortTooltip,
               onSelected: (v) => setState(() => _desktopSort = v),
@@ -754,18 +801,18 @@ class _ReportsPageState extends State<ReportsPage> {
                 ),
               ],
               child: Container(
-                height: 48,
-                width: 48,
+                height: catalog.sortButtonSize,
+                width: catalog.sortButtonSize,
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(catalog.searchRadius),
                 ),
-                child: Icon(Icons.sort, color: cs.onSurfaceVariant),
+                child: Icon(Icons.sort, color: cs.onSurfaceVariant, size: catalog.itemIconSize),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: catalog.headerGap),
         if (!isSearching) _buildSectionChips(context, sections),
       ],
     );
@@ -787,7 +834,7 @@ class _ReportsPageState extends State<ReportsPage> {
           icon: Icons.assessment,
           count: sorted.length,
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: context.reportsCatalog.headerGap),
         _buildDesktopAllGrid(
           context,
           sorted,
@@ -816,7 +863,7 @@ class _ReportsPageState extends State<ReportsPage> {
         icon: s.icon,
         count: sorted.length,
       ),
-      const SizedBox(height: 8),
+      SizedBox(height: context.reportsCatalog.headerGap),
       _buildDesktopSectionGrid(context, sorted),
     ];
   }
@@ -838,21 +885,23 @@ class _ReportsPageState extends State<ReportsPage> {
   }) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final catalog = context.reportsCatalog;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: catalog.headerGap / 2),
       child: Row(
         children: [
-          Icon(icon, color: cs.primary),
-          const SizedBox(width: 8),
+          Icon(icon, color: cs.primary, size: catalog.itemIconSize),
+          SizedBox(width: catalog.headerGap),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: catalog.sectionTitleStyle(textTheme, color: cs.onSurface),
             ),
           ),
           Text(
             t.reportsSectionCount(count),
-            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+            style: catalog.subtitleStyle(textTheme, color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -863,18 +912,13 @@ class _ReportsPageState extends State<ReportsPage> {
     BuildContext context,
     List<_ReportLink> items,
   ) {
+    final catalog = context.reportsCatalog;
     final width = MediaQuery.of(context).size.width;
-    final columns = width >= 1200 ? 3 : 2;
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 3.2,
-      ),
+      gridDelegate: catalog.gridDelegate(width),
       itemBuilder: (ctx, i) => _buildReportCardCompact(ctx, items[i]),
     );
   }
@@ -884,18 +928,13 @@ class _ReportsPageState extends State<ReportsPage> {
     List<_ReportLink> items, {
     required Map<String, String> sectionTitleByItemKey,
   }) {
+    final catalog = context.reportsCatalog;
     final width = MediaQuery.of(context).size.width;
-    final columns = width >= 1200 ? 3 : 2;
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 3.2,
-      ),
+      gridDelegate: catalog.gridDelegate(width),
       itemBuilder: (ctx, i) {
         final it = items[i];
         final sec = sectionTitleByItemKey[it.key];
@@ -960,6 +999,22 @@ class _ReportsPageState extends State<ReportsPage> {
     return true;
   }
 
+  bool _marketplacePluginActive(String code) {
+    return _marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains(code);
+  }
+
+  bool _sectionVisibleForPlugins(_ReportSection section) {
+    final pluginItems = section.items
+        .where((i) => i.marketplacePluginCode != null)
+        .toList();
+    if (pluginItems.isEmpty) return true;
+    if (pluginItems.length != section.items.length) return true;
+    return pluginItems.any(
+      (i) => _marketplacePluginActive(i.marketplacePluginCode!),
+    );
+  }
+
   void _showAccessDenied(BuildContext context, AppLocalizations t) {
     ScaffoldMessenger.of(
       context,
@@ -989,18 +1044,11 @@ class _ReportsPageState extends State<ReportsPage> {
           ),
           _ReportLink(
             key: 'hscript_builder',
-            title: 'گزارش‌ساز اسکریپتی',
-            subtitle: 'ساخت گزارش سفارشی با HScript',
+            title: t.reportsHscriptTitle,
+            subtitle: t.reportsHscriptSubtitle,
             icon: Icons.code,
             route: '/business/$b/hscript',
-            keywords: const [
-              'hscript',
-              'اسکریپت',
-              'گزارش سفارشی',
-              'custom report',
-              'داشبورد',
-              'نمودار',
-            ],
+            keywords: _reportKeywordsFromPipe(t.reportsHscriptKeywords),
             permissionSection: 'reports',
           ),
         ],
@@ -1039,37 +1087,33 @@ class _ReportsPageState extends State<ReportsPage> {
           ),
           _ReportLink(
             key: 'ar_aging',
-            title: 'سن بدهی مشتریان',
-            subtitle: 'تحلیل سررسید مطالبات',
+            title: t.reportsArAgingTitle,
+            subtitle: t.reportsArAgingSubtitle,
             icon: Icons.timelapse_outlined,
             route: '/business/$b/reports/ar-aging',
-            keywords: const ['سن بدهی', 'مطالبات', 'سررسید', 'aging', 'ar'],
+            keywords: _reportKeywordsFromPipe(t.reportsArAgingKeywords),
             permissionSection: 'people',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'ap_aging',
-            title: 'سن بستانکاری تامین‌کنندگان',
-            subtitle: 'تحلیل سررسید بدهی‌ها',
+            title: t.reportsApAgingTitle,
+            subtitle: t.reportsApAgingSubtitle,
             icon: Icons.history_toggle_off_outlined,
             route: '/business/$b/reports/ap-aging',
-            keywords: const [
-              'سن بستانکاری',
-              'بدهی',
-              'تامین کننده',
-              'سررسید',
-              'aging',
-              'ap',
-            ],
+            keywords: _reportKeywordsFromPipe(t.reportsApAgingKeywords),
             permissionSection: 'people',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'person_balances_by_currency',
-            title: 'مانده اشخاص به تفکیک ارز',
-            subtitle: 'مانده بومی هر ارز و معادل ارز پایه',
+            title: t.reportsPersonBalancesByCurrencyTitle,
+            subtitle: t.reportsPersonBalancesByCurrencySubtitle,
             icon: Icons.currency_exchange_outlined,
             route: '/business/$b/reports/person-balances-by-currency',
-            keywords: const ['مانده اشخاص', 'ارز', 'معادل پایه', 'currency'],
+            keywords: _reportKeywordsFromPipe(t.reportsPersonBalancesByCurrencyKeywords),
             permissionSection: 'people',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'people_transactions',
@@ -1193,6 +1237,15 @@ class _ReportsPageState extends State<ReportsPage> {
             icon: Icons.warning_amber,
             route: '/business/$b/reports/critical-stock',
             keywords: const ['بحرانی', 'کمبود'],
+            permissionSection: 'products',
+          ),
+          _ReportLink(
+            key: 'expiry_stock',
+            title: t.reportsExpiryStockTitle,
+            subtitle: t.reportsExpiryStockSubtitle,
+            icon: Icons.event_busy,
+            route: '/business/$b/reports/expiry-stock',
+            keywords: const ['انقضا', 'لات', 'تاریخ تولید', 'فاسدشدنی', 'expiry', 'lot'],
             permissionSection: 'products',
           ),
           _ReportLink(
@@ -1376,6 +1429,56 @@ class _ReportsPageState extends State<ReportsPage> {
             keywords: const ['تولید', 'ضایعات'],
             permissionSection: 'products',
           ),
+          _ReportLink(
+            key: 'advprod_orders',
+            title: t.advancedProductionReportOrders,
+            subtitle: t.advancedProductionMenu,
+            icon: Icons.list_alt_outlined,
+            route: '/business/$b/advanced-production?report=orders',
+            keywords: const ['سفارش تولید', 'advanced production'],
+            permissionSection: 'advanced_production',
+            marketplacePluginCode: 'advanced_production',
+          ),
+          _ReportLink(
+            key: 'advprod_overdue',
+            title: t.advancedProductionReportOverdue,
+            subtitle: t.advancedProductionMenu,
+            icon: Icons.running_with_errors_outlined,
+            route: '/business/$b/advanced-production?report=overdue',
+            keywords: const ['عقب افتاده', 'overdue'],
+            permissionSection: 'advanced_production',
+            marketplacePluginCode: 'advanced_production',
+          ),
+          _ReportLink(
+            key: 'advprod_order_costing',
+            title: t.advancedProductionReportCost,
+            subtitle: t.advancedProductionValuationNote,
+            icon: Icons.price_change_outlined,
+            route: '/business/$b/advanced-production?report=order_costing',
+            keywords: const ['بهای تمام شده', 'cost'],
+            permissionSection: 'advanced_production',
+            marketplacePluginCode: 'advanced_production',
+          ),
+          _ReportLink(
+            key: 'advprod_material_shortage',
+            title: t.advancedProductionReportShortage,
+            subtitle: t.advancedProductionMenu,
+            icon: Icons.inventory_outlined,
+            route: '/business/$b/advanced-production?report=material_shortage',
+            keywords: const ['کسری مواد', 'shortage'],
+            permissionSection: 'advanced_production',
+            marketplacePluginCode: 'advanced_production',
+          ),
+          _ReportLink(
+            key: 'advprod_material_variance',
+            title: t.advancedProductionReportVariance,
+            subtitle: t.advancedProductionMenu,
+            icon: Icons.compare_arrows,
+            route: '/business/$b/advanced-production?report=material_variance',
+            keywords: const ['انحراف', 'variance'],
+            permissionSection: 'advanced_production',
+            marketplacePluginCode: 'advanced_production',
+          ),
         ],
       ),
       _ReportSection(
@@ -1391,6 +1494,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/trial-balance',
             keywords: const ['تراز', 'آزمایشی'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'balance_sheet',
@@ -1400,6 +1504,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/balance-sheet',
             keywords: const ['ترازنامه', 'وضعیت مالی', 'دارایی', 'بدهی'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'financial_package',
@@ -1409,6 +1514,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/financial-package',
             keywords: const ['بسته', 'گزارش مالی', 'تراز', 'سود و زیان'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'general_ledger',
@@ -1418,6 +1524,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/general-ledger',
             keywords: const ['دفتر کل', 'ledger'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'journal_ledger',
@@ -1427,6 +1534,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/journal-ledger',
             keywords: const ['دفتر روزنامه', 'journal'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'accounts_review',
@@ -1435,24 +1543,27 @@ class _ReportsPageState extends State<ReportsPage> {
             icon: Icons.account_tree,
             route: '/business/$b/reports/accounts-review',
             keywords: const ['مرور حساب', 'درختی'],
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'cash_flow',
-            title: 'صورت جریان وجوه نقد',
-            subtitle: 'تحلیل ورود و خروج وجه نقد',
+            title: t.reportsCashFlowTitle,
+            subtitle: t.reportsCashFlowSubtitle,
             icon: Icons.account_balance_wallet_outlined,
             route: '/business/$b/reports/cash-flow',
-            keywords: const ['جریان نقد', 'وجوه نقد', 'cash flow'],
+            keywords: _reportKeywordsFromPipe(t.reportsCashFlowKeywords),
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'fx_revaluation',
-            title: 'گزارش تسعیر ارز',
-            subtitle: 'سود و زیان ناشی از تسعیر ارز',
+            title: t.reportsFxRevaluationTitle,
+            subtitle: t.reportsFxRevaluationSubtitle,
             icon: Icons.currency_exchange_outlined,
             route: '/business/$b/reports/fx-revaluation',
-            keywords: const ['تسعیر', 'ارز', 'fx', 'revaluation'],
+            keywords: _reportKeywordsFromPipe(t.reportsFxRevaluationKeywords),
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
         ],
       ),
@@ -1469,6 +1580,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/pnl-period',
             keywords: const ['سود و زیان', 'دوره'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'pnl_cumulative',
@@ -1478,6 +1590,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/pnl-cumulative',
             keywords: const ['سود و زیان', 'تجمیعی'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
         ],
       ),
@@ -1556,6 +1669,98 @@ class _ReportsPageState extends State<ReportsPage> {
       );
     }
     if (_marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains('fixed_assets')) {
+      sections.add(
+        _ReportSection(
+          id: 'fixed_assets_reports',
+          title: t.fixedAssetsReportSection,
+          icon: Icons.precision_manufacturing_outlined,
+          items: [
+            _ReportLink(
+              key: 'fa_register',
+              title: t.fixedAssetsReportRegister,
+              subtitle: t.fixedAssetsReportRegisterSubtitle,
+              icon: Icons.inventory_2_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=register',
+              keywords: const ['اموال', 'دفتر', 'دارایی ثابت', 'nbv', 'register'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_class_summary',
+              title: t.fixedAssetsReportClassSummary,
+              subtitle: t.fixedAssetsReportClassSummarySubtitle,
+              icon: Icons.account_tree_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=class_summary',
+              keywords: const ['گردش', 'طبقه', 'افشا', 'استاندارد ۱۱', 'rollforward'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_depreciation',
+              title: t.fixedAssetsReportDepreciation,
+              subtitle: t.fixedAssetsReportDepreciationSubtitle,
+              icon: Icons.calculate_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=depreciation',
+              keywords: const ['استهلاک', 'ماهانه', 'ماده ۱۴۹'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_acquisitions',
+              title: t.fixedAssetsReportAcquisitions,
+              subtitle: t.fixedAssetsReportAcquisitionsSubtitle,
+              icon: Icons.add_box_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=acquisitions',
+              keywords: const ['تحصیل', 'خرید سرمایه‌ای', 'افتتاحیه'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_disposals',
+              title: t.fixedAssetsReportDisposals,
+              subtitle: t.fixedAssetsReportDisposalsSubtitle,
+              icon: Icons.output_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=disposals',
+              keywords: const ['خروج', 'اسقاط', 'فروش دارایی', 'سود واگذاری'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_idle',
+              title: t.fixedAssetsReportIdle,
+              subtitle: t.fixedAssetsReportIdleSubtitle,
+              icon: Icons.pause_circle_outline,
+              route: '/business/$b/reports/fixed-assets?kind=idle',
+              keywords: const ['راکد', 'idle', 'ماده ۱۴۹'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_locations',
+              title: t.fixedAssetsReportLocations,
+              subtitle: t.fixedAssetsReportLocationsSubtitle,
+              icon: Icons.place_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=locations',
+              keywords: const ['محل', 'تحویل‌گیرنده', 'اموال‌گردانی'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_expenditures',
+              title: t.fixedAssetsReportExpenditures,
+              subtitle: t.fixedAssetsReportExpendituresSubtitle,
+              icon: Icons.build_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=expenditures',
+              keywords: const ['تعمیر', 'مخارج بعدی', 'تعمیر اساسی'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+          ],
+        ),
+      );
+    }
+    if (_marketplacePluginsResolved &&
         _activeMarketplacePluginCodes.contains('woocommerce_hesabix')) {
       sections.add(
         _ReportSection(
@@ -1611,7 +1816,31 @@ class _ReportsPageState extends State<ReportsPage> {
         ),
       );
     }
-    return sections;
+    final visible = <_ReportSection>[];
+    for (final section in sections.where(_sectionVisibleForPlugins)) {
+      final items = section.items.where(_pluginItemVisible).toList();
+      if (items.isEmpty) continue;
+      if (identical(items, section.items) || items.length == section.items.length) {
+        visible.add(section);
+        continue;
+      }
+      visible.add(
+        _ReportSection(
+          id: section.id,
+          title: section.title,
+          icon: section.icon,
+          initiallyExpanded: section.initiallyExpanded,
+          items: items,
+        ),
+      );
+    }
+    return visible;
+  }
+
+  bool _pluginItemVisible(_ReportLink item) {
+    if (item.marketplacePluginCode == null) return true;
+    if (!_marketplacePluginsResolved) return false;
+    return _marketplacePluginActive(item.marketplacePluginCode!);
   }
 }
 
@@ -1681,7 +1910,7 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
     return Container(
       alignment: Alignment.centerLeft,
       color: cs.surface,
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: context.reportsCatalog.headerGap / 2),
       foregroundDecoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(

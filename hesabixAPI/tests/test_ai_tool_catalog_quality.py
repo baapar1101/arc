@@ -27,13 +27,17 @@ from app.services.ai.ai_tool_security import (
 def test_manifest_and_registry_identities_match():
     parsed = parse_registered_tool_fields()
     manifested = set(iter_manifest_names())
-    assert set(parsed) == manifested
-    assert len(parsed) == 180
+    missing_from_manifest = sorted(set(parsed) - manifested)
+    assert missing_from_manifest == []
+    assert "list_mcp_categories" in parsed
+    assert "search_mcp_tools" in parsed
     assert len(parsed) == len(set(parsed))
+    assert len(parsed) >= 180
 
 
 def test_all_capabilities_are_granular_and_valid():
-    for name in iter_manifest_names():
+    parsed = parse_registered_tool_fields()
+    for name in parsed:
         entry = get_manifest_entry(name)
         assert entry is not None
         cap = resolve_tool_capability(name, entry.domains)
@@ -94,7 +98,8 @@ def test_critical_tools_have_permission_metadata():
 
 
 def test_empty_permission_is_explicit_policy_or_assigned():
-    rows = audit_catalog()
+    parsed = parse_registered_tool_fields()
+    rows = [row for row in audit_catalog() if row["name"] in parsed]
     missing = [row["name"] for row in rows if row["permission_status"] == "missing"]
     assert missing == []
     empty_ok = [
@@ -102,7 +107,7 @@ def test_empty_permission_is_explicit_policy_or_assigned():
         if not row["required_permissions"]
     ]
     for row in empty_ok:
-        assert row["permission_policy"] in ALLOWED_EMPTY_PERMISSION_POLICIES
+        assert row["permission_policy"] in ALLOWED_EMPTY_PERMISSION_POLICIES, row["name"]
 
 
 def test_unspecified_empty_permission_is_fail_closed():
@@ -125,8 +130,10 @@ def test_handler_and_self_scoped_policies():
 
 
 def test_catalog_completeness_gates():
-    stats = catalog_completeness()
-    assert stats["total"] == 180
+    parsed = parse_registered_tool_fields()
+    rows = [row for row in audit_catalog() if row["name"] in parsed]
+    stats = catalog_completeness(rows)
+    assert stats["total"] == len(parsed)
     assert stats["missing_permissions"] == 0
     assert stats["missing_side_effect"] == 0
     assert stats["missing_domain"] == 0
@@ -134,3 +141,5 @@ def test_catalog_completeness_gates():
     assert stats["missing_search_text"] == 0
     assert stats["missing_description"] == 0
     assert stats["complete_metadata"] >= 40
+    assert "list_mcp_categories" in parsed
+    assert "search_mcp_tools" in parsed

@@ -7,12 +7,11 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from pathlib import Path
 
-from weasyprint import HTML, CSS
-from weasyprint.text.fonts import FontConfiguration
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.i18n import get_translator
+from app.core.weasyprint_runtime import load_weasyprint
 from adapters.api.v1.schemas import QueryInfo
 
 
@@ -26,7 +25,7 @@ class BasePDFModule(ABC):
             loader=FileSystemLoader(str(self.template_dir)),
             autoescape=select_autoescape(['html', 'xml'])
         )
-        self.font_config = FontConfiguration()
+        self.font_config = load_weasyprint().FontConfiguration()
     
     @abstractmethod
     def generate_pdf(

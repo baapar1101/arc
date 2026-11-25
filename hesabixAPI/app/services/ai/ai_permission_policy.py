@@ -40,6 +40,8 @@ AGENT_INTERNAL_PERMISSION_TOOLS = frozenset({
     "spawn_subagent",
     "await_subagent",
     "cancel_subagent",
+    "list_mcp_categories",
+    "search_mcp_tools",
 })
 USER_CONTEXT_PERMISSION_TOOLS = frozenset({
     "resolve_date_range",

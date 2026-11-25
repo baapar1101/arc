@@ -16,7 +16,13 @@ from app.services.ai.ai_skill_parser import (
 
 def test_validate_skill_slug():
     assert validate_skill_slug("debt-analysis") is None
-    assert validate_skill_slug("PDF") == "SKILL_SLUG_FORMAT_INVALID"
+    # Validation and parsing both retain the existing lowercase canonicalization.
+    assert validate_skill_slug("PDF") is None
+    assert validate_skill_slug("PDF Report") == "SKILL_SLUG_FORMAT_INVALID"
+    canonical = parse_skill_md(compose_skill_md(
+        skill_slug="PDF", description="Read PDF documents", skill_body="# Read",
+    ))
+    assert canonical.skill_slug == "pdf"
     assert validate_skill_slug("-bad") == "SKILL_SLUG_FORMAT_INVALID"
 
 

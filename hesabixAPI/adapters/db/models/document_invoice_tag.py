@@ -12,7 +12,6 @@ class DocumentInvoiceTag(Base):
 	__tablename__ = "document_invoice_tags"
 	__table_args__ = (
 		UniqueConstraint("business_id", "name", name="uq_document_invoice_tags_business_name"),
-		Index("ix_document_invoice_tags_business_id", "business_id"),
 	)
 
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

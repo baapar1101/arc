@@ -7,6 +7,8 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_legacy_import_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import 'package:hesabix_ui/theme/tokens/extensions.dart';
 
 class LegacyDatabaseImportPage extends StatefulWidget {
   const LegacyDatabaseImportPage({super.key});
@@ -63,7 +65,7 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
     final bytes = f.bytes;
     final name = f.name;
     if (bytes == null || bytes.isEmpty || name == null) {
-      if (mounted) SnackBarHelper.showError(context, message: 'خواندن فایل ناموفق بود');
+      if (mounted) SnackBarHelper.showError(context, message: adminTx(context, 'خواندن فایل ناموفق بود', 'Could not read the file'));
       return;
     }
     final lower = name.toLowerCase();
@@ -75,7 +77,7 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'فرمت فایل باید .sql، .sql.gz، .zip یا .hs60 باشد',
+          message: adminTx(context, 'فرمت فایل باید .sql، .sql.gz، .zip یا .hs60 باشد', 'File must be .sql, .sql.gz, .zip, or .hs60'),
         );
       }
       return;
@@ -113,6 +115,7 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
       rewriteConfirmation: _importMode == 'rewrite_business'
           ? _rewriteConfirmationController.text.trim()
           : null,
+      runConfirmation: dryRun ? null : 'IMPORT',
     );
   }
 
@@ -120,7 +123,7 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
     final bytes = _fileBytes;
     final name = _filename;
     if (bytes == null || name == null) {
-      SnackBarHelper.showError(context, message: 'ابتدا فایل SQL را انتخاب کنید');
+      SnackBarHelper.showError(context, message: adminTx(context, 'ابتدا فایل SQL را انتخاب کنید', 'Choose an SQL file first'));
       return;
     }
     setState(() {
@@ -155,11 +158,11 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
         _jobTimer?.cancel();
         _jobTimer = null;
         if (state == 'succeeded') {
-          SnackBarHelper.showSuccess(context, message: 'ایمپورت با موفقیت انجام شد');
+          SnackBarHelper.showSuccess(context, message: adminTx(context, 'ایمپورت انجام شد', 'Import completed'));
         } else {
           final err = status['error'];
           final msg = err is Map ? (err['message'] as String?) : err?.toString();
-          SnackBarHelper.showError(context, message: 'ایمپورت ناموفق: ${msg ?? "خطا"}');
+          SnackBarHelper.showError(context, message: '${adminTx(context, 'ایمپورت ناموفق', 'Import failed')}: ${msg ?? adminTx(context, 'خطا', 'Error')}');
         }
       }
     }).catchError((_) {
@@ -167,25 +170,72 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
     });
   }
 
+  Future<bool> _confirmRealImport() async {
+    final controller = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        var phraseError = '';
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              title: Text(adminTx(context, 'تأیید ایمپورت واقعی', 'Confirm a real import')),
+              content: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'عبارت IMPORT یا ایمپورت', 'Type IMPORT or ایمپورت'),
+                  errorText: phraseError.isEmpty ? null : phraseError,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(adminTx(context, 'انصراف', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final text = controller.text.trim();
+                    if (text != 'IMPORT' && text != 'ایمپورت') {
+                      setLocal(() => phraseError = adminTx(context, 'عبارت باید IMPORT یا ایمپورت باشد', 'Type IMPORT or ایمپورت'));
+                      return;
+                    }
+                    Navigator.pop(dialogContext, true);
+                  },
+                  child: Text(adminTx(context, 'ادامه', 'Continue')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    return accepted == true;
+  }
+
   Future<void> _startImport() async {
     final bytes = _fileBytes;
     final name = _filename;
     if (bytes == null || name == null) {
-      SnackBarHelper.showError(context, message: 'ابتدا فایل SQL را انتخاب کنید');
+      SnackBarHelper.showError(context, message: adminTx(context, 'ابتدا فایل SQL را انتخاب کنید', 'Choose an SQL file first'));
       return;
     }
     if (_importMode != 'new_business') {
       if (_parseOptionalInt(_targetBusinessIdController.text) == null) {
-        SnackBarHelper.showError(context, message: 'شناسه کسب‌وکار هدف را وارد کنید');
+        SnackBarHelper.showError(context, message: adminTx(context, 'شناسه کسب‌وکار هدف را وارد کنید', 'Enter the target business ID'));
         return;
       }
     }
     if (_importMode == 'rewrite_business') {
       final c = _rewriteConfirmationController.text.trim();
       if (c != 'بازنویسی' && c != 'REWRITE') {
-        SnackBarHelper.showError(context, message: 'برای بازنویسی عبارت «بازنویسی» را وارد کنید');
+        SnackBarHelper.showError(context, message: adminTx(context, 'برای بازنویسی عبارت «بازنویسی» یا REWRITE را وارد کنید', 'Type بازنویسی or REWRITE to rewrite'));
         return;
       }
+    }
+    if (!_dryRun) {
+      final confirmed = await _confirmRealImport();
+      if (!confirmed || !mounted) return;
     }
 
     setState(() {
@@ -207,7 +257,9 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
       _pollJob();
       SnackBarHelper.showSuccess(
         context,
-        message: _dryRun ? 'شبیه‌سازی در صف قرار گرفت' : 'ایمپورت در پس‌زمینه شروع شد',
+        message: _dryRun
+            ? adminTx(context, 'شبیه‌سازی در صف قرار گرفت', 'Dry run queued')
+            : adminTx(context, 'ایمپورت در پس‌زمینه شروع شد', 'Import started in the background'),
       );
     } catch (e) {
       if (mounted) {
@@ -226,29 +278,28 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('ایمپورت دیتابیس قدیمی'),
-      ),
+    final hub = context.settingsHub;
+    return AdminCompactScaffold(
+      title: adminTx(context, 'ایمپورت دیتابیس قدیمی', 'Legacy database import'),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: hub.pagePadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _infoCard(theme),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _fileCard(theme),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             _optionsCard(theme),
             if (_analysis != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               _analysisCard(theme, _analysis!),
             ],
             if (_jobStatus != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               _jobCard(theme, _jobStatus!),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -261,10 +312,10 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.analytics_outlined),
-                    label: const Text('تحلیل فایل'),
+                    label: Text(adminTx(context, 'تحلیل فایل', 'Analyze file')),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: _loading ? null : _startImport,
@@ -275,7 +326,9 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.cloud_upload_outlined),
-                    label: Text(_dryRun ? 'اجرای dry-run' : 'شروع ایمپورت'),
+                    label: Text(_dryRun
+                        ? adminTx(context, 'اجرای آزمایشی', 'Run dry-run')
+                        : adminTx(context, 'شروع ایمپورت', 'Start import')),
                   ),
                 ),
               ],
@@ -291,9 +344,12 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          'دامپ MySQL نسخه قدیمی Hesabix (phpMyAdmin) یا فایل .hs60 / .zip حاوی SQL را آپلود کنید. '
-          'داده‌ها از مسیر سرویس‌های استاندارد (فاکتور، دریافت/پرداخت، هزینه/درآمد، حواله انبار، انتقال، تراز افتتاحیه، چک) ثبت می‌شوند.',
-          style: theme.textTheme.bodyMedium,
+          adminTx(
+            context,
+            'دامپ MySQL نسخه قدیمی حسابیکس یا فایل .hs60 / .zip حاوی SQL را بارگذاری کنید. داده‌ها از مسیر سرویس‌های استاندارد ثبت می‌شوند.',
+            'Upload an old Hesabix MySQL dump or an .hs60 / .zip file that contains SQL. Data is written through the standard services.',
+          ),
+          style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
         ),
       ),
     );
@@ -306,12 +362,15 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('فایل SQL', style: theme.textTheme.titleMedium),
+            Text(
+              adminTx(context, 'فایل SQL', 'SQL file'),
+              style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
+            ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _loading ? null : _pickFile,
               icon: const Icon(Icons.upload_file),
-              label: Text(_filename ?? 'انتخاب فایل .sql / .hs60 / .zip'),
+              label: Text(_filename ?? adminTx(context, 'انتخاب فایل .sql / .hs60 / .zip', 'Choose .sql / .hs60 / .zip')),
             ),
           ],
         ),
@@ -326,65 +385,74 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('تنظیمات ایمپورت', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
+            Text(
+              adminTx(context, 'تنظیمات ایمپورت', 'Import options'),
+              style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
+            ),
+            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _importMode,
-              decoration: const InputDecoration(
-                labelText: 'حالت ایمپورت',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: adminTx(context, 'حالت ایمپورت', 'Import mode'),
+                border: const OutlineInputBorder(),
               ),
-              items: const [
-                DropdownMenuItem(value: 'new_business', child: Text('کسب‌وکار جدید')),
-                DropdownMenuItem(value: 'merge_into_business', child: Text('ادغام در کسب‌وکار موجود')),
-                DropdownMenuItem(value: 'rewrite_business', child: Text('بازنویسی کسب‌وکار موجود')),
+              items: [
+                DropdownMenuItem(value: 'new_business', child: Text(adminTx(context, 'کسب‌وکار جدید', 'New business'))),
+                DropdownMenuItem(value: 'merge_into_business', child: Text(adminTx(context, 'ادغام در کسب‌وکار موجود', 'Merge into an existing business'))),
+                DropdownMenuItem(value: 'rewrite_business', child: Text(adminTx(context, 'بازنویسی کسب‌وکار موجود', 'Rewrite an existing business'))),
               ],
               onChanged: _loading ? null : (v) => setState(() => _importMode = v ?? 'new_business'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextField(
               controller: _targetBusinessIdController,
-              decoration: const InputDecoration(
-                labelText: 'شناسه کسب‌وکار هدف (merge/rewrite)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: adminTx(context, 'شناسه کسب‌وکار هدف', 'Target business ID'),
+                border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _ownerUserIdController,
-              decoration: const InputDecoration(
-                labelText: 'شناسه مالک (اختیاری، حالت new)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: adminTx(context, 'شناسه مالک (اختیاری)', 'Owner user ID (optional)'),
+                border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
             ),
             if (_importMode == 'rewrite_business') ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               TextField(
                 controller: _rewriteConfirmationController,
-                decoration: const InputDecoration(
-                  labelText: 'تأیید بازنویسی — عبارت «بازنویسی»',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.warning_amber),
+                decoration: InputDecoration(
+                  isDense: true,
+                  labelText: adminTx(context, 'برای بازنویسی «بازنویسی» یا REWRITE را بنویسید', 'Type بازنویسی or REWRITE'),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.warning_amber),
                 ),
               ),
             ],
             SwitchListTile(
-              title: const Text('Dry-run (بدون ذخیره)'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(adminTx(context, 'اجرای آزمایشی (بدون ذخیره)', 'Dry run (nothing is saved)')),
               value: _dryRun,
               onChanged: _loading ? null : (v) => setState(() => _dryRun = v),
             ),
             const Divider(),
-            _scopeSwitch('کاربران', _importUsers, (v) => _importUsers = v),
-            _scopeSwitch('مستر دیتا', _importMaster, (v) => _importMaster = v),
-            _scopeSwitch('فاکتورها', _importInvoices, (v) => _importInvoices = v),
-            _scopeSwitch('دریافت/پرداخت', _importReceipts, (v) => _importReceipts = v),
-            _scopeSwitch('هزینه/درآمد', _importExpenseIncome, (v) => _importExpenseIncome = v),
-            _scopeSwitch('انبارها و حواله‌ها', _importWarehouses, (v) => _importWarehouses = v),
-            _scopeSwitch('انتقال وجه', _importTransfers, (v) => _importTransfers = v),
-            _scopeSwitch('تراز افتتاحیه', _importOpeningBalance, (v) => _importOpeningBalance = v),
-            _scopeSwitch('چک‌ها', _importChecks, (v) => _importChecks = v),
+            _scopeSwitch(adminTx(context, 'کاربران', 'Users'), _importUsers, (v) => _importUsers = v),
+            _scopeSwitch(adminTx(context, 'مستر دیتا', 'Master data'), _importMaster, (v) => _importMaster = v),
+            _scopeSwitch(adminTx(context, 'فاکتورها', 'Invoices'), _importInvoices, (v) => _importInvoices = v),
+            _scopeSwitch(adminTx(context, 'دریافت و پرداخت', 'Receipts and payments'), _importReceipts, (v) => _importReceipts = v),
+            _scopeSwitch(adminTx(context, 'هزینه و درآمد', 'Expenses and income'), _importExpenseIncome, (v) => _importExpenseIncome = v),
+            _scopeSwitch(adminTx(context, 'انبارها و حواله‌ها', 'Warehouses and transfers'), _importWarehouses, (v) => _importWarehouses = v),
+            _scopeSwitch(adminTx(context, 'انتقال وجه', 'Money transfers'), _importTransfers, (v) => _importTransfers = v),
+            _scopeSwitch(adminTx(context, 'تراز افتتاحیه', 'Opening balance'), _importOpeningBalance, (v) => _importOpeningBalance = v),
+            _scopeSwitch(adminTx(context, 'چک‌ها', 'Checks'), _importChecks, (v) => _importChecks = v),
           ],
         ),
       ),
@@ -412,17 +480,20 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('نتیجه تحلیل', style: theme.textTheme.titleMedium),
+            Text(
+              adminTx(context, 'نتیجه تحلیل', 'Analysis'),
+              style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
+            ),
             const SizedBox(height: 8),
             if (!valid)
               ...errors.map((e) => Text('• $e', style: TextStyle(color: theme.colorScheme.error))),
-            Text('کسب‌وکار: ${analysis['business_count'] ?? 0}'),
-            Text('کاربر: ${analysis['user_count'] ?? 0}'),
-            Text('اسناد: ${analysis['document_count'] ?? 0}'),
-            Text('سطرهای سند: ${analysis['document_row_count'] ?? 0}'),
+            Text('${adminTx(context, 'کسب‌وکار', 'Businesses')}: ${analysis['business_count'] ?? 0}'),
+            Text('${adminTx(context, 'کاربر', 'Users')}: ${analysis['user_count'] ?? 0}'),
+            Text('${adminTx(context, 'اسناد', 'Documents')}: ${analysis['document_count'] ?? 0}'),
+            Text('${adminTx(context, 'سطرهای سند', 'Document lines')}: ${analysis['document_row_count'] ?? 0}'),
             if (docTypes.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text('انواع سند:', style: theme.textTheme.labelLarge),
+              Text(adminTx(context, 'انواع سند', 'Document types'), style: theme.textTheme.labelLarge),
               ...docTypes.entries.map((e) => Text('  ${e.key}: ${e.value}')),
             ],
           ],
@@ -448,7 +519,10 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('وضعیت Job: ${state ?? "—"}', style: theme.textTheme.titleMedium),
+            Text(
+              '${adminTx(context, 'وضعیت کار', 'Job')}: ${state ?? "—"}',
+              style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
+            ),
             if (message.isNotEmpty) Text(message),
             if (state == 'running' || state == 'queued') ...[
               const SizedBox(height: 8),

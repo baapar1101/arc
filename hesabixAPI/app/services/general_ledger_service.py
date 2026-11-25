@@ -18,7 +18,6 @@ from adapters.db.models.petty_cash import PettyCash
 from adapters.db.models.product import Product
 from adapters.db.models.currency import Currency
 from app.services.opening_balance_service import _find_existing_ob_document
-from adapters.db.repositories.document_repository import DocumentRepository
 
 
 def _parse_iso_date(dt: str | date) -> date:
@@ -48,6 +47,11 @@ def _get_document_type_name(doc_type: str | None) -> str:
         'expense_income': 'درآمد/هزینه',
         'opening_balance': 'تراز افتتاحیه',
         'manual_document': 'سند دستی',
+        'received_loan_facility': 'تسهیلات دریافتی',
+        'fixed_asset_acquisition': 'تحصیل دارایی ثابت',
+        'fixed_asset_depreciation': 'استهلاک دارایی ثابت',
+        'fixed_asset_disposal': 'خروج دارایی ثابت',
+        'fixed_asset_subsequent': 'مخارج بعدی دارایی ثابت',
         'check_endorse': 'پاسخگویی چک',
         'check_clear': 'وصول چک',
         'check_pay': 'پرداخت چک',
@@ -210,22 +214,41 @@ def get_general_ledger_report(
             }
         }
     
-    # دریافت سند تراز افتتاحیه (اگر وجود دارد)
+    # سند تراز افتتاحیه فقط در مانده ابتدای دوره لحاظ می‌شود، نه در گردش دوره
     opening_balance_data = {}
+    use_base_amounts = currency_id is None
     if fiscal_year_id:
         try:
             ob_doc = _find_existing_ob_document(db, business_id, fiscal_year_id)
             if ob_doc:
-                repo = DocumentRepository(db)
-                ob_dict = repo.to_dict_with_lines(ob_doc)
-                lines = ob_dict.get('lines', [])
-                for line in lines:
-                    acc_id = line.get('account_id')
-                    if acc_id and acc_id in account_ids:
-                        if acc_id not in opening_balance_data:
-                            opening_balance_data[acc_id] = {'debit': Decimal(0), 'credit': Decimal(0)}
-                        opening_balance_data[acc_id]['debit'] += Decimal(str(line.get('debit', 0) or 0))
-                        opening_balance_data[acc_id]['credit'] += Decimal(str(line.get('credit', 0) or 0))
+                if use_base_amounts:
+                    ob_query = db.query(
+                        DocumentLine.account_id,
+                        func.coalesce(
+                            func.sum(func.coalesce(DocumentLine.debit_base, DocumentLine.debit)),
+                            0,
+                        ).label('debit'),
+                        func.coalesce(
+                            func.sum(func.coalesce(DocumentLine.credit_base, DocumentLine.credit)),
+                            0,
+                        ).label('credit'),
+                    )
+                else:
+                    ob_query = db.query(
+                        DocumentLine.account_id,
+                        func.coalesce(func.sum(DocumentLine.debit), 0).label('debit'),
+                        func.coalesce(func.sum(DocumentLine.credit), 0).label('credit'),
+                    )
+                ob_query = ob_query.filter(
+                    DocumentLine.document_id == ob_doc.id,
+                    DocumentLine.account_id.in_(account_ids),
+                )
+                for row in ob_query.group_by(DocumentLine.account_id).all():
+                    if row.account_id:
+                        opening_balance_data[row.account_id] = {
+                            'debit': Decimal(str(row.debit or 0)),
+                            'credit': Decimal(str(row.credit or 0)),
+                        }
         except Exception:
             pass
     
@@ -265,6 +288,7 @@ def get_general_ledger_report(
             and_(
                 Document.business_id == business_id,
                 Document.is_proforma == False,
+                Document.document_type != "opening_balance",
                 DocumentLine.account_id.isnot(None),
                 DocumentLine.account_id.in_(account_ids),
                 Document.document_date <= date_before_from
@@ -312,8 +336,10 @@ def get_general_ledger_report(
     
     if not include_proforma:
         lines_query = lines_query.filter(Document.is_proforma == False)
-    
+
+    # سند افتتاحیه قبلاً در مانده ابتدای دوره آمده؛ تکرار آن گردش و مانده را دو برابر می‌کند
     if fiscal_year_id:
+        lines_query = lines_query.filter(Document.document_type != "opening_balance")
         lines_query = lines_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     if currency_id:
@@ -417,7 +443,6 @@ def get_general_ledger_report(
     running_balance = opening_balance
     total_debit = Decimal(0)
     total_credit = Decimal(0)
-    use_base_amounts = currency_id is None
     
     accounts_map = {acc.id: acc for acc in accounts}
 

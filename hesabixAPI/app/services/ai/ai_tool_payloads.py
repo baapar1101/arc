@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from app.core.product_measurements import MEASUREMENT_FIELDS
+
 _LINE_ROOT_TO_EXTRA = (
     "unit_price",
     "line_discount",
@@ -18,6 +20,22 @@ _LINE_ROOT_TO_EXTRA = (
     "discount_value",
     "unit",
     "unit_price_source",
+    "fixed_asset",
+    "fixed_asset_class_id",
+    "fixed_asset_location_id",
+    "fixed_asset_custodian_person_id",
+    "fixed_asset_salvage",
+    "fixed_asset_useful_life_months",
+    "fixed_asset_declining_annual_rate",
+    "fixed_asset_commission_date",
+    "fixed_asset_name",
+    "lot_allocations",
+    "allow_expired_lot_sale",
+    "manager_confirm_expired",
+    "lot_code",
+    "manufacturing_date",
+    "expiry_date",
+    "variant_id",
 )
 
 _INVOICE_PERSON_TYPES = frozenset({
@@ -87,6 +105,65 @@ _INVOICE_LINE_ITEM_SCHEMA: Dict[str, Any] = {
             "type": "array",
             "items": {"type": "integer"},
             "description": "شناسه نمونه‌های یونیک این سطر (کالای یونیک)",
+        },
+        "fixed_asset": {
+            "type": "boolean",
+            "description": (
+                "فقط فاکتور خرید: سطر سرمایه‌ای اموال. موجودی و حواله انبار ساخته نمی‌شود؛ "
+                "بها به حساب دارایی ثابت می‌رود. fixed_asset_class_id الزامی است."
+            ),
+        },
+        "fixed_asset_class_id": {
+            "type": "integer",
+            "description": "شناسه طبقه اموال از list_fixed_asset_classes وقتی fixed_asset=true",
+        },
+        "fixed_asset_location_id": {
+            "type": "integer",
+            "description": "محل استقرار دارایی سرمایه‌ای (اختیاری؛ از list_fixed_asset_locations)",
+        },
+        "fixed_asset_custodian_person_id": {
+            "type": "integer",
+            "description": "تحویل‌گیرنده دارایی سرمایه‌ای از search_persons (اختیاری)",
+        },
+        "fixed_asset_salvage": {
+            "type": "number",
+            "description": "ارزش اسقاط دارایی سرمایه‌ای (اختیاری)",
+        },
+        "fixed_asset_useful_life_months": {
+            "type": "integer",
+            "description": "عمر مفید به ماه برای دارایی سرمایه‌ای (اختیاری)",
+        },
+        "fixed_asset_declining_annual_rate": {
+            "type": "number",
+            "description": "نرخ مانده نزولی دارایی سرمایه‌ای اگر روش طبقه نزولی باشد (کسری بین ۰ و ۱)",
+        },
+        "fixed_asset_commission_date": {
+            "type": "string",
+            "format": "date",
+            "description": "تاریخ بهره‌برداری دارایی سرمایه‌ای (اختیاری؛ وگرنه تاریخ فاکتور)",
+        },
+        "fixed_asset_name": {
+            "type": "string",
+            "description": "نام کارت دارایی؛ اگر خالی باشد از شرح سطر یا نام کالا استفاده می‌شود",
+        },
+        "lot_allocations": {
+            "type": "array",
+            "description": "تخصیص لات برای کالای تاریخ‌دار. برای فروش اگر خالی باشد FEFO اعمال می‌شود.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "lot_id": {"type": "integer"},
+                    "lot_code": {"type": "string"},
+                    "manufacturing_date": {"type": "string", "format": "date"},
+                    "expiry_date": {"type": "string", "format": "date"},
+                    "quantity": {"type": "number"},
+                    "is_undated": {"type": "boolean"},
+                },
+            },
+        },
+        "allow_expired_lot_sale": {
+            "type": "boolean",
+            "description": "تأیید فروش لات منقضی وقتی سیاست کالا manager_confirm است",
         },
     },
     "required": ["product_id", "quantity", "unit_price"],
@@ -323,6 +400,8 @@ CREATE_INVOICE_DESCRIPTION = (
     "ثبت فاکتور با همان فیلدهای فرم صدور فاکتور: نوع، تاریخ، سررسید، ارز، طرف‌حساب، "
     "اقلام (قیمت/تخفیف/مالیات/انبار)، تخفیف کلی، اضافات/کسورات، فروشنده و کارمزد، "
     "اقساط، پرداخت همزمان، پروژه، برچسب، پیش‌فاکتور. "
+    "برای خرید دارایی ثابت: invoice_type=invoice_purchase و در همان سطر fixed_asset=true با "
+    "fixed_asset_class_id از list_fixed_asset_classes؛ موجودی کالا بدهکار نمی‌شود و کارت اموال ساخته می‌شود. "
     "قبل از صدا: search_persons، search_products، در صورت نیاز list_currencies و list_warehouses. "
     "برای فروش/خرید person_id عددی الزامی است. نیاز به تأیید."
 )
@@ -617,7 +696,10 @@ def build_create_invoice_payload(
     )
     document_date = raw.get("document_date") or raw.get("invoice_date")
     if not document_date:
-        document_date = date.today().isoformat()
+        from app.core.business_calendar import business_today
+
+        bid = coerce_positive_int(business_id or raw.get("business_id"))
+        document_date = business_today(bid).isoformat()
 
     payload: Dict[str, Any] = {
         "invoice_type": invoice_type,
@@ -690,6 +772,7 @@ UPDATE_INVOICE_DESCRIPTION = (
     "ویرایش فاکتور با همان فیلدهای فرم ویرایش: تاریخ، سررسید، طرف‌حساب، اقلام، "
     "تخفیف کلی، اضافات/کسورات، فروشنده/کارمزد، اقساط، پرداخت‌ها، پروژه، برچسب، پیش‌فاکتور. "
     "اول get_invoice_details. اگر فقط تاریخ/شرح/شخص عوض می‌شود lines را نفرست. "
+    "برای سطر سرمایه‌ای خرید همان پرچم fixed_asset و fixed_asset_class_id را بفرست. "
     "payments در صورت ارسال جایگزین تسویه‌های قبلی است. نیاز به تأیید."
 )
 
@@ -1551,6 +1634,24 @@ CREATE_WAREHOUSE_DOCUMENT_PARAMETERS_SCHEMA: Dict[str, Any] = {
                     "product_id": {"type": "integer", "description": "شناسه کالا از search_products"},
                     "quantity": {"type": "number", "description": "تعداد مثبت"},
                     "description": {"type": "string", "description": "شرح سطر (اختیاری)"},
+                    "lot_code": {"type": "string", "description": "شماره لات برای ورود کالای تاریخ‌دار"},
+                    "manufacturing_date": {"type": "string", "format": "date"},
+                    "expiry_date": {"type": "string", "format": "date"},
+                    "variant_id": {"type": "integer"},
+                    "lot_allocations": {
+                        "type": "array",
+                        "description": "تخصیص لات. ورود تاریخ‌دار بدون لات رد می‌شود؛ خروج خالی با FEFO پر می‌شود.",
+                        "items": {"type": "object"},
+                    },
+                    "selected_instance_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "واحدهای یونیک تاریخ‌دار",
+                    },
+                    "allow_expired_lot_sale": {
+                        "type": "boolean",
+                        "description": "برای خروج منقضی فقط وقتی سیاست کالا manager_confirm است",
+                    },
                 },
                 "required": ["product_id", "quantity"],
             },
@@ -1563,7 +1664,8 @@ CREATE_WAREHOUSE_DOCUMENT_DESCRIPTION = (
     "ثبت حواله انبار دستی (ورود/خروج/انتقال). قبل از صدا: "
     "list_warehouses برای شناسه انبار، search_products برای product_id. "
     "برای ورود warehouse_id یا warehouse_id_to؛ برای خروج warehouse_id یا warehouse_id_from. "
-    "نیاز به تأیید. حواله در وضعیت پیش‌نویس ساخته می‌شود."
+    "ورود کالای تاریخ‌دار نیاز به lot_allocations یا lot_code و تاریخ تولید/انقضا دارد؛ "
+    "خروج بدون لات با FEFO پر می‌شود. نیاز به تأیید. حواله در وضعیت پیش‌نویس ساخته می‌شود."
 )
 
 
@@ -1592,6 +1694,24 @@ def build_create_warehouse_document_payload(args: Dict[str, Any]) -> Dict[str, A
         line = {"product_id": pid, "quantity": qty}
         if item.get("description"):
             line["description"] = item.get("description")
+        extra: Dict[str, Any] = {}
+        for key in (
+            "lot_code",
+            "manufacturing_date",
+            "expiry_date",
+            "variant_id",
+            "lot_allocations",
+            "selected_instance_ids",
+            "allow_expired_lot_sale",
+        ):
+            if item.get(key) is not None:
+                line[key] = item.get(key)
+                extra[key] = item.get(key)
+        if extra.get("selected_instance_ids") is not None:
+            extra["instance_ids"] = extra["selected_instance_ids"]
+            line["instance_ids"] = extra["selected_instance_ids"]
+        if extra:
+            line["extra_info"] = extra
         lines.append(line)
     wid = coerce_positive_int(raw.get("warehouse_id"))
     w_from = coerce_positive_int(raw.get("warehouse_id_from"))
@@ -1611,14 +1731,16 @@ def build_create_warehouse_document_payload(args: Dict[str, Any]) -> Dict[str, A
         w_to = w_to or w_from or wid
         if not w_to and not w_from:
             raise ValueError("برای تعدیل حداقل یک انبار لازم است.")
-    return {
+    payload: Dict[str, Any] = {
         "doc_type": doc_type,
-        "document_date": raw.get("document_date") or date.today().isoformat(),
         "warehouse_id_from": w_from,
         "warehouse_id_to": w_to,
         "description": raw.get("description"),
         "lines": lines,
     }
+    if raw.get("document_date"):
+        payload["document_date"] = raw.get("document_date")
+    return payload
 
 
 _WORKFLOW_STATUS_ALIASES = {
@@ -2522,6 +2644,10 @@ _PRODUCT_OPENING_BALANCE_SCHEMA: Dict[str, Any] = {
 }
 
 _PRODUCT_WRITE_FIELDS_SCHEMA: Dict[str, Any] = {
+    **{
+        key: {"type": ["string", "null"], "description": f"{label} (رشتهٔ اعشاری دقیق)"}
+        for key, label in MEASUREMENT_FIELDS.items()
+    },
     "item_type": {
         "type": "string",
         "enum": ["کالا", "خدمت"],
@@ -2571,6 +2697,28 @@ _PRODUCT_WRITE_FIELDS_SCHEMA: Dict[str, Any] = {
     "track_inventory": {
         "type": "boolean",
         "description": "کنترل موجودی انبار. برای خدمت باید false باشد.",
+    },
+    "track_expiry": {
+        "type": "boolean",
+        "description": "ردیابی تاریخ تولید و انقضا. فقط با track_inventory=true.",
+    },
+    "lot_policy": {
+        "type": "string",
+        "enum": ["optional", "required"],
+        "description": "optional=لات اختیاری، required=لات اجباری",
+    },
+    "shelf_life_days": {"type": "integer", "description": "عمر مفید از تاریخ تولید به روز"},
+    "alert_offset_days": {"type": "integer", "description": "هشدار چند روز مانده به انقضا"},
+    "removal_offset_days": {"type": "integer", "description": "خروج از قفسه چند روز مانده به انقضا"},
+    "best_before_offset_days": {"type": "integer", "description": "بهترین مصرف چند روز مانده به انقضا"},
+    "expired_sale_policy": {
+        "type": "string",
+        "enum": ["block", "manager_confirm"],
+        "description": "block=ممنوع، manager_confirm=با تأیید مدیر",
+    },
+    "min_remaining_shelf_life_days": {
+        "type": "integer",
+        "description": "حداقل روز مانده هنگام فروش",
     },
     "default_warehouse_id": {
         "type": "integer",
@@ -2827,10 +2975,18 @@ def _normalize_product_opening_balance(raw: Any) -> Optional[Dict[str, Any]]:
         payload["fiscal_year_id"] = int(raw["fiscal_year_id"])
     if "clear" in raw:
         payload["clear"] = bool(raw["clear"])
+    lot_code = raw.get("lot_code")
+    if lot_code not in (None, ""):
+        payload["lot_code"] = str(lot_code).strip()
+    for key in ("manufacturing_date", "expiry_date"):
+        val = raw.get(key)
+        if val not in (None, ""):
+            payload[key] = str(val).strip()[:10]
     return payload or None
 
 
 def _apply_product_write_fields(args: Dict[str, Any], payload: Dict[str, Any]) -> None:
+    payload.update((key, args[key]) for key in MEASUREMENT_FIELDS if key in args)
     if "item_type" in args:
         payload["item_type"] = normalize_product_item_type(args.get("item_type"))
     if "code" in args:
@@ -2862,6 +3018,11 @@ def _apply_product_write_fields(args: Dict[str, Any], payload: Dict[str, Any]) -
         "reorder_point",
         "min_order_qty",
         "lead_time_days",
+        "shelf_life_days",
+        "alert_offset_days",
+        "removal_offset_days",
+        "best_before_offset_days",
+        "min_remaining_shelf_life_days",
         "tax_type_id",
         "tax_unit_id",
     ):
@@ -2879,6 +3040,7 @@ def _apply_product_write_fields(args: Dict[str, Any], payload: Dict[str, Any]) -
     for key in (
         "auto_update_base_from_fx",
         "track_inventory",
+        "track_expiry",
         "track_serial",
         "track_barcode",
         "is_sales_taxable",
@@ -2889,6 +3051,10 @@ def _apply_product_write_fields(args: Dict[str, Any], payload: Dict[str, Any]) -
         _copy_optional_bool(args, payload, key)
     if "inventory_mode" in args:
         payload["inventory_mode"] = normalize_product_inventory_mode(args.get("inventory_mode"))
+    if "lot_policy" in args and args.get("lot_policy") is not None:
+        payload["lot_policy"] = str(args.get("lot_policy"))
+    if "expired_sale_policy" in args and args.get("expired_sale_policy") is not None:
+        payload["expired_sale_policy"] = str(args.get("expired_sale_policy"))
     if "attribute_ids" in args:
         payload["attribute_ids"] = _int_id_list(args.get("attribute_ids"), "attribute_ids") or []
     if "catalog_gallery_file_ids" in args:

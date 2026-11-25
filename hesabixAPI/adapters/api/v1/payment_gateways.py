@@ -18,7 +18,7 @@ router = APIRouter(prefix="/businesses/{business_id}/wallet", tags=["wallet"])
 @router.get(
 	"/gateways",
 	summary="لیست درگاه‌های فعال برای کسب‌وکار",
-	description="اگر برای کسب‌وکار خاص درگاه‌هایی تنظیم شده باشد، همان‌ها را برمی‌گرداند؛ در غیر این صورت همه درگاه‌های فعال سیستم.",
+	description="اگر برای کسب‌وکار درگاه اختصاصی باشد همان‌ها، وگرنه درگاه‌های فعال سیستم. ابزار MCP: `list_payment_gateways`.",
 )
 def list_business_gateways(
 	request: Request,

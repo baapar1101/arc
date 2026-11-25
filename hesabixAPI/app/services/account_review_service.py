@@ -152,6 +152,7 @@ def get_accounts_review_report(
                 and_(
                     Document.business_id == business_id,
                     Document.is_proforma == False,  # noqa: E712
+                    Document.document_type != "opening_balance",
                     DocumentLine.account_id == account_id,
                     Document.document_date >= date_from_obj,
                     Document.document_date <= date_to_obj,

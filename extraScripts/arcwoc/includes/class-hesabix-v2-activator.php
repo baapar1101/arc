@@ -161,6 +161,8 @@ class Hesabix_V2_Activator
 			'sync_order_on_checkout' => true,
 			'sync_order_on_payment_complete' => false,
 			'sync_order_on_statuses' => array('processing', 'completed'),
+			'sales_return_on_statuses' => array('cancelled', 'refunded'),
+			'sales_return_on_wc_refund' => true,
 			'finalize_proforma_on_paid' => true,
 			'finalize_proforma_order_statuses' => array('processing', 'completed'),
 			'invoice_is_proforma' => false,
@@ -181,6 +183,7 @@ class Hesabix_V2_Activator
 			'gateway_settlement_meta_key' => '_gateway_settlement_fee',
 			'order_fiscal_year_date_policy' => 'keep',
 			'queue_items_per_cron_run' => 15,
+			'product_variation_mode' => 'legacy',
 		);
 
 		if (!get_option('hesabix_v2_sync_settings')) {

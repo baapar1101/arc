@@ -12,6 +12,26 @@ hesabix_require_deploy_env() {
   fi
 }
 
+# API process (typically www-data) must read branding keys from .deploy_env.
+# Keep owner root; allow the API group to read (640), not world.
+hesabix_secure_deploy_env_file() {
+  local file="${1:-${HESABIX_DEPLOY_ENV}}"
+  [[ -f "$file" ]] || return 0
+  local grp=""
+  if [[ -f "${APP_ROOT}/app/hesabixAPI/.env" ]]; then
+    grp="$(stat -c %G "${APP_ROOT}/app/hesabixAPI/.env" 2>/dev/null || true)"
+  fi
+  if [[ -z "$grp" ]] && getent group www-data >/dev/null 2>&1; then
+    grp="www-data"
+  fi
+  if [[ -n "$grp" ]]; then
+    chgrp "$grp" "$file" 2>/dev/null || true
+    chmod 640 "$file" 2>/dev/null || true
+  else
+    chmod 640 "$file" 2>/dev/null || true
+  fi
+}
+
 hesabix_load_deploy_env() {
   hesabix_require_deploy_env || return 1
   set -a
@@ -72,7 +92,11 @@ os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 with open(path, "w", encoding="utf-8") as f:
     f.writelines(out)
 PY
-  chmod 600 "${file}" 2>/dev/null || true
+  if [[ "$(basename "$file")" == ".deploy_env" ]]; then
+    hesabix_secure_deploy_env_file "$file"
+  else
+    chmod 600 "${file}" 2>/dev/null || true
+  fi
 }
 
 hesabix_validate_domain() {

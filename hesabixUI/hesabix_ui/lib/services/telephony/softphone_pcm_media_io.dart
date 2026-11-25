@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'softphone_pcm_media_stub.dart';
 import 'softphone_pcm_media_windows.dart';
+import 'telephony_l10n.dart';
 
 export 'softphone_pcm_media_stub.dart';
 
@@ -22,7 +23,8 @@ class IoSoftphonePcmMedia implements SoftphonePcmMedia {
   StreamSubscription<Uint8List>? _micSub;
   bool _ready = false;
   bool _mic = false;
-  static const int _bufferSize = 4096;
+  // ۲۰–۴۰ms @ 8kHz mono PCM16. مقدار قبلی ۴۰۹۶ بایت (~۲۵۶ms) تأخیر زیاد می‌ساخت.
+  static const int _bufferSize = 640;
 
   @override
   bool get isReady => _ready;
@@ -35,7 +37,7 @@ class IoSoftphonePcmMedia implements SoftphonePcmMedia {
     if (_ready) return;
     final mic = await Permission.microphone.request();
     if (!mic.isGranted) {
-      throw StateError('دسترسی میکروفون داده نشد');
+      throw StateError(telephonyL10n().telephonyMicDenied);
     }
     await _player.openPlayer();
     await _recorder.openRecorder();

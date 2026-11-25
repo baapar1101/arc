@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # اجرا با دسترسی root (ExecStartPre=! در hesabix-api.service)
-# ۱) systemctl daemon-reload — بعد از تغییر یونیت‌ها یا اسکریپت‌هایی مثل build_web
-# ۲) در صورت نبودن/خرابی وابستگی‌های Python، نصب از آینه‌ها مطابق deploy.sh
+# ۱) نصب postgresql-client نسخه‌دار اگر pg_dump فقط wrapper باشد (نصب‌های قبلی)
+# ۲) systemctl daemon-reload — بعد از تغییر یونیت‌ها یا اسکریپت‌هایی مثل build_web
+# ۳) در صورت نبودن/خرابی وابستگی‌های Python، نصب از آینه‌ها مطابق deploy.sh
+# ۴) اگر Alembic چند head داشته باشد، قبل از upgrade آن‌ها را merge می‌کند
 
 set -euo pipefail
 # systemd ممکن است PATH کوتاه بدهد؛ runuser در /usr/sbin است
@@ -22,6 +24,23 @@ if [[ -f "${ENSURE_SECRETS}" ]]; then
     log "ensure_api_production_secrets failed"
     exit 1
   fi
+fi
+
+# نصب postgresql-client نسخه‌دار روی نصب‌های قبلی (قبل از daemon-reload تا drop-in اعمال شود).
+# شکست apt API را پایین نمی‌آورد — بکاپ تا نصب موفق بسته کار نمی‌کند.
+ENSURE_PG_CLIENT=""
+for _pg_client_script in \
+  "${API_DIR}/../scripts/ensure_postgresql_client.sh" \
+  "${APP_ROOT}/app/scripts/ensure_postgresql_client.sh"; do
+  if [[ -f "${_pg_client_script}" ]]; then
+    ENSURE_PG_CLIENT="${_pg_client_script}"
+    break
+  fi
+done
+if [[ -n "${ENSURE_PG_CLIENT}" ]]; then
+  chmod +x "${ENSURE_PG_CLIENT}" 2>/dev/null || true
+  log "ensuring postgresql-client tools for pg_dump"
+  bash "${ENSURE_PG_CLIENT}" --nonfatal || log "ensure_postgresql_client skipped (non-fatal)"
 fi
 
 if ! command -v systemctl >/dev/null 2>&1; then
@@ -51,13 +70,6 @@ run_as_www() {
   fi
 }
 
-# همان مسیر import واقعی workerها
-if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>/dev/null; then
-  exit 0
-fi
-
-log "import app.main failed; attempting pip install -e . from Hesabix PyPI mirror..."
-
 set_pip_env_for_url() {
   local index_url="$1"
   export PIP_INDEX_URL="${index_url}"
@@ -70,39 +82,71 @@ set_pip_env_for_url() {
   fi
 }
 
-# میرور اصلی + آینه‌های چین (بدون تحریم) به‌عنوان fallback.
-CHINA_EXTRA="https://mirrors.aliyun.com/pypi/simple"
-MIRRORS=()
-if [[ -n "${PIP_INDEX_URL:-}" ]]; then
-  MIRRORS+=("${PIP_INDEX_URL}")
-else
-  MIRRORS+=("https://p.mirror.hesabix.ir/simple")
+# همان مسیر import واقعی workerها
+set +e
+import_err="$(run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>&1)"
+import_rc=$?
+set -e
+if [[ "${import_rc}" -ne 0 ]]; then
+  if grep -q "Production security validation failed" <<<"${import_err}"; then
+    log "app.main import failed due to production settings, not missing packages:"
+    log "${import_err}"
+    exit 1
+  fi
+
+  log "import app.main failed; attempting pip install -e . from Hesabix PyPI mirror..."
+  log "${import_err}"
+
+  # Sequential indexes only (no extra-index). A dead extra-index stalls every pip lookup.
+  MIRRORS=()
+  if [[ -n "${PIP_INDEX_URL:-}" ]]; then
+    MIRRORS+=("${PIP_INDEX_URL}")
+  fi
+  MIRRORS+=(
+    "https://pypi.org/simple"
+    "https://pypi.tuna.tsinghua.edu.cn/simple"
+    "https://mirrors.cloud.tencent.com/pypi/simple"
+    "https://p.mirror.hesabix.ir/simple"
+    "https://mirrors.aliyun.com/pypi/simple"
+  )
+
+  seen_mirrors=" "
+  for url in "${MIRRORS[@]}"; do
+    [[ -z "$url" ]] && continue
+    case "${seen_mirrors}" in *" ${url} "*) continue ;; esac
+    seen_mirrors+="${url} "
+    log "trying PyPI: $url"
+    set_pip_env_for_url "$url"
+    pip_env=(env -u PIP_EXTRA_INDEX_URL PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_DEFAULT_TIMEOUT=15)
+    pip_args=("$PIP" --isolated --disable-pip-version-check --timeout 15 --retries 2 install --index-url "$url")
+    if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
+      pip_env+=(PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}")
+      pip_args+=(--trusted-host "${PIP_TRUSTED_HOST}")
+    fi
+    if ! run_as_www "${pip_env[@]}" "${pip_args[@]}" --upgrade pip setuptools wheel \
+        || ! run_as_www "${pip_env[@]}" "${pip_args[@]}" -e "${API_DIR}"; then
+      continue
+    fi
+    if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main"; then
+      log "OK after install from $url"
+      import_rc=0
+      break
+    fi
+  done
+
+  if [[ "${import_rc}" -ne 0 ]]; then
+    log "could not fix Python dependencies or app.main still does not import"
+    exit 1
+  fi
 fi
-MIRRORS+=("${CHINA_EXTRA}")
-MIRRORS+=("https://mirrors.cloud.tencent.com/pypi/simple")
 
-seen_mirrors=" "
-for url in "${MIRRORS[@]}"; do
-  [[ -z "$url" ]] && continue
-  case "${seen_mirrors}" in *" ${url} "*) continue ;; esac
-  seen_mirrors+="${url} "
-  log "trying PyPI: $url"
-  set_pip_env_for_url "$url"
-  extra="${CHINA_EXTRA}"
-  [[ "$url" == "${CHINA_EXTRA}" ]] && extra="https://mirrors.cloud.tencent.com/pypi/simple"
-  pip_env=(env PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_EXTRA_INDEX_URL="${extra}")
-  if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
-    pip_env+=(PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}")
-  fi
-  if ! run_as_www "${pip_env[@]}" "$PIP" install --upgrade pip setuptools wheel \
-      || ! run_as_www "${pip_env[@]}" "$PIP" install -e "${API_DIR}"; then
-    continue
-  fi
-  if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main"; then
-    log "OK after install from $url"
-    exit 0
-  fi
-done
-
-log "could not fix Python dependencies or app.main still does not import"
-exit 1
+# Root can write merge revisions; the next ExecStartPre (`upgrade head`) runs as www-data.
+log "ensuring a single Alembic head"
+if ! env PYTHONPATH="${API_DIR}" "$VENV_PY" "${API_DIR}/scripts/check_migration_branches.py"; then
+  log "failed to auto-merge Alembic heads"
+  exit 1
+fi
+if id -u www-data >/dev/null 2>&1; then
+  chown -R www-data:www-data "${API_DIR}/migrations/versions" 2>/dev/null || true
+fi
+exit 0

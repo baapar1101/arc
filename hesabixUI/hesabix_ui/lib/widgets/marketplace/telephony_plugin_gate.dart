@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/business_nav.dart';
 import '../../services/marketplace_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// نمایش محتوا فقط وقتی افزونه استریسک/ایزابل فعال است.
 class TelephonyPluginGate extends StatefulWidget {
@@ -60,13 +61,14 @@ class _TelephonyPluginGateState extends State<TelephonyPluginGate> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (!_active) {
       return Scaffold(
-        appBar: AppBar(title: const Text('مرکز تماس')),
+        appBar: AppBar(title: Text(t.telephonyMenu)),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
@@ -91,13 +93,13 @@ class _TelephonyPluginGateState extends State<TelephonyPluginGate> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'افزونه اتصال به استریسک و ایزابل فعال نیست',
+                    t.telephonyPluginInactiveTitle,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'برای Screen Pop، Click-to-Call و تاریخچه تماس، این افزونه را از بازار افزونه‌ها فعال کنید.',
+                    t.telephonyPluginInactiveBody,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
@@ -105,7 +107,7 @@ class _TelephonyPluginGateState extends State<TelephonyPluginGate> {
                   FilledButton.icon(
                     onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'plugin-marketplace')),
                     icon: const Icon(Icons.storefront_outlined),
-                    label: const Text('بازار افزونه‌ها'),
+                    label: Text(t.pluginMarketplace),
                   ),
                 ],
               ),

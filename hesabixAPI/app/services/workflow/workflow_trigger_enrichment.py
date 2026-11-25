@@ -18,6 +18,17 @@ logger = logging.getLogger(__name__)
 
 DOCUMENT_TYPES_RECEIPT_PAYMENT = frozenset({"receipt", "payment"})
 
+_DOCUMENT_TYPE_LABELS = {
+    "expense": "هزینه",
+    "income": "درآمد",
+    "receipt": "دریافت",
+    "payment": "پرداخت",
+    "transfer": "انتقال",
+    "manual": "دستی",
+    "opening_balance": "تراز افتتاحیه",
+    "year_end_closing": "سربندی سال",
+}
+
 
 def _to_decimal(value: Any) -> Decimal:
     if value is None:
@@ -108,6 +119,13 @@ def build_receipt_payment_trigger_enrichment(
 
     if primary_person_id is not None:
         out["person_id"] = primary_person_id
+        from adapters.db.models.person import Person
+
+        person = db.query(Person).filter(Person.id == primary_person_id).first()
+        if person is not None:
+            person_name = person_display_name(person.alias_name, person.first_name, person.last_name)
+            if person_name:
+                out["person_name"] = person_name
     if primary_account_id is not None:
         out["account_id"] = primary_account_id
     if primary_method is not None:
@@ -156,9 +174,11 @@ def build_document_trigger_enrichment(
     if not item_line_accounts:
         item_line_accounts = [int(l.account_id) for l in lines if l.account_id]
 
+    doc_type = str(doc.document_type)
     out: Dict[str, Any] = {
         "document_id": int(doc.id),
-        "document_type": str(doc.document_type),
+        "document_type": doc_type,
+        "document_type_label": _DOCUMENT_TYPE_LABELS.get(doc_type, doc_type),
         "fiscal_year_id": int(doc.fiscal_year_id),
         "currency_id": int(doc.currency_id),
         "created_by_user_id": int(doc.created_by_user_id),
@@ -175,8 +195,34 @@ def build_document_trigger_enrichment(
 
     if person_ids:
         out["person_id"] = min(person_ids)
+        from adapters.db.models.person import Person
+
+        person = db.query(Person).filter(Person.id == int(out["person_id"])).first()
+        if person is not None:
+            party_name = person_display_name(person.alias_name, person.first_name, person.last_name)
+            if party_name:
+                out["person_name"] = party_name
 
     return {k: v for k, v in out.items() if v is not None and v != ""}
+
+
+def person_display_name(
+    alias_name: Optional[str],
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+) -> str:
+    """نام قابل نمایش شخص: نام مستعار، وگرنه نام و نام خانوادگی."""
+    alias = (alias_name or "").strip()
+    if alias:
+        return alias
+    parts = [(first_name or "").strip(), (last_name or "").strip()]
+    return " ".join(part for part in parts if part)
+
+
+def crm_chat_visitor_name(first_name: Optional[str], last_name: Optional[str]) -> str:
+    """نام نمایشی بازدیدکننده برای قالب‌هایی که visitor_name می‌خواهند."""
+    parts = [(first_name or "").strip(), (last_name or "").strip()]
+    return " ".join(part for part in parts if part)
 
 
 def build_crm_chat_visitor_message_trigger_enrichment(
@@ -191,6 +237,7 @@ def build_crm_chat_visitor_message_trigger_enrichment(
     return {
         "visitor_first_name": c.visitor_first_name,
         "visitor_last_name": c.visitor_last_name,
+        "visitor_name": crm_chat_visitor_name(c.visitor_first_name, c.visitor_last_name),
         "visitor_email": c.visitor_email or "",
         "visitor_phone": c.visitor_phone,
         "conversation_status": c.status,

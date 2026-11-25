@@ -44,9 +44,13 @@ def create_attribute(db: Session, business_id: int, payload: ProductAttributeCre
         data_type=data_type,
         options=options_dict
     )
+    if data_type == "select" and options:
+        from app.services.product_attribute_option_service import sync_select_options
+
+        sync_select_options(db, obj, options)
     return {
         "message": "ویژگی با موفقیت ایجاد شد",
-        "data": _to_dict(obj),
+        "data": _to_dict(obj, db),
     }
 
 
@@ -69,8 +73,14 @@ def list_attributes(db: Session, business_id: int, query: Dict[str, Any]) -> Dic
         search=search,
         filters=filters,
     )
+    from app.services.product_attribute_option_service import list_option_items
+
     for item in result.get("items", []):
         item["options"] = _options_raw_to_api_list(item.get("options"))
+        try:
+            item["option_items"] = list_option_items(db, int(item["id"]), business_id)
+        except Exception:
+            item["option_items"] = []
     return result
 
 
@@ -78,7 +88,7 @@ def get_attribute(db: Session, attribute_id: int, business_id: int) -> Optional[
     obj = db.get(ProductAttribute, attribute_id)
     if not obj or obj.business_id != business_id:
         return None
-    return _to_dict(obj)
+    return _to_dict(obj, db)
 
 
 def update_attribute(db: Session, attribute_id: int, business_id: int, payload: ProductAttributeUpdateRequest) -> Optional[Dict[str, Any]]:
@@ -125,9 +135,15 @@ def update_attribute(db: Session, attribute_id: int, business_id: int, payload: 
     )
     if not updated:
         return None
+    if (updated.data_type or "text") == "select":
+        from app.services.product_attribute_option_service import labels_from_options_json, sync_select_options
+
+        labels = payload.options if isinstance(payload.options, list) else labels_from_options_json(updated.options)
+        if labels:
+            sync_select_options(db, updated, labels)
     return {
         "message": "ویژگی با موفقیت ویرایش شد",
-        "data": _to_dict(updated),
+        "data": _to_dict(updated, db),
     }
 
 
@@ -153,8 +169,13 @@ def _options_raw_to_api_list(raw: Any) -> Optional[list]:
     return None
 
 
-def _to_dict(obj: ProductAttribute) -> Dict[str, Any]:
+def _to_dict(obj: ProductAttribute, db: Optional[Session] = None) -> Dict[str, Any]:
     options_list = _options_raw_to_api_list(getattr(obj, "options", None))
+    option_items = []
+    if db is not None:
+        from app.services.product_attribute_option_service import list_option_items
+
+        option_items = list_option_items(db, int(obj.id), int(obj.business_id))
 
     return {
         "id": obj.id,
@@ -163,6 +184,7 @@ def _to_dict(obj: ProductAttribute) -> Dict[str, Any]:
         "description": obj.description,
         "data_type": getattr(obj, 'data_type', 'text'),
         "options": options_list,
+        "option_items": option_items,
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

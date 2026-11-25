@@ -39,6 +39,25 @@ WORKFLOW_EXTENSION_EVENT_CODES: frozenset[str] = frozenset(
 )
 
 INVOICE_SHARE_LINK_EVENT_CODES: frozenset[str] = frozenset({"invoice_share_link"})
+PAY_LINK_RECEIVED_EVENT_CODES: frozenset[str] = frozenset({"pay_link.received"})
+OFFICE_AUTOMATION_EVENT_CODES: frozenset[str] = frozenset(
+	{
+		"office_automation.letter_referred",
+		"office_automation.letter_returned",
+		"office_automation.letter_dispatched",
+		"office_automation.letter_followup_due",
+		"office_automation.letter_signed",
+	}
+)
+INVENTORY_EXPIRY_EVENT_CODES: frozenset[str] = frozenset({"inventory.expires_soon"})
+
+PAY_LINK_RECEIVED_TEMPLATE_VARIABLES: list[dict[str, str]] = [
+    {"key": "payer_name", "type": "string", "description": "نام واریزکننده"},
+    {"key": "amount", "type": "number", "description": "مبلغ واریز"},
+    {"key": "date_time", "type": "string", "description": "تاریخ و ساعت واریز"},
+    {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+    {"key": "username", "type": "string", "description": "نام کاربری لینک واریز"},
+]
 
 NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
     {
@@ -292,6 +311,38 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
 
 {{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "کمبود موجودی — {{ business_name }}",
+        "is_active": True,
+        "requires_approval": True,
+    },
+    {
+        "code": "inventory.expires_soon",
+        "name": "هشدار نزدیک به انقضا",
+        "description": "وقتی لات کالا به تاریخ هشدار یا انقضا برسد — «inventory.expires_soon».",
+        "category": "warehouse",
+        "available_variables": [
+            {"key": "product_id", "type": "number", "description": "شناسه کالا"},
+            {"key": "product_name", "type": "string", "description": "نام کالا"},
+            {"key": "lot_code", "type": "string", "description": "کد لات"},
+            {"key": "manufacturing_date", "type": "date", "description": "تاریخ تولید"},
+            {"key": "expiry_date", "type": "date", "description": "تاریخ انقضا"},
+            {"key": "remaining_days", "type": "number", "description": "روز مانده تا انقضا"},
+            {"key": "quantity_main", "type": "number", "description": "مقدار در واحد اصلی"},
+            {"key": "status", "type": "string", "description": "وضعیت لات"},
+            {"key": "warehouse_id", "type": "number", "description": "شناسه انبار"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "هشدار انقضا: {{ product_name }} لات {{ lot_code }} تا {{ remaining_days | format_number }} روز دیگر منقضی می‌شود. {{ business_name }}",
+        "default_email_template": """هشدار نزدیک به انقضا
+
+کالا: {{ product_name }}
+لات: {{ lot_code }}
+تاریخ تولید: {{ manufacturing_date | format_date }}
+تاریخ انقضا: {{ expiry_date | format_date }}
+مانده: {{ remaining_days | format_number }} روز
+مقدار: {{ quantity_main | format_number }}
+
+{{ business_name }}""",
+        "default_email_subject": "نزدیک به انقضا — {{ product_name }}",
         "is_active": True,
         "requires_approval": True,
     },
@@ -559,6 +610,28 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "requires_approval": True,
     },
     {
+        "code": "pay_link.received",
+        "name": "واریز از لینک پرداخت کسب‌وکار",
+        "description": "اعلان مالک پس از واریز موفق از صفحه عمومی /u/{username}",
+        "category": "sales",
+        "available_variables": list(PAY_LINK_RECEIVED_TEMPLATE_VARIABLES),
+        "default_sms_template": (
+            "واریز {{ amount }} توسط {{ payer_name }} در {{ date_time }} "
+            "از لینک {{ username }} — {{ business_name }}"
+        ),
+        "default_email_template": """واریز جدید از لینک پرداخت
+
+مبلغ: {{ amount }}
+واریزکننده: {{ payer_name }}
+تاریخ: {{ date_time }}
+لینک: {{ username }}
+
+{{ business_name }}""",
+        "default_email_subject": "واریز جدید از لینک پرداخت — {{ business_name }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
         "code": "payroll.run.finalized",
         "name": "قطعی‌سازی اجرای حقوق",
         "description": "پس از قطعی‌سازی سند حقوق ماهانه",
@@ -593,7 +666,147 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "is_active": True,
         "requires_approval": False,
     },
+    {
+        "code": "office_automation.letter_referred",
+        "name": "ارجاع نامه اتوماسیون اداری",
+        "description": "پس از ارجاع نامه به کارتابل سمت",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما ارجاع شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما ارجاع شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "ارجاع نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_returned",
+        "name": "عودت نامه اتوماسیون اداری",
+        "description": "پس از عودت ارجاع نامه به سمت فرستنده",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما عودت شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما عودت شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "عودت نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_dispatched",
+        "name": "ابلاغ نامه اتوماسیون اداری",
+        "description": "پس از ابلاغ نامه به سمت مخاطب",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به شما ابلاغ شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به شما ابلاغ شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "ابلاغ نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_followup_due",
+        "name": "سررسید پیگیری نامه",
+        "description": "هشدار سررسید تاریخ پیگیری نامه",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "پیگیری نامه «{{ subject }}» با شماره {{ number }} امروز سررسید شده است. {{ business_name }}",
+        "default_email_template": "پیگیری نامه «{{ subject }}» با شماره {{ number }} امروز سررسید شده است.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "سررسید پیگیری نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_signed",
+        "name": "امضای نامه اتوماسیون اداری",
+        "description": "پس از امضای یک مرحله از مسیر امضا",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} امضا شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} امضا شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "امضای نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "procurement.requisition.approved",
+        "name": "تأیید درخواست خرید",
+        "description": "پس از تأیید نهایی درخواست خرید",
+        "category": "procurement",
+        "available_variables": [
+            {"key": "code", "type": "string", "description": "شماره درخواست"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "درخواست خرید {{ code }} تأیید شد. {{ business_name }}",
+        "default_email_template": "درخواست خرید {{ code }} تأیید شد.\n\n{{ business_name }}",
+        "default_email_subject": "تأیید درخواست خرید — {{ code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "procurement.order.approved",
+        "name": "تأیید سفارش خرید",
+        "description": "پس از تأیید سفارش خرید",
+        "category": "procurement",
+        "available_variables": [
+            {"key": "code", "type": "string", "description": "شماره سفارش"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "سفارش خرید {{ code }} تأیید شد. {{ business_name }}",
+        "default_email_template": "سفارش خرید {{ code }} تأیید شد.\n\n{{ business_name }}",
+        "default_email_subject": "تأیید سفارش خرید — {{ code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "procurement.contract.expiring",
+        "name": "نزدیک شدن انقضای قرارداد تأمین",
+        "description": "وقتی قرارداد فعال در ۳۰ روز آینده تمام می‌شود",
+        "category": "procurement",
+        "available_variables": [
+            {"key": "code", "type": "string", "description": "شماره قرارداد"},
+            {"key": "end_date", "type": "string", "description": "تاریخ پایان"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "قرارداد {{ code }} در تاریخ {{ end_date }} تمام می‌شود. {{ business_name }}",
+        "default_email_template": "قرارداد {{ code }} در تاریخ {{ end_date }} به پایان می‌رسد.\n\n{{ business_name }}",
+        "default_email_subject": "انقضای قرارداد تأمین — {{ code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
 ]
+
+
+PROCUREMENT_EVENT_CODES: frozenset[str] = frozenset(
+    {
+        "procurement.requisition.approved",
+        "procurement.order.approved",
+        "procurement.contract.expiring",
+    }
+)
 
 
 def event_type_row_by_code(code: str) -> dict | None:

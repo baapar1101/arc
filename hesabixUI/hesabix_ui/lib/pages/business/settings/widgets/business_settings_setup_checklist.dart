@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../../../theme/tokens/extensions.dart';
 import '../../../system_settings/models/settings_item.dart';
 import '../business_settings_layout.dart';
 import 'business_settings_card.dart';
@@ -18,14 +19,15 @@ class BusinessSettingsSetupChecklist extends StatelessWidget {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final hub = context.settingsHub;
     final t = AppLocalizations.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: hub.setupMargin,
+      padding: hub.setupPadding,
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(hub.categoryRadius),
         border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
       ),
       child: Column(
@@ -33,29 +35,35 @@ class BusinessSettingsSetupChecklist extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.rocket_launch_outlined, color: colorScheme.primary, size: 20),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.rocket_launch_outlined,
+                color: colorScheme.primary,
+                size: hub.setupIconSize,
+              ),
+              SizedBox(width: hub.cardIconGap),
               Expanded(
                 child: Text(
                   t.businessSettingsSetupTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+                  style: hub.listTitleStyle(
+                    theme.textTheme,
                     color: colorScheme.onSurface,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: hub.setupTitleGap),
           Text(
             t.businessSettingsSetupDescription,
-            style: theme.textTheme.bodySmall?.copyWith(
+            style: hub.cardSubtitleStyle(
+              theme.textTheme,
               color: colorScheme.onSurface.withValues(alpha: 0.7),
-              height: 1.35,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 12),
-          BusinessSettingsLayout.buildTwoColumnGrid(
+          SizedBox(height: hub.listTitleGap),
+          BusinessSettingsLayout.buildResponsiveGrid(
             context: context,
             children: items
                 .map(

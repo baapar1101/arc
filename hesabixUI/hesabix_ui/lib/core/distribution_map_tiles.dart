@@ -13,9 +13,11 @@ class DistributionMapTileConfig {
 
   factory DistributionMapTileConfig.fromSettings(Map<String, dynamic>? settings) {
     final raw = (settings?['map_tile_source'] ?? sourceOsm).toString().trim().toLowerCase();
+    final key = (settings?['memaps_api_key'] ?? '').toString().trim();
+    final wantMemaps = raw == sourceMemaps;
     return DistributionMapTileConfig(
-      source: raw == sourceMemaps ? sourceMemaps : sourceOsm,
-      memapsApiKey: (settings?['memaps_api_key'] ?? '').toString().trim(),
+      source: wantMemaps && key.isNotEmpty ? sourceMemaps : sourceOsm,
+      memapsApiKey: key,
     );
   }
 

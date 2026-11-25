@@ -133,6 +133,19 @@ def assert_tokens_not_used_by_unique_instances(
             "این بارکد برای واحد یک کالای یونیک ثبت شده است؛ ابتدا آن را اصلاح کنید",
             http_status=409,
         )
+    from adapters.db.models.product_variant import ProductVariant
+
+    vq = db.query(ProductVariant.id).filter(
+        ProductVariant.business_id == business_id,
+        ProductVariant.barcode.isnot(None),
+        func.lower(ProductVariant.barcode).in_(norms),
+    )
+    if vq.first() is not None:
+        raise ApiError(
+            "GENERAL_BARCODE_CONFLICTS_WITH_VARIANT",
+            "این بارکد برای ترکیب ویژگی کالا ثبت شده است",
+            http_status=409,
+        )
 
 
 def replace_general_barcode_aliases(

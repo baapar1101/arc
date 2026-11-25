@@ -72,6 +72,45 @@ def _load_config(gw: PaymentGateway) -> Dict[str, Any]:
 		return {}
 
 
+def persist_gateway_verify_on_tx(
+	tx: WalletTransaction | None,
+	extra: Dict[str, Any] | None,
+	*,
+	card_num: Any = None,
+	ref_id: Any = None,
+	factor_id: Any = None,
+	extra_fields: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+	"""شماره کارت و پیگیری درگاه را روی extra_info تراکنش نگه می‌دارد تا مالک بتواند واریز را تطبیق دهد."""
+	ex = extra if isinstance(extra, dict) else {}
+	card = str(card_num).strip() if card_num not in (None, "") else ""
+	ref = str(ref_id).strip() if ref_id not in (None, "") else ""
+	factor = str(factor_id).strip() if factor_id not in (None, "") else ""
+	if card:
+		ex["card_num"] = card
+	if ref:
+		ex["gateway_ref_id"] = ref
+	if factor:
+		ex["factor_id"] = factor
+	verify = dict(ex.get("gateway_verify") or {}) if isinstance(ex.get("gateway_verify"), dict) else {}
+	if extra_fields:
+		for key, value in extra_fields.items():
+			if value is None or str(value).strip() == "":
+				continue
+			verify[str(key)] = value
+	if card:
+		verify["card_num"] = card
+	if ref:
+		verify["ref_id"] = ref
+	if factor:
+		verify["factor_id"] = factor
+	if verify:
+		ex["gateway_verify"] = verify
+	if tx is not None:
+		tx.extra_info = json.dumps(ex, ensure_ascii=False)
+	return ex
+
+
 def _get_gateway_or_error(db: Session, gateway_id: int) -> PaymentGateway:
 	gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first()
 	if not gw:
@@ -218,6 +257,7 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 	ref_id = None
 	success = False
 	tx = None
+	extra: Dict[str, Any] = {}
 	if tx_id > 0:
 		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	if tx_id > 0 and is_ok and tx:
@@ -227,6 +267,7 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 			extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
 			gateway_id = extra.get("gateway_id")
 		except Exception:
+			extra = {}
 			gateway_id = None
 		gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
 		if gw:
@@ -249,6 +290,19 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 						ref_id = (d_data or {}).get("ref_id")
 						fee_amount = (d_data or {}).get("fee")
 						success = int(code or -1) in (100, 101)
+						if isinstance(d_data, dict):
+							persist_gateway_verify_on_tx(
+								tx,
+								extra,
+								card_num=d_data.get("card_pan") or d_data.get("card_num"),
+								ref_id=ref_id,
+								extra_fields={
+									"authority": authority,
+									"card_hash": d_data.get("card_hash"),
+									"fee": d_data.get("fee"),
+									"verify_code": code,
+								},
+							)
 				except Exception:
 					success = False
 	# Confirm or fail based on verify (or status fallback)
@@ -389,16 +443,22 @@ def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 				if confirm.rrn:
 					ref_id = confirm.rrn
 				card_num = confirm.card_number
-				if extra is not None:
-					extra["parsian_confirm_status"] = confirm.status
-					if confirm.rrn:
-						extra["parsian_rrn"] = confirm.rrn
-					if confirm.card_number:
-						extra["parsian_card"] = confirm.card_number
-					if tx:
-						tx.extra_info = json.dumps(extra, ensure_ascii=False)
+				extra["parsian_confirm_status"] = confirm.status
+				if confirm.rrn:
+					extra["parsian_rrn"] = confirm.rrn
+				if confirm.card_number:
+					extra["parsian_card"] = confirm.card_number
 		elif paid_at_bank and gw is None and is_test_token(token):
 			success = True
+		if not card_num:
+			card_num = params.get("CardNumberMasked") or params.get("cardnumber") or params.get("CardNumber")
+		persist_gateway_verify_on_tx(
+			tx,
+			extra,
+			card_num=card_num,
+			ref_id=ref_id,
+			extra_fields={"parsian_status": extra.get("parsian_confirm_status"), "token": token, "callback_status": cb_status},
+		)
 		confirm_top_up(db, tx_id, success=success, external_ref=(str(ref_id) if ref_id else token) or None, user_id=user_id)
 	amount_out = 0.0
 	if tx is not None:
@@ -639,6 +699,7 @@ def _verify_bitpay(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 	amount = None
 	card_num = None
 	factor_id = None
+	status = None
 	try:
 		with httpx.Client(timeout=10.0) as client:
 			# ارسال به صورت form data
@@ -677,7 +738,15 @@ def _verify_bitpay(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 			extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
 			user_id = extra.get("created_by_user_id")
 		except Exception:
-			pass
+			extra = {}
+		persist_gateway_verify_on_tx(
+			tx,
+			extra,
+			card_num=card_num,
+			ref_id=id_get,
+			factor_id=factor_id,
+			extra_fields={"trans_id": trans_id, "status": status},
+		)
 		# به‌روزرسانی fee_amount در صورت وجود (BitPay معمولاً fee را برنمی‌گرداند)
 		confirm_top_up(db, tx_id, success=success, external_ref=id_get, user_id=user_id)
 	if amount is None and tx is not None:

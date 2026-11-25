@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
 import '../../services/system_settings_service.dart';
 import '../../services/currency_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class ZohalSettingsPage extends StatefulWidget {
   const ZohalSettingsPage({super.key});
@@ -89,15 +90,14 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
         lowBalanceThreshold: double.tryParse(_lowBalanceThresholdController.text.trim()),
       );
       if (mounted) {
-        final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: 'تنظیمات با موفقیت ذخیره شد');
+        SnackBarHelper.show(context, message: adminTx(context, 'ذخیره شد', 'Saved'));
         _load(); // Reload to get updated values
       }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+          message: '${adminTx(context, 'ذخیره نشد', 'Could not save')}: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
@@ -109,21 +109,27 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('تنظیمات سرویس زحل'),
-        actions: [
-          if (!_loading)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _load,
-              tooltip: 'بارگذاری مجدد',
-            ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'تنظیمات زحل', 'Zohal settings'),
+      subtitle: adminTx(context, 'اتصال و کلید سرویس زحل', 'Zohal connection and key'),
+      actions: [
+        if (!_loading)
+          IconButton(
+            tooltip: adminTx(context, 'ذخیره', 'Save'),
+            onPressed: _saving ? null : _save,
+            icon: _saving
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.save_outlined, size: 20),
+          ),
+        if (!_loading)
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: _load,
+            tooltip: adminTx(context, 'بارگذاری مجدد', 'Reload'),
+          ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -138,13 +144,13 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                       ElevatedButton.icon(
                         onPressed: _load,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('تلاش مجدد'),
+                        label: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
                       ),
                     ],
                   ),
                 )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: context.settingsHub.pagePadding,
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -161,33 +167,31 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                                     Icon(Icons.key, color: theme.colorScheme.primary),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'کلید API',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      adminTx(context, 'کلید API', 'API key'),
+                                      style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _apiKeyController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'کلید API زحل',
-                                    hintText: 'کلید API خود را وارد کنید',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.vpn_key),
+                                  decoration: InputDecoration(
+                                    labelText: adminTx(context, 'کلید API زحل', 'Zohal API key'),
+                                    border: const OutlineInputBorder(),
+                                    isDense: true,
+                                    prefixIcon: const Icon(Icons.vpn_key),
                                   ),
                                   obscureText: true,
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
-                                      return 'کلید API الزامی است';
+                                      return adminTx(context, 'کلید API الزامی است', 'API key is required');
                                     }
                                     return null;
                                   },
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'کلید API را از پنل زحل دریافت کنید',
+                                  adminTx(context, 'کلید را از پنل زحل بگیرید', 'Copy the key from the Zohal panel'),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
@@ -208,29 +212,28 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                                     Icon(Icons.link, color: theme.colorScheme.primary),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'آدرس پایه API',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      adminTx(context, 'آدرس پایه', 'Base URL'),
+                                      style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _baseUrlController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'آدرس پایه API',
+                                  decoration: InputDecoration(
+                                    labelText: adminTx(context, 'آدرس پایه API', 'API base URL'),
                                     hintText: 'https://service.zohal.io/api/v0',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.http),
+                                    border: const OutlineInputBorder(),
+                                    isDense: true,
+                                    prefixIcon: const Icon(Icons.http),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
-                                      return 'آدرس پایه API الزامی است';
+                                      return adminTx(context, 'آدرس پایه الزامی است', 'Base URL is required');
                                     }
                                     final uri = Uri.tryParse(value.trim());
                                     if (uri == null || !uri.hasAbsolutePath) {
-                                      return 'آدرس معتبر نیست';
+                                      return adminTx(context, 'آدرس معتبر نیست', 'Invalid URL');
                                     }
                                     return null;
                                   },
@@ -251,10 +254,8 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                                     Icon(Icons.warning_amber, color: theme.colorScheme.primary),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'آستانه موجودی کم',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      adminTx(context, 'آستانه موجودی کم', 'Low balance threshold'),
+                                      style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                                     ),
                                   ],
                                 ),
@@ -262,7 +263,7 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                                 TextFormField(
                                   controller: _lowBalanceThresholdController,
                                   decoration: InputDecoration(
-                                    labelText: 'آستانه موجودی کم (${_walletCurrencyTitle ?? 'تومان'})',
+                                    labelText: adminTx(context, 'آستانه', 'Threshold') + ' (${_walletCurrencyTitle ?? adminTx(context, 'تومان', 'IRR')})',
                                     hintText: '10000',
                                     border: const OutlineInputBorder(),
                                     prefixIcon: const Icon(Icons.account_balance_wallet),
@@ -270,18 +271,18 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                                   keyboardType: TextInputType.number,
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
-                                      return 'آستانه موجودی الزامی است';
+                                      return adminTx(context, 'آستانه الزامی است', 'Threshold is required');
                                     }
                                     final num = double.tryParse(value.trim());
                                     if (num == null || num < 0) {
-                                      return 'مقدار معتبر وارد کنید';
+                                      return adminTx(context, 'مقدار معتبر نیست', 'Invalid value');
                                     }
                                     return null;
                                   },
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'اگر موجودی کیف پول کمتر از این مقدار (${_walletCurrencyTitle ?? 'تومان'}) باشد، به کاربر اخطار نمایش داده می‌شود',
+                                  adminTx(context, 'کمتر از این مبلغ به کاربر هشدار داده می‌شود', 'Users are warned when the wallet is below this amount'),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
@@ -300,7 +301,7 @@ class _ZohalSettingsPageState extends State<ZohalSettingsPage> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.save),
-                          label: Text(_saving ? 'در حال ذخیره...' : 'ذخیره تنظیمات'),
+                          label: Text(_saving ? adminTx(context, 'در حال ذخیره', 'Saving') : adminTx(context, 'ذخیره', 'Save')),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),

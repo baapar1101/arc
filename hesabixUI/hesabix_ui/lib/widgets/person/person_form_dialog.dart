@@ -25,6 +25,8 @@ class PersonFormDialog extends StatefulWidget {
   final Person? person; // null برای افزودن، مقدار برای ویرایش
   final VoidCallback? onSuccess;
   final String? initialAliasName; // مقدار اولیه برای نام مستعار
+  /// شماره موبایل از پیش‌پر شده (مثلاً تماس‌گیرنده در Screen Pop).
+  final String? initialMobile;
   /// انواع پیش‌فرض شخص هنگام افزودن (مثلاً کارمند از combobox حقوق).
   final List<PersonType>? initialPersonTypes;
 
@@ -34,6 +36,7 @@ class PersonFormDialog extends StatefulWidget {
     this.person,
     this.onSuccess,
     this.initialAliasName,
+    this.initialMobile,
     this.initialPersonTypes,
   });
 
@@ -231,6 +234,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       if (widget.initialAliasName != null && widget.initialAliasName!.isNotEmpty) {
         // اگر مقدار اولیه برای نام مستعار داریم
         _aliasNameController.text = widget.initialAliasName!;
+      }
+      final initialMobile = widget.initialMobile?.trim() ?? '';
+      if (initialMobile.isNotEmpty) {
+        _mobileController.text = initialMobile;
       }
       _namePrefixSelection = '';
       _legalEntityType = 'natural';

@@ -5,6 +5,7 @@
 import pytest
 from unittest.mock import Mock
 from app.core.auth_dependency import AuthContext
+from app.core.permissions import user_can_confirm_expired_sale_from_permissions
 from adapters.db.models.user import User
 
 
@@ -241,6 +242,15 @@ class TestPermissionDecorators:
         
         # این تست نیاز به mock کردن get_current_user دارد
         pass
+
+
+def test_confirm_expired_sale_permission_defaults_closed():
+    assert user_can_confirm_expired_sale_from_permissions(None) is False
+    assert user_can_confirm_expired_sale_from_permissions({}) is False
+    assert user_can_confirm_expired_sale_from_permissions({"invoices": {"add": True}}) is False
+    assert user_can_confirm_expired_sale_from_permissions(
+        {"invoices": {"confirm_expired_sale": True}}
+    ) is True
 
 
 if __name__ == "__main__":

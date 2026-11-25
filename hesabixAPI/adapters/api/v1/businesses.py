@@ -60,7 +60,7 @@ router = APIRouter(prefix="/businesses", tags=["کسب‌وکارها"])
 
 @router.post("", 
     summary="ایجاد کسب و کار جدید", 
-    description="ایجاد کسب و کار جدید برای کاربر جاری",
+    description="ایجاد کسب‌وکار در حساب شخصی است و در MCP کسب‌وکار متصل ثبت نشده. نشست: `get_business_info`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -188,7 +188,7 @@ def _normalize_business_field(value: Any) -> BusinessField:
 
 @router.post("/import-from-backup",
     summary="ایجاد کسب و کار جدید از فایل پشتیبان",
-    description="ایجاد کسب و کار جدید از فایل پشتیبان (.hbx). فایل‌های .hs60 در حال حاضر پشتیبانی نمی‌شوند.",
+    description="آپلود باینری ZIP/.hbx در حساب شخصی است و در MCP ثبت نشده.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -492,7 +492,7 @@ async def import_business_from_backup(
 @router.post(
     "/import-from-legacy-api/preview",
     summary="پیش‌نمایش انتقال از نسخه قدیم (API)",
-    description="اعتبارسنجی کلید API و نمایش حجم داده‌های قابل انتقال از حسابیکس نسخه قدیم",
+    description="کلید API نسخه قدیم محرمانه است و در MCP ثبت نشده.",
     response_model=SuccessResponse,
 )
 def preview_import_from_legacy_api(
@@ -519,7 +519,7 @@ def preview_import_from_legacy_api(
 @router.post(
     "/import-from-legacy-api",
     summary="ایجاد کسب و کار از نسخه قدیم (API)",
-    description="دانلود آرشیو از سرور نسخه قدیم و ایجاد کسب‌وکار جدید در پنل کاربر",
+    description="کلید API و آرشیو مهاجرت محرمانه/باینری است و در MCP ثبت نشده.",
     response_model=SuccessResponse,
 )
 async def import_business_from_legacy_api(
@@ -612,7 +612,7 @@ async def import_business_from_legacy_api(
 
 @router.post("/list", 
     summary="لیست کسب و کارهای کاربر", 
-    description="دریافت لیست کسب و کارهای کاربر جاری با قابلیت فیلتر و جستجو",
+    description="فهرست کسب‌وکارهای حساب کاربر. ابزار MCP: `list_my_businesses`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -700,7 +700,7 @@ def list_user_businesses(
 @router.get(
     "/{business_id}/print-settings",
     summary="تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس مهر/امضا، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    description="تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس، پرداخت‌ها، اقساط و متن انتهایی). ابزار MCP: `get_business_print_settings`.",
     response_model=SuccessResponse,
 )
 async def get_business_print_settings_endpoint(
@@ -723,7 +723,7 @@ async def get_business_print_settings_endpoint(
 @router.put(
     "/{business_id}/print-settings",
     summary="ویرایش تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس مهر/امضا، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    description="ذخیره تنظیمات چاپ. ابزار MCP: `update_business_print_settings` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 async def update_business_print_settings_endpoint(
@@ -747,7 +747,7 @@ async def update_business_print_settings_endpoint(
 @router.get(
     "/{business_id}/invoice-share-settings",
     summary="تنظیمات پیش‌فرض پرداخت آنلاین لینک عمومی فاکتور",
-    description="مقادیر پیش‌فرض برای فعال‌سازی پرداخت آنلاین هنگام ایجاد لینک اشتراک فاکتور جدید.",
+    description="پیش‌فرض پرداخت آنلاین لینک اشتراک فاکتور. ابزار MCP: `get_invoice_share_payment_settings`.",
     response_model=SuccessResponse,
 )
 async def get_business_invoice_share_settings_endpoint(
@@ -767,7 +767,7 @@ async def get_business_invoice_share_settings_endpoint(
 @router.put(
     "/{business_id}/invoice-share-settings",
     summary="ذخیرهٔ تنظیمات پیش‌فرض پرداخت آنلاین لینک عمومی فاکتور",
-    description="به‌روزرسانی پیش‌فرض‌های پرداخت آنلاین برای لینک‌های اشتراک فاکتور.",
+    description="ابزار MCP: `update_invoice_share_payment_settings` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 async def update_business_invoice_share_settings_endpoint(
@@ -787,7 +787,7 @@ async def update_business_invoice_share_settings_endpoint(
 
 @router.get("/{business_id}", 
     summary="جزئیات کسب و کار", 
-    description="دریافت جزئیات یک کسب و کار خاص",
+    description="جزئیات کسب‌وکار متصل. ابزار MCP: `get_business_info`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -824,7 +824,7 @@ async def update_business_invoice_share_settings_endpoint(
 )
 @router.post("/{business_id}/details", 
     summary="جزئیات کسب و کار", 
-    description="دریافت جزئیات یک کسب و کار خاص",
+    description="ابزار MCP: `get_business_info`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -882,7 +882,7 @@ def get_business(
 
 @router.put("/{business_id}", 
     summary="ویرایش کسب و کار", 
-    description="ویرایش اطلاعات یک کسب و کار",
+    description="ابزار MCP: `update_business_info` (نیازمند تأیید).",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -937,7 +937,7 @@ def update_business_info(
 
 @router.get("/{business_id}/delete-info",
     summary="دریافت اطلاعات حذف کسب و کار",
-    description="بررسی و دریافت اطلاعات مرتبط با حذف کسب و کار",
+    description="محدودیت‌ها و آمار اسناد/اشخاص/کالا قبل از حذف نرم. فقط مالک. ابزار MCP: get_business_delete_info.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -955,7 +955,7 @@ def get_business_delete_info_endpoint(
 
 @router.delete("/{business_id}", 
     summary="حذف کسب و کار", 
-    description="حذف نرم یک کسب و کار (30 روز قابل بازیابی)",
+    description="حذف نرم کسب‌وکار با بکاپ خودکار؛ پیش‌فرض ۳۰ روز قابل بازیابی. فقط مالک. ابزار MCP: soft_delete_connected_business.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -1058,7 +1058,7 @@ def delete_business_info(
 
 @router.post("/{business_id}/restore",
     summary="بازیابی کسب و کار",
-    description="بازیابی کسب و کار حذف شده (فقط در 30 روز اول)",
+    description="بازیابی کسب‌وکار حذف‌شده در مهلت ۳۰ روز. فقط مالک. ابزار MCP: restore_connected_business.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -1119,7 +1119,7 @@ def restore_business_endpoint(
 @router.post(
     "/{business_id}/logo",
     summary="آپلود لوگوی کسب‌وکار",
-    description="آپلود تصویر لوگوی کسب‌وکار و ذخیره شناسه فایل روی رکورد Business.",
+    description="آپلود باینری لوگو است و در MCP ثبت نشده.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -1192,7 +1192,7 @@ async def upload_business_logo(
 @router.get(
     "/{business_id}/logo",
     summary="دریافت لوگوی کسب‌وکار",
-    description="بازگرداندن تصویر لوگوی کسب‌وکار به‌صورت فایل برای نمایش در UI یا فاکتور.",
+    description="خروجی باینری لوگو است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def get_business_logo(
@@ -1220,7 +1220,7 @@ async def get_business_logo(
 @router.post(
     "/{business_id}/stamp",
     summary="آپلود مهر/امضای کسب‌وکار",
-    description="آپلود تصویر مهر یا امضای رسمی کسب‌وکار و ذخیره شناسه فایل روی رکورد Business.",
+    description="آپلود باینری مهر/امضا است و در MCP ثبت نشده.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -1293,7 +1293,7 @@ async def upload_business_stamp(
 @router.get(
     "/{business_id}/stamp",
     summary="دریافت مهر/امضای کسب‌وکار",
-    description="بازگرداندن تصویر مهر یا امضای کسب‌وکار به‌صورت فایل برای نمایش در UI یا فاکتور.",
+    description="خروجی باینری مهر/امضا است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def get_business_stamp(
@@ -1320,7 +1320,7 @@ async def get_business_stamp(
 
 @router.post("/stats", 
     summary="آمار کسب و کارها", 
-    description="دریافت آمار کلی کسب و کارهای کاربر",
+    description="آمار حساب شخصی است و در MCP کسب‌وکار متصل ثبت نشده. فهرست: `list_my_businesses`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -1365,7 +1365,7 @@ def get_business_stats(
 @router.post(
     "/{business_id}/currencies",
     summary="اضافه کردن ارز جانبی به کسب‌وکار",
-    description="اضافه کردن یک ارز به لیست ارزهای قابل استفاده در کسب‌وکار",
+    description="ابزار MCP: `add_business_currency` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -1395,7 +1395,7 @@ def add_business_currency_endpoint(
 @router.delete(
     "/{business_id}/currencies/{currency_id}",
     summary="حذف ارز جانبی از کسب‌وکار",
-    description="حذف یک ارز از لیست ارزهای قابل استفاده در کسب‌وکار (در صورت عدم استفاده در اسناد)",
+    description="ابزار MCP: `remove_business_currency` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -1416,7 +1416,7 @@ def remove_business_currency_endpoint(
 @router.get(
     "/{business_id}/currencies/{currency_id}/usage-check",
     summary="بررسی استفاده ارز در اسناد",
-    description="بررسی اینکه آیا یک ارز در اسناد حسابداری استفاده شده است یا نه",
+    description="بررسی استفاده ارز در اسناد، حساب‌ها و کالاها و اینکه آیا حذف ارز مجاز است. ابزار MCP: `check_business_currency_usage`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")

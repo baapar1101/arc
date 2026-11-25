@@ -18,7 +18,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.product import Product
 from adapters.db.models.product_instance import ProductInstance
 from adapters.db.models.person import Person
-from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+from app.core.plugin_license import is_plugin_active
 from adapters.db.repositories.warranty_repository import (
     WarrantySettingRepository,
     WarrantyCodeRepository,
@@ -84,28 +84,7 @@ def _generate_sequential_code(
 
 def _check_warranty_plugin_active(db: Session, business_id: int) -> bool:
     """بررسی فعال بودن پلاگین گارانتی برای کسب و کار"""
-    plugin = db.query(MarketplacePlugin).filter(
-        MarketplacePlugin.code == 'product_warranty',
-        MarketplacePlugin.is_active == True  # noqa: E712
-    ).first()
-    
-    if not plugin:
-        return False
-    
-    license = db.query(BusinessPlugin).filter(
-        BusinessPlugin.business_id == business_id,
-        BusinessPlugin.plugin_id == plugin.id,
-        BusinessPlugin.status == 'active'
-    ).first()
-    
-    if not license:
-        return False
-    
-    # بررسی انقضا
-    if license.ends_at and license.ends_at < datetime.utcnow():
-        return False
-    
-    return True
+    return is_plugin_active(db, business_id, "product_warranty")
 
 
 def _get_or_create_warranty_settings(

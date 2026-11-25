@@ -13,6 +13,7 @@ from sqlalchemy import and_
 
 from adapters.db.models.document import Document
 from adapters.db.models.tax_setting import TaxSetting
+from app.services.motamed_asa_provider_service import MOTAMED_ASA_PROVIDER
 from app.services.tax_submission_service import inquire_tax_status
 
 logger = logging.getLogger(__name__)
@@ -128,7 +129,31 @@ def auto_inquire_pending_invoices(
             if not tax_setting:
                 logger.warning(f"Tax settings not found for business {bid}")
                 continue
-            
+
+            # «معتمد آسا» invoices are inquired from ASA, not from the tax system with the business's own key.
+            asa_docs = [
+                doc for doc in docs
+                if (doc.extra_info or {}).get("tax_submission_provider") == MOTAMED_ASA_PROVIDER
+            ]
+            if asa_docs:
+                asa_ids = {int(doc.id) for doc in asa_docs}
+                docs = [doc for doc in docs if int(doc.id) not in asa_ids]
+                try:
+                    response = inquire_tax_status(db, bid, invoice_ids=sorted(asa_ids))
+                    db.commit()
+                    total_inquired += len(response.get("results") or [])
+                    for doc in asa_docs:
+                        extra = doc.extra_info or {}
+                        all_results.append({
+                            "invoice_id": doc.id,
+                            "business_id": bid,
+                            "tracking_code": extra.get("tax_tracking_code"),
+                            "status": extra.get("tax_status"),
+                        })
+                except Exception as e:
+                    logger.error(f"Error inquiring motamed_asa status for business {bid}: {e}", exc_info=True)
+                    db.rollback()
+
             # جمع‌آوری tracking codes
             tracking_codes: List[str] = []
             doc_by_tracking: Dict[str, Document] = {}

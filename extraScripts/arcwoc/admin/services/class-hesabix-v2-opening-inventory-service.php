@@ -514,11 +514,18 @@ class Hesabix_V2_Opening_Inventory_Service
 		}
 
 		$price_for_tax = $raw;
+		$tax_args = array(
+			'qty' => 1,
+			'price' => $raw,
+		);
 		if (function_exists('wc_get_price_excluding_tax') && function_exists('wc_get_price_including_tax')) {
 			if ($inc_tax) {
-				$price_for_tax = (float) wc_get_price_including_tax(array('qty' => 1, 'product' => $product));
+				$calc = wc_get_price_including_tax($product, $tax_args);
 			} else {
-				$price_for_tax = (float) wc_get_price_excluding_tax(array('qty' => 1, 'product' => $product));
+				$calc = wc_get_price_excluding_tax($product, $tax_args);
+			}
+			if ($calc !== '' && $calc !== null) {
+				$price_for_tax = (float) $calc;
 			}
 		}
 
@@ -526,7 +533,7 @@ class Hesabix_V2_Opening_Inventory_Service
 			$price_for_tax = 0.0;
 		}
 
-		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($api, $product->get_currency());
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($api, null);
 		if (empty($gate['ok'])) {
 			return 0.0;
 		}
@@ -648,9 +655,79 @@ class Hesabix_V2_Opening_Inventory_Service
 			$info = isset($row['extra_info']) && is_array($row['extra_info']) ? $row['extra_info'] : array();
 			$wid = isset($info['warehouse_id']) ? (int) $info['warehouse_id'] : 0;
 			$key = (int) $row['product_id'] . ':' . $wid;
+			if (isset($map[ $key ])) {
+				$has_a = self::line_has_variant_allocations($map[ $key ]);
+				$has_b = self::line_has_variant_allocations($row);
+				if ($has_a && $has_b) {
+					$map[ $key ] = self::merge_native_allocation_lines($map[ $key ], $row);
+					continue;
+				}
+				if ($has_a && !$has_b) {
+					continue;
+				}
+			}
 			$map[ $key ] = $row;
 		}
 		return array_values($map);
+	}
+
+	/**
+	 * @param array $row
+	 * @return bool
+	 */
+	private static function line_has_variant_allocations($row)
+	{
+		if (!empty($row['allocations']) && is_array($row['allocations'])) {
+			return true;
+		}
+		$info = isset($row['extra_info']) && is_array($row['extra_info']) ? $row['extra_info'] : array();
+		return !empty($info['allocations']) && is_array($info['allocations']);
+	}
+
+	/**
+	 * @param array $a
+	 * @param array $b
+	 * @return array
+	 */
+	private static function merge_native_allocation_lines($a, $b)
+	{
+		$qty = (float) ($a['quantity'] ?? 0) + (float) ($b['quantity'] ?? 0);
+		$allocs = array();
+		foreach (array($a, $b) as $row) {
+			$list = array();
+			if (!empty($row['allocations']) && is_array($row['allocations'])) {
+				$list = $row['allocations'];
+			} elseif (!empty($row['extra_info']['allocations']) && is_array($row['extra_info']['allocations'])) {
+				$list = $row['extra_info']['allocations'];
+			}
+			foreach ($list as $item) {
+				if (!is_array($item) || empty($item['variant_id'])) {
+					continue;
+				}
+				$vid = (int) $item['variant_id'];
+				if (!isset($allocs[ $vid ])) {
+					$allocs[ $vid ] = 0.0;
+				}
+				$allocs[ $vid ] += (float) ($item['quantity'] ?? 0);
+			}
+		}
+		$out_alloc = array();
+		foreach ($allocs as $vid => $q) {
+			if ($q <= 0) {
+				continue;
+			}
+			$out_alloc[] = array(
+				'variant_id' => (int) $vid,
+				'quantity' => $q,
+			);
+		}
+		$a['quantity'] = $qty;
+		$a['allocations'] = $out_alloc;
+		if (!isset($a['extra_info']) || !is_array($a['extra_info'])) {
+			$a['extra_info'] = array();
+		}
+		$a['extra_info']['allocations'] = $out_alloc;
+		return $a;
 	}
 
 	/**
@@ -1009,13 +1086,45 @@ class Hesabix_V2_Opening_Inventory_Service
 				continue;
 			}
 
+			$native_variant_id = 0;
+			$line_product_id = (int) $res['hesabix_id'];
+			if ($parent > 0 && class_exists('Hesabix_V2_Native_Variation_Sync')) {
+				$native_line = Hesabix_V2_Native_Variation_Sync::resolve_invoice_line($sync->db_client(), $wc_pid, $parent);
+				if ($native_line) {
+					$line_product_id = (int) $native_line['product_id'];
+					$native_variant_id = (int) $native_line['variant_id'];
+				} elseif (!empty($res['native']) && !empty($res['variant_id'])) {
+					$native_variant_id = (int) $res['variant_id'];
+				}
+			}
+
 			$line = self::build_inventory_line_from_wc_product(
 				$product,
-				(int) $res['hesabix_id'],
+				$line_product_id,
 				$warehouse_id,
 				$opts,
 				$api
 			);
+			if ($line && $native_variant_id > 0) {
+				$alloc = array(
+					array(
+						'variant_id' => $native_variant_id,
+						'quantity' => $line['quantity'],
+					),
+				);
+				$line['allocations'] = $alloc;
+				if (!isset($line['extra_info']) || !is_array($line['extra_info'])) {
+					$line['extra_info'] = array();
+				}
+				$line['extra_info']['allocations'] = $alloc;
+			} elseif ($line && ((!empty($res['native']) || ($parent > 0 && class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::has_native_parent_mapping($parent, $sync->db_client()))))) {
+				$detail[] = array(
+					'wc_id' => $wc_pid,
+					'ok' => true,
+					'message' => __('موجودی Native بدون تخصیص ترکیب ثبت نشد.', 'hesabix-v2'),
+				);
+				continue;
+			}
 			if (!$line) {
 				$detail[] = array('wc_id' => $wc_pid, 'ok' => true, 'message' => __('بدون خط (موجودی صفر)', 'hesabix-v2'));
 				continue;

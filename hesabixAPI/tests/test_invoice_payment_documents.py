@@ -84,10 +84,12 @@ def test_create_receipt_payment_documents_for_invoice_payments_creates_one_per_i
     assert len(first_call["account_lines"]) == 1
     assert first_call["account_lines"][0]["amount"] == 100000.0
     assert first_call["account_lines"][0]["transaction_date"] == "2024-03-05"
+    assert first_call["document_date"] == "2024-03-05"
 
     assert second_call["person_lines"][0]["amount"] == 250000.0
     assert len(second_call["account_lines"]) == 1
     assert second_call["account_lines"][0]["transaction_date"] == "2024-03-12"
+    assert second_call["document_date"] == "2024-03-12"
 
 
 @patch("app.services.invoice_service._validate_invoice_payment_item_currency", return_value=None)
@@ -184,6 +186,7 @@ def test_create_receipt_payment_documents_skips_zero_amount_items(
     assert created_ids == [201]
     assert mock_create.call_count == 1
     assert mock_create.call_args.kwargs["data"]["person_lines"][0]["amount"] == 50000.0
+    assert mock_create.call_args.kwargs["data"]["document_date"] == "2024-03-08"
 
 
 def test_validate_invoice_payment_rejects_bank_from_other_business():
@@ -231,3 +234,74 @@ def test_validate_invoice_payment_accepts_bank_of_same_business():
         business_id=6342,
     )
     assert result is None
+
+
+@patch("app.services.invoice_service._validate_invoice_payment_item_currency", return_value=None)
+@patch("app.services.receipt_payment_service.create_receipt_payment")
+def test_invoice_prepayment_receipt_uses_bank_date_not_later_invoice_date(
+    mock_create,
+    _mock_validate,
+):
+    """پیش‌دریافت: واریز بانکی قبل از فاکتور باید سند دریافت را با تاریخ واریز بسازد."""
+    mock_create.return_value = {"id": 421}
+    document = Document(
+        id=88,
+        code="INV-20260620-00021",
+        business_id=1,
+        currency_id=1,
+        document_date=date(2026, 6, 20),  # ۱۴۰۵/۰۳/۳۰
+    )
+    created_ids = _create_receipt_payment_documents_for_invoice_payments(
+        MagicMock(),
+        business_id=1,
+        user_id=2,
+        document=document,
+        person_id=10,
+        payments=[{
+            "type": "bank",
+            "amount": 1500000,
+            "transaction_date": "2026-04-01",  # ۱۴۰۵/۰۱/۱۲
+            "bank_id": 9,
+        }],
+        invoice_type=INVOICE_SALES,
+    )
+
+    assert created_ids == [421]
+    payload = mock_create.call_args.kwargs["data"]
+    assert payload["document_type"] == "receipt"
+    assert payload["document_date"] == "2026-04-01"
+    assert payload["account_lines"][0]["transaction_date"] == "2026-04-01"
+
+
+def test_resolve_receipt_document_date_prefers_cash_event_over_invoice_date():
+    from app.services.receipt_payment_service import (
+        resolve_receipt_document_date_from_account_lines,
+    )
+
+    invoice_date = date(2026, 6, 20)
+    assert resolve_receipt_document_date_from_account_lines(
+        invoice_date,
+        [{"transaction_date": "2026-04-01"}],
+    ) == date(2026, 4, 1)
+    assert resolve_receipt_document_date_from_account_lines(
+        invoice_date,
+        [{"transaction_date": "2026-07-10"}],
+    ) == date(2026, 7, 10)
+    assert resolve_receipt_document_date_from_account_lines(
+        invoice_date,
+        [{"amount": 10}],
+    ) == invoice_date
+    assert resolve_receipt_document_date_from_account_lines(
+        invoice_date,
+        [
+            {"transaction_date": "2026-04-12"},
+            {"transaction_date": "2026-04-01"},
+        ],
+    ) == date(2026, 4, 1)
+    assert resolve_receipt_document_date_from_account_lines(
+        invoice_date,
+        [
+            {"transaction_date": "2026-07-10", "is_commission_line": True},
+            {"transaction_date": "2026-04-01"},
+        ],
+    ) == date(2026, 4, 1)

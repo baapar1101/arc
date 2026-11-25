@@ -148,6 +148,7 @@ def profile_to_dict(p: DistributionCustomerProfile) -> Dict[str, Any]:
 		"outlet_type": p.outlet_type,
 		"assortment_id": p.assortment_id,
 		"storefront_photo_file_id": p.storefront_photo_file_id,
+		"owner_user_id": getattr(p, "owner_user_id", None),
 		"onboarded_at": p.onboarded_at.isoformat() + "Z" if p.onboarded_at else None,
 		"notes": p.notes,
 	}
@@ -206,6 +207,9 @@ def upsert_customer_profile(
 		row.storefront_photo_file_id = int(raw) if raw else None
 	if "notes" in payload:
 		row.notes = (str(payload.get("notes") or "").strip() or None)
+	if "owner_user_id" in payload:
+		raw_owner = payload.get("owner_user_id")
+		row.owner_user_id = int(raw_owner) if raw_owner else None
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
@@ -214,9 +218,23 @@ def upsert_customer_profile(
 	return d
 
 
-def list_customer_profiles(db: Session, business_id: int, *, person_id: Optional[int] = None) -> List[Dict[str, Any]]:
+def list_customer_profiles(
+	db: Session,
+	business_id: int,
+	*,
+	person_id: Optional[int] = None,
+	ctx: Optional[AuthContext] = None,
+) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
+	if ctx is not None and person_id:
+		dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, int(person_id))
 	q = db.query(DistributionCustomerProfile).filter(DistributionCustomerProfile.business_id == business_id)
+	if ctx is not None:
+		allowed = dist_svc.allowed_person_ids_for_ctx(db, business_id, ctx)
+		if allowed is not None:
+			if not allowed:
+				return []
+			q = q.filter(DistributionCustomerProfile.person_id.in_(allowed))
 	if person_id:
 		q = q.filter(DistributionCustomerProfile.person_id == int(person_id))
 	rows = q.order_by(DistributionCustomerProfile.id.desc()).limit(500).all()
@@ -558,8 +576,17 @@ def _stop_plan_item(
 	}
 
 
-def customer_360(db: Session, business_id: int, person_id: int, *, user_id: Optional[int] = None) -> Dict[str, Any]:
+def customer_360(
+	db: Session,
+	business_id: int,
+	person_id: int,
+	*,
+	user_id: Optional[int] = None,
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
+	if ctx is not None:
+		dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
@@ -570,13 +597,13 @@ def customer_360(db: Session, business_id: int, person_id: int, *, user_id: Opti
 		invoices = list_person_open_invoices(db, business_id, person_id, limit=8)
 	except Exception:
 		invoices = []
-	visits = (
-		db.query(DistributionFieldVisit)
-		.filter(DistributionFieldVisit.business_id == business_id, DistributionFieldVisit.person_id == person_id)
-		.order_by(DistributionFieldVisit.started_at.desc())
-		.limit(8)
-		.all()
+	vq = db.query(DistributionFieldVisit).filter(
+		DistributionFieldVisit.business_id == business_id,
+		DistributionFieldVisit.person_id == person_id,
 	)
+	if ctx is not None:
+		vq = dist_svc.apply_user_id_scope(vq, DistributionFieldVisit.user_id, db, business_id, ctx)
+	visits = vq.order_by(DistributionFieldVisit.started_at.desc()).limit(8).all()
 	last_visit = visits[0] if visits else None
 	assets = (
 		db.query(DistributionCustomerAsset)
@@ -702,6 +729,7 @@ def add_van_lot(
 	*,
 	lot_code: Optional[str] = None,
 	expiry_date: Optional[date] = None,
+	manufacturing_date: Optional[date] = None,
 	unit_weight_kg: Optional[float] = None,
 	unit_volume_m3: Optional[float] = None,
 ) -> DistributionVanLot:
@@ -730,6 +758,7 @@ def add_van_lot(
 		van_id=van_id,
 		product_id=product_id,
 		lot_code=code,
+		manufacturing_date=manufacturing_date,
 		expiry_date=exp,
 		quantity=float(qty),
 		unit_weight_kg=unit_weight_kg,
@@ -739,13 +768,24 @@ def add_van_lot(
 	return row
 
 
-def consume_van_lots_fefo(
-	db: Session, van_id: int, product_id: int, qty: float,
-) -> List[Dict[str, Any]]:
-	need = float(qty)
-	if need <= 0:
-		return []
-	rows = (
+def _van_lot_is_expired(exp: Optional[date], as_of: date) -> bool:
+	if exp is None or exp == NO_EXPIRY:
+		return False
+	return exp < as_of
+
+
+def _van_lot_payload(row: DistributionVanLot, take: float) -> Dict[str, Any]:
+	exp = row.expiry_date
+	return {
+		"lot_code": row.lot_code,
+		"manufacturing_date": row.manufacturing_date.isoformat() if getattr(row, "manufacturing_date", None) else None,
+		"expiry_date": None if exp == NO_EXPIRY else (exp.isoformat() if exp else None),
+		"quantity": take,
+	}
+
+
+def _van_lots_query(db: Session, van_id: int, product_id: int):
+	return (
 		db.query(DistributionVanLot)
 		.filter(
 			DistributionVanLot.van_id == van_id,
@@ -753,25 +793,133 @@ def consume_van_lots_fefo(
 			DistributionVanLot.quantity > 0,
 		)
 		.order_by(DistributionVanLot.expiry_date.asc().nullslast(), DistributionVanLot.id.asc())
-		.all()
 	)
+
+
+def plan_van_lots_fefo(
+	db: Session,
+	van_id: int,
+	product_id: int,
+	qty: float,
+	*,
+	skip_expired: bool = True,
+	as_of: Optional[date] = None,
+) -> List[Dict[str, Any]]:
+	need = float(qty)
+	if need <= 0:
+		return []
+	today = as_of or business_today()
+	planned: List[Dict[str, Any]] = []
+	for row in _van_lots_query(db, van_id, product_id).all():
+		if need <= 1e-9:
+			break
+		if skip_expired and _van_lot_is_expired(row.expiry_date, today):
+			continue
+		avail = float(row.quantity or 0)
+		take = min(avail, need)
+		if take <= 0:
+			continue
+		planned.append(_van_lot_payload(row, take))
+		need -= take
+	if need > 1e-6:
+		raise ApiError(
+			"INSUFFICIENT_VAN_LOT",
+			f"لات کافی برای کالای {product_id} نیست (کمبود {round(need, 3)})",
+			http_status=400,
+		)
+	return planned
+
+
+def consume_van_lots_fefo(
+	db: Session,
+	van_id: int,
+	product_id: int,
+	qty: float,
+	*,
+	skip_expired: bool = True,
+	as_of: Optional[date] = None,
+	allocations: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+	need = float(qty)
+	if need <= 0:
+		return []
+	today = as_of or business_today()
+	rows = _van_lots_query(db, van_id, product_id).all()
 	if not rows:
+		if allocations:
+			raise ApiError(
+				"INSUFFICIENT_VAN_LOT",
+				f"لات کافی برای کالای {product_id} نیست",
+				http_status=400,
+			)
 		return []
 	consumed: List[Dict[str, Any]] = []
+
+	def _take_from_row(row: DistributionVanLot, take_need: float) -> float:
+		avail = float(row.quantity or 0)
+		take = min(avail, take_need)
+		if take <= 0:
+			return 0.0
+		row.quantity = round(avail - take, 3)
+		row.updated_at = datetime.utcnow()
+		consumed.append(_van_lot_payload(row, take))
+		return take
+
+	if allocations:
+		for alloc in allocations:
+			if not isinstance(alloc, dict):
+				continue
+			take_need = float(alloc.get("quantity") or 0)
+			if take_need <= 0:
+				continue
+			code = (str(alloc.get("lot_code") or "-").strip() or "-")
+			exp_raw = alloc.get("expiry_date")
+			exp_key = None
+			if exp_raw:
+				try:
+					exp_key = date.fromisoformat(str(exp_raw)[:10])
+				except ValueError:
+					exp_key = None
+			matched = False
+			for row in rows:
+				row_exp = None if row.expiry_date == NO_EXPIRY else row.expiry_date
+				row_code = (str(row.lot_code or "-").strip() or "-")
+				if row_code != code:
+					continue
+				if exp_key is not None and row_exp != exp_key:
+					continue
+				if exp_key is None and row_exp not in (None,):
+					if alloc.get("expiry_date") not in (None, ""):
+						continue
+				taken = _take_from_row(row, take_need)
+				if taken <= 0:
+					continue
+				take_need = round(take_need - taken, 6)
+				need = round(need - taken, 6)
+				matched = True
+				if take_need <= 1e-9:
+					break
+			if take_need > 1e-6:
+				raise ApiError(
+					"INSUFFICIENT_VAN_LOT",
+					f"لات کافی برای کالای {product_id} نیست (کمبود {round(take_need, 3)})",
+					http_status=400,
+				)
+			if not matched and float(alloc.get("quantity") or 0) > 0:
+				raise ApiError(
+					"INSUFFICIENT_VAN_LOT",
+					f"لات کافی برای کالای {product_id} نیست",
+					http_status=400,
+				)
+		return consumed
+
 	for row in rows:
 		if need <= 1e-9:
 			break
-		avail = float(row.quantity or 0)
-		take = min(avail, need)
-		row.quantity = round(avail - take, 3)
-		row.updated_at = datetime.utcnow()
-		need -= take
-		exp = row.expiry_date
-		consumed.append({
-			"lot_code": row.lot_code,
-			"expiry_date": None if exp == NO_EXPIRY else (exp.isoformat() if exp else None),
-			"quantity": take,
-		})
+		if skip_expired and _van_lot_is_expired(row.expiry_date, today):
+			continue
+		taken = _take_from_row(row, need)
+		need = round(need - taken, 6)
 	if need > 1e-6:
 		raise ApiError(
 			"INSUFFICIENT_VAN_LOT",
@@ -884,7 +1032,7 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 
 		van = get_van_for_user(db, business_id, uid)
 		if van:
-			van_stock = get_van_stock(db, business_id, int(van.id))
+			van_stock = get_van_stock(db, business_id, int(van.id), ctx=ctx)
 			van_stock["capacity"] = van_capacity_snapshot(db, business_id, van)
 			van_stock["plate_number"] = getattr(van, "plate_number", None)
 	except Exception:
@@ -1050,6 +1198,7 @@ def onboard_new_outlet(
 		"assortment_id": payload.get("assortment_id"),
 		"storefront_photo_file_id": payload.get("storefront_photo_file_id"),
 		"notes": payload.get("notes"),
+		"owner_user_id": actor_user_id,
 	})
 	person = db.query(Person).filter(Person.id == person_id).first()
 	if person:
@@ -1120,11 +1269,12 @@ def visitor_scorecard(
 	from app.services.distribution_commercial_service import get_commercial_kpi_pack
 
 	pack = get_commercial_kpi_pack(db, business_id, ctx, from_date, to_date, target_user_id)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	uid = target_user_id if target_user_id is not None else scope
 	vq = db.query(DistributionFieldVisit).filter(DistributionFieldVisit.business_id == business_id)
-	if uid is not None:
-		vq = vq.filter(DistributionFieldVisit.user_id == int(uid))
+	if target_user_id is not None:
+		dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(target_user_id))
+		vq = vq.filter(DistributionFieldVisit.user_id == int(target_user_id))
+	else:
+		vq = dist_svc.apply_user_id_scope(vq, DistributionFieldVisit.user_id, db, business_id, ctx)
 	vq = vq.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
 	vq = vq.filter(func.date(DistributionFieldVisit.started_at) <= to_date)
 	visits = vq.all()
@@ -1145,12 +1295,14 @@ def visitor_scorecard(
 	avg_tis = round(sum(durations) / len(durations) / 60.0, 1) if durations else None
 	lpi = round(lines_total / invoice_count, 2) if invoice_count else None
 	plan_items = 0
-	if uid is not None:
-		# پوشش نسبت به برنامهٔ بازه — تقریبی: میانگین اقلام برنامه روزهای بازه
+	cover_uid = int(target_user_id) if target_user_id is not None else ctx.get_user_id()
+	if cover_uid is not None and (
+		target_user_id is not None or dist_svc.scoped_user_ids_for_ctx(db, business_id, ctx) is not None
+	):
 		day = from_date
 		n_days = 0
 		while day <= to_date and n_days < 14:
-			plan = dist_svc.get_daily_plan(db, business_id, int(uid), day)
+			plan = dist_svc.get_daily_plan(db, business_id, int(cover_uid), day)
 			plan_items += len(plan.get("items") or [])
 			day += timedelta(days=1)
 			n_days += 1

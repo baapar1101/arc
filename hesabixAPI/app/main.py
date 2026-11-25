@@ -6,7 +6,6 @@ from app.openapi_local_docs import get_local_swagger_ui_html
 import logging
 import os
 from pathlib import Path
-from typing import Optional, IO
 
 from app.core.settings import get_settings
 from app.core.logging import configure_logging
@@ -27,6 +26,7 @@ from adapters.api.v1.categories import router as categories_router
 from adapters.api.v1.product_attributes import router as product_attributes_router
 from adapters.api.v1.catalog_spec_fields import router as catalog_spec_fields_router
 from adapters.api.v1.products import router as products_router
+from adapters.api.v1.product_variants import router as product_variants_router
 from adapters.api.v1.price_lists import router as price_lists_router
 from adapters.api.v1.invoices import router as invoices_router
 from adapters.api.v1.persons import router as persons_router
@@ -54,6 +54,8 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.audit_logs import router as admin_audit_logs_router
+from adapters.api.v1.admin.operations import router as admin_operations_router
 from adapters.api.v1.admin.tax_providers import router as admin_tax_providers_router
 from adapters.api.v1.admin.legacy_import import router as admin_legacy_import_router
 from adapters.api.v1.admin.firewall import router as admin_firewall_router
@@ -98,6 +100,11 @@ from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.warranty import router as warranty_router
 from adapters.api.v1.customer_club import router as customer_club_router
 from adapters.api.v1.payroll import router as payroll_router
+from adapters.api.v1.office_automation import router as office_automation_router
+from adapters.api.v1.procurement import public_router as procurement_public_router
+from adapters.api.v1.procurement import router as procurement_router
+from adapters.api.v1.fixed_assets import router as fixed_assets_router
+from adapters.api.v1.advanced_production import router as advanced_production_router
 from adapters.api.v1.barcode_labels import router as barcode_labels_router
 from adapters.api.v1.repair_shop import router as repair_shop_router
 from adapters.api.v1.business_notifications import router as business_notifications_router
@@ -110,6 +117,8 @@ from adapters.api.v1.advanced_plugins import router as advanced_plugins_router
 from adapters.api.v1.telephony import router as telephony_router
 from adapters.api.v1.telephony_softphone_ws import router as telephony_softphone_ws_router
 from adapters.api.v1.woocommerce_integration import router as woocommerce_integration_router
+from adapters.api.v1.system_branding import router as system_branding_router
+from adapters.api.v1.digipay import router as digipay_router, public_router as digipay_public_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
 from adapters.api.v1.admin.notification_event_types import router as admin_notification_event_types_router
@@ -117,6 +126,8 @@ from adapters.api.v1.admin.notification_moderation import router as admin_notifi
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.ai.voice_ws import router as ai_voice_ws_router
 from adapters.api.v1.public_share_links import router as public_share_links_router
+from adapters.api.v1.public_pay_pages import router as public_pay_pages_router
+from adapters.api.v1.business_pay_pages import router as business_pay_pages_router
 from adapters.api.v1.public_storage_file_shares import router as public_storage_file_shares_router
 from adapters.api.v1.public_product_catalog import router as public_product_catalog_router
 from adapters.api.v1.business_backups import router as business_backups_router
@@ -141,12 +152,13 @@ from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
 from app.core.calendar_middleware import add_calendar_type
+from app.core.process_lock import InterProcessFileLock, default_lock_path
 
 # Import activity log hooks برای ثبت event handlers
 import adapters.db.activity_log_hooks  # noqa: F401
 
 
-_BACKGROUND_JOBS_LOCK_FH: Optional[IO[str]] = None
+_BACKGROUND_JOBS_LOCK: InterProcessFileLock | None = None
 
 
 def _try_acquire_background_jobs_lock() -> bool:
@@ -155,38 +167,43 @@ def _try_acquire_background_jobs_lock() -> bool:
     با uvicorn --workers هر worker جداگانه startup event را اجرا می‌کند؛
     این lock باعث می‌شود فقط یکی از process ها leader شود و jobها را اجرا کند.
     """
-    global _BACKGROUND_JOBS_LOCK_FH
+    global _BACKGROUND_JOBS_LOCK
 
     # امکان خاموش کردن کامل background jobs از طریق env
     enabled = os.getenv("HESABIX_BACKGROUND_JOBS_ENABLED", "true").strip().lower()
     if enabled in {"0", "false", "no", "off"}:
         return False
 
-    lock_path = os.getenv("HESABIX_BACKGROUND_JOBS_LOCKFILE", "/tmp/hesabix-background-jobs.lock")
-
-    try:
-        import fcntl  # Linux-only
-    except Exception:
-        # در محیط‌هایی که fcntl ندارند (مثلاً Windows) همان رفتار قبلی را نگه می‌داریم
+    if _BACKGROUND_JOBS_LOCK is not None and _BACKGROUND_JOBS_LOCK.acquired:
         return True
 
+    lock_path = os.getenv(
+        "HESABIX_BACKGROUND_JOBS_LOCKFILE",
+        str(default_lock_path("hesabix-background-jobs.lock")),
+    )
+
     try:
-        fh = open(lock_path, "a+", encoding="utf-8")
-        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        fh.seek(0)
-        fh.truncate()
-        fh.write(f"pid={os.getpid()}\n")
-        fh.flush()
-        _BACKGROUND_JOBS_LOCK_FH = fh  # نگه داشتن handle برای حفظ lock
+        lock = InterProcessFileLock(lock_path)
+        if not lock.acquire():
+            return False
+        lock.write_owner_pid()
+        _BACKGROUND_JOBS_LOCK = lock
         return True
-    except Exception:
-        try:
-            if _BACKGROUND_JOBS_LOCK_FH:
-                _BACKGROUND_JOBS_LOCK_FH.close()
-        except Exception:
-            pass
-        _BACKGROUND_JOBS_LOCK_FH = None
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Unable to acquire background-jobs process lock at %s: %s",
+            lock_path,
+            exc,
+        )
+        _BACKGROUND_JOBS_LOCK = None
         return False
+
+
+def _release_background_jobs_lock() -> None:
+    global _BACKGROUND_JOBS_LOCK
+    if _BACKGROUND_JOBS_LOCK is not None:
+        _BACKGROUND_JOBS_LOCK.release()
+        _BACKGROUND_JOBS_LOCK = None
 
 
 def _openapi_query_filter_section() -> str:
@@ -897,6 +914,9 @@ def create_app() -> FastAPI:
         if raw_body:
             try:
                 normalized_body = smart_normalize_json(raw_body)
+                if path.startswith(f"{settings.api_v1_prefix}/products/business/"):
+                    # Product measurements may need the exact JSON number tokens.
+                    request.state.original_product_json = raw_body
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
@@ -1020,6 +1040,7 @@ def create_app() -> FastAPI:
     application.include_router(product_attributes_router, prefix=settings.api_v1_prefix)
     application.include_router(catalog_spec_fields_router, prefix=settings.api_v1_prefix)
     application.include_router(products_router, prefix=settings.api_v1_prefix)
+    application.include_router(product_variants_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.product_bundles import router as product_bundles_router
     application.include_router(product_bundles_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.product_instances import router as product_instances_router
@@ -1028,12 +1049,17 @@ def create_app() -> FastAPI:
     application.include_router(warehouse_docs_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouse_reports import router as warehouse_reports_router
     application.include_router(warehouse_reports_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.inventory_lots import router as inventory_lots_router
+    application.include_router(inventory_lots_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouses import router as warehouses_router
     application.include_router(warehouses_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouse_locations import router as warehouse_locations_router
     application.include_router(warehouse_locations_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.boms import router as boms_router
     application.include_router(boms_router, prefix=settings.api_v1_prefix)
+
+    from adapters.api.v1.production_orders import router as production_orders_router
+    application.include_router(production_orders_router, prefix=settings.api_v1_prefix)
     application.include_router(price_lists_router, prefix=settings.api_v1_prefix)
     application.include_router(invoices_router, prefix=settings.api_v1_prefix)
     application.include_router(persons_router, prefix=settings.api_v1_prefix)
@@ -1044,7 +1070,9 @@ def create_app() -> FastAPI:
     from adapters.api.v1.task_management import router as task_management_router
     application.include_router(task_management_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.crm import router as crm_router
+    from adapters.api.v1.crm_enterprise import router as crm_enterprise_router
     application.include_router(crm_router, prefix=settings.api_v1_prefix)
+    application.include_router(crm_enterprise_router, prefix=settings.api_v1_prefix)
     application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.checks import router as checks_router
     application.include_router(checks_router, prefix=settings.api_v1_prefix)
@@ -1078,6 +1106,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_fx_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_pay_pages_router, prefix=settings.api_v1_prefix)
     application.include_router(zohal_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
     application.include_router(credit_router, prefix=settings.api_v1_prefix)
@@ -1090,6 +1119,11 @@ def create_app() -> FastAPI:
     application.include_router(warranty_router, prefix=settings.api_v1_prefix)
     application.include_router(customer_club_router, prefix=settings.api_v1_prefix)
     application.include_router(payroll_router, prefix=settings.api_v1_prefix)
+    application.include_router(office_automation_router, prefix=settings.api_v1_prefix)
+    application.include_router(procurement_router, prefix=settings.api_v1_prefix)
+    application.include_router(procurement_public_router, prefix=settings.api_v1_prefix)
+    application.include_router(fixed_assets_router, prefix=settings.api_v1_prefix)
+    application.include_router(advanced_production_router, prefix=settings.api_v1_prefix)
     application.include_router(barcode_labels_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.distribution import router as distribution_router
     application.include_router(distribution_router, prefix=settings.api_v1_prefix)
@@ -1105,6 +1139,9 @@ def create_app() -> FastAPI:
     application.include_router(sepidar_import_router, prefix=settings.api_v1_prefix)
     application.include_router(advanced_plugins_router, prefix=settings.api_v1_prefix)
     application.include_router(woocommerce_integration_router, prefix=settings.api_v1_prefix)
+    application.include_router(system_branding_router, prefix=settings.api_v1_prefix)
+    application.include_router(digipay_router, prefix=settings.api_v1_prefix)
+    application.include_router(digipay_public_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_softphone_ws_router)
     # Notifications
@@ -1134,6 +1171,7 @@ def create_app() -> FastAPI:
     application.include_router(announcements_router, prefix=settings.api_v1_prefix)
     # Public share links (no prefix to allow short /p/{code})
     application.include_router(public_share_links_router)
+    application.include_router(public_pay_pages_router)
     application.include_router(public_storage_file_shares_router)
     application.include_router(public_product_catalog_router)
     
@@ -1157,6 +1195,8 @@ def create_app() -> FastAPI:
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_audit_logs_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_operations_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_tax_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_legacy_import_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_firewall_router, prefix=settings.api_v1_prefix)
@@ -1173,6 +1213,8 @@ def create_app() -> FastAPI:
     application.include_router(admin_scripts_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.admin.pay_page_abuse_reports import router as admin_pay_page_abuse_router
+    application.include_router(admin_pay_page_abuse_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_event_types_router, prefix=settings.api_v1_prefix)
@@ -1208,12 +1250,14 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.voice_feedback import router as ai_voice_feedback_router
     from adapters.api.v1.ai.voice_http import router as ai_voice_http_router
     from adapters.api.v1.ai.mcp import router as ai_mcp_router
+    from adapters.api.v1.ai.mcp_support import router as ai_mcp_support_router
     from adapters.api.v1.ai.mcp_oauth import oauth_router as ai_mcp_oauth_router, metadata_router as ai_mcp_metadata_router
     from adapters.api.v1.ai.models import router as ai_models_router
     from adapters.api.v1.ai.skills import router as ai_skills_router
     from adapters.api.v1.ai.business_provider import router as ai_business_provider_router
     application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_mcp_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_mcp_support_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_mcp_oauth_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_mcp_metadata_router)
     application.include_router(ai_models_router, prefix=settings.api_v1_prefix)
@@ -1329,6 +1373,14 @@ def create_app() -> FastAPI:
         from app.services.crm_background_jobs import crm_automation_background_loop
         asyncio.create_task(crm_automation_background_loop(60))
 
+        # اتوماسیون اداری: هشدار سررسید پیگیری و مهلت ارجاع (پیامک/ایمیل/درون‌برنامه)
+        from app.services.oa_background_jobs import oa_automation_background_loop
+        asyncio.create_task(oa_automation_background_loop(300))
+
+        # Customer club: expire points that reached their configured due date.
+        from app.services.customer_club_background_jobs import customer_club_background_loop
+        asyncio.create_task(customer_club_background_loop(300))
+
         from app.services.support.support_background_jobs import (
             support_sla_breach_check_loop,
             support_subscription_status_loop,
@@ -1351,6 +1403,10 @@ def create_app() -> FastAPI:
         from app.services.hscript_schedule_background_jobs import hscript_schedule_loop
 
         asyncio.create_task(hscript_schedule_loop(60))
+
+    @application.on_event("shutdown")
+    async def _release_process_locks():
+        _release_background_jobs_lock()
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):

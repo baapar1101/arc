@@ -100,6 +100,8 @@ class BOMExplosionRequest(BaseModel):
     bom_id: Optional[int] = None
     quantity: Decimal = Field(..., description="مقدار تولید")
     date: Optional[str] = None
+    recursive: bool = Field(default=False, description="انفجار چندسطحی مواد برای برنامه‌ریزی سفارش تولید")
+    max_depth: int = Field(default=16, ge=1, le=32)
 
     class Config:
         json_schema_extra = {

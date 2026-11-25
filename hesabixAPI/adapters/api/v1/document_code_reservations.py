@@ -43,7 +43,7 @@ def _parse_document_date(value: str) -> date:
 @router.post(
     "",
     summary="رزرو شماره سند (قطعی)",
-    description="برای نمایش شماره قطعی فاکتور در فرم ایجاد؛ شمارنده افزایش می‌یابد و شماره تا زمان انقضا یا ثبت محفوظ می‌ماند.",
+    description="شماره قطعی فاکتور را رزرو می‌کند و شمارنده را افزایش می‌دهد. ابزار MCP: `reserve_document_code` (نیازمند تأیید).",
 )
 def reserve_document_code_endpoint(
     request: Request,
@@ -76,6 +76,7 @@ def reserve_document_code_endpoint(
 @router.delete(
     "/{reservation_id}",
     summary="لغو رزرو شماره سند",
+    description="ابزار MCP: `cancel_document_code_reservation` (نیازمند تأیید).",
 )
 def cancel_document_code_reservation_endpoint(
     request: Request,

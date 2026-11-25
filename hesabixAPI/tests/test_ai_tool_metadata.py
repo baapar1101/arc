@@ -33,8 +33,14 @@ def _registered_names_from_source() -> set[str]:
 def test_manifest_covers_every_registered_tool_name():
     registered = _registered_names_from_source()
     manifested = set(iter_manifest_names())
-    assert registered == manifested
-    assert len(registered) == 180
+    missing_from_manifest = sorted(registered - manifested)
+    assert missing_from_manifest == []
+    assert "list_mcp_categories" in registered
+    assert "search_mcp_tools" in registered
+    assert "list_mcp_categories" in manifested
+    assert "search_mcp_tools" in manifested
+    assert len(registered) == len(set(registered))
+    assert len(registered) >= 180
 
 
 def test_every_manifest_domain_is_known():

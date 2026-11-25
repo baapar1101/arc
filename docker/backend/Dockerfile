@@ -34,4 +34,4 @@ USER 10001:10001
 
 EXPOSE 8000
 
-CMD ["/bin/sh", "-c", "python -m alembic -c alembic.ini upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-2}"]
+CMD ["/bin/sh", "-c", "python scripts/check_migration_branches.py --upgrade && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-2}"]

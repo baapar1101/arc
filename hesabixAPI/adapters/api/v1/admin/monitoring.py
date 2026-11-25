@@ -8,6 +8,7 @@ from sqlalchemy import desc
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
+from app.services.admin_audit_service import client_ip_from_request, record_admin_action
 from app.core.permissions import require_app_permission
 from app.services.monitoring_service import HardwareMonitoringService, ServiceMonitoringService
 from app.services.monitoring_realtime import monitoring_realtime_manager
@@ -64,6 +65,8 @@ def abandon_notification_outbox_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
+	if not ctx.is_superadmin():
+		raise ApiError("FORBIDDEN", "فقط superadmin می‌تواند صف اعلان را رها کند.", http_status=403)
 	try:
 		n = abandon_outbox_rows(
 			db,
@@ -75,6 +78,21 @@ def abandon_notification_outbox_endpoint(
 			only_retry_scheduled=payload.only_retry_scheduled,
 			max_rows=payload.max_rows,
 			admin_note=payload.admin_note,
+		)
+		record_admin_action(
+			db,
+			actor_user_id=ctx.get_user_id(),
+			action="notifications.outbox_abandon",
+			summary=f"رها کردن {n} ردیف صف اعلان",
+			target_type="notification_outbox",
+			metadata={
+				"abandoned_count": n,
+				"statuses": payload.statuses,
+				"channel": payload.channel,
+				"event_key": payload.event_key,
+				"max_rows": payload.max_rows,
+			},
+			client_ip=client_ip_from_request(request),
 		)
 		return success_response({"abandoned_count": n, "message": f"{n} ردیف به وضعیت abandoned منتقل شد"}, request)
 	except ApiError:

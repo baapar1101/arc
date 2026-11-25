@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class ZohalStatisticsPage extends StatefulWidget {
   const ZohalStatisticsPage({super.key});
@@ -59,19 +60,17 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('آمار استفاده از سرویس‌های زحل'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _load,
-            tooltip: 'بارگذاری مجدد',
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'آمار زحل', 'Zohal statistics'),
+      subtitle: adminTx(context, 'مصرف سرویس‌های استعلام', 'Inquiry service usage'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: _load,
+          tooltip: adminTx(context, 'بارگذاری مجدد', 'Reload'),
+        ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -86,15 +85,15 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                       ElevatedButton.icon(
                         onPressed: _load,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('تلاش مجدد'),
+                        label: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
                       ),
                     ],
                   ),
                 )
               : _statistics == null
-                  ? const Center(child: Text('داده‌ای یافت نشد'))
+                  ? Center(child: Text(adminTx(context, 'داده‌ای نیست', 'No data'), style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant)))
                   : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
+                      padding: context.settingsHub.pagePadding,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -106,10 +105,8 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'خلاصه آمار',
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    adminTx(context, 'خلاصه', 'Summary'),
+                                    style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                                   ),
                                   const SizedBox(height: 16),
                                   Row(
@@ -117,7 +114,7 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                       Expanded(
                                         child: _buildStatCard(
                                           theme,
-                                          'کل درخواست‌ها',
+                                          adminTx(context, 'کل درخواست‌ها', 'All requests'),
                                           (_statistics!['total_requests'] ?? 0).toString(),
                                           Icons.request_quote,
                                           theme.colorScheme.primary,
@@ -127,7 +124,7 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                       Expanded(
                                         child: _buildStatCard(
                                           theme,
-                                          'موفق',
+                                          adminTx(context, 'موفق', 'Succeeded'),
                                           (_statistics!['successful_requests'] ?? 0).toString(),
                                           Icons.check_circle,
                                           SemanticColorResolver.positive(context),
@@ -137,7 +134,7 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                       Expanded(
                                         child: _buildStatCard(
                                           theme,
-                                          'ناموفق',
+                                          adminTx(context, 'ناموفق', 'Failed'),
                                           (_statistics!['failed_requests'] ?? 0).toString(),
                                           Icons.cancel,
                                           SemanticColorResolver.negative(context),
@@ -148,8 +145,8 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                   const SizedBox(height: 16),
                                   _buildStatCard(
                                     theme,
-                                    'کل درآمد',
-                                    '${formatWithThousands((_statistics!['total_revenue'] ?? 0).toDouble())} تومان',
+                                    adminTx(context, 'کل درآمد', 'Total revenue'),
+                                    '${formatWithThousands((_statistics!['total_revenue'] ?? 0).toDouble())}',
                                     Icons.attach_money,
                                     theme.colorScheme.primary,
                                     fullWidth: true,
@@ -167,19 +164,17 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'آمار به تفکیک سرویس',
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    adminTx(context, 'به تفکیک سرویس', 'By service'),
+                                    style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                                   ),
                                   const SizedBox(height: 16),
                                   ...((_statistics!['by_service'] as List?) ?? []).map((service) {
                                     return ListTile(
                                       leading: const Icon(Icons.search),
                                       title: Text(service['service_name'] ?? ''),
-                                      subtitle: Text('${service['request_count'] ?? 0} درخواست'),
+                                      subtitle: Text('${service['request_count'] ?? 0} ${adminTx(context, 'درخواست', 'requests')}'),
                                       trailing: Text(
-                                        '${formatWithThousands((service['revenue'] ?? 0).toDouble())} تومان',
+                                        '${formatWithThousands((service['revenue'] ?? 0).toDouble())}',
                                         style: theme.textTheme.bodyLarge?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: theme.colorScheme.primary,
@@ -200,19 +195,17 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'آمار به تفکیک کسب‌وکار',
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    adminTx(context, 'به تفکیک کسب‌وکار', 'By business'),
+                                    style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                                   ),
                                   const SizedBox(height: 16),
                                   ...((_statistics!['by_business'] as List?) ?? []).map((business) {
                                     return ListTile(
                                       leading: const Icon(Icons.business),
                                       title: Text(business['business_name'] ?? ''),
-                                      subtitle: Text('${business['request_count'] ?? 0} درخواست'),
+                                      subtitle: Text('${business['request_count'] ?? 0} ${adminTx(context, 'درخواست', 'requests')}'),
                                       trailing: Text(
-                                        '${formatWithThousands((business['revenue'] ?? 0).toDouble())} تومان',
+                                        '${formatWithThousands((business['revenue'] ?? 0).toDouble())}',
                                         style: theme.textTheme.bodyLarge?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: theme.colorScheme.primary,
@@ -265,7 +258,7 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),

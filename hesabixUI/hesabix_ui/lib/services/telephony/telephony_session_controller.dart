@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../utils/error_extractor.dart';
 import '../in_app_notifications_hub.dart';
 import 'softphone_engine.dart';
 import 'telephony_api.dart';
@@ -20,6 +21,8 @@ class TelephonySessionController extends ChangeNotifier {
   bool screenPopVisible = false;
   bool pendingPostCall = false;
   int? _pendingPostCallId;
+  final Set<int> _shownPostCallIds = {};
+  DateTime? _lastPostCallAt;
 
   bool get loading => _loading;
   String? get error => _error;
@@ -77,6 +80,9 @@ class TelephonySessionController extends ChangeNotifier {
 
   void bindBusiness(int businessId, {bool pluginActive = true}) {
     if (_businessId == businessId && _pluginLikelyActive == pluginActive) return;
+    if (_businessId != businessId) {
+      _shownPostCallIds.clear();
+    }
     _businessId = businessId;
     _pluginLikelyActive = pluginActive;
     if (pluginActive) {
@@ -123,9 +129,15 @@ class TelephonySessionController extends ChangeNotifier {
         'status': type == 'telephony.call_missed' ? 'missed' : 'completed',
         if (id != null) 'id': id,
       };
-      if (id != null && _pendingPostCallId != id) {
-        pendingPostCall = true;
-        _pendingPostCallId = id;
+      if (id != null && !_shownPostCallIds.contains(id) && _pendingPostCallId != id) {
+        final last = _lastPostCallAt;
+        if (pendingPostCall || (last != null && DateTime.now().difference(last).inSeconds < 8)) {
+          _shownPostCallIds.add(id);
+        } else {
+          pendingPostCall = true;
+          _pendingPostCallId = id;
+          _lastPostCallAt = DateTime.now();
+        }
       }
       // بستن Screen Pop تا Post-Call sheet جای آن را بگیرد
       screenPopVisible = false;
@@ -138,10 +150,21 @@ class TelephonySessionController extends ChangeNotifier {
   bool takePendingPostCall() {
     if (!pendingPostCall) return false;
     pendingPostCall = false;
+    final id = _pendingPostCallId;
+    if (id != null) {
+      _shownPostCallIds.add(id);
+      _lastPostCallAt = DateTime.now();
+      if (_shownPostCallIds.length > 40) {
+        final extra = _shownPostCallIds.length - 40;
+        _shownPostCallIds.removeAll(_shownPostCallIds.take(extra).toList());
+      }
+    }
     return true;
   }
 
   void clearPendingPostCall() {
+    final id = _pendingPostCallId;
+    if (id != null) _shownPostCallIds.add(id);
     pendingPostCall = false;
     _pendingPostCallId = null;
     notifyListeners();
@@ -157,7 +180,7 @@ class TelephonySessionController extends ChangeNotifier {
       contextData = await _api.getMyContext(bid);
       _error = null;
     } catch (e) {
-      _error = '$e';
+      _error = ErrorExtractor.userMessage(e);
     } finally {
       _loading = false;
       notifyListeners();

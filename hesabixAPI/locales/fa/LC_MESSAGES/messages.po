@@ -473,7 +473,7 @@ msgstr "فاکتور"
 
 # Warranty
 msgid "PLUGIN_NOT_ACTIVE"
-msgstr "پلاگین گارانتی برای این کسب و کار فعال نیست"
+msgstr "افزونه مورد نیاز برای این کسب‌وکار فعال نیست"
 
 msgid "WARRANTY_CODE_NOT_FOUND"
 msgstr "کد گارانتی یافت نشد"
@@ -938,3 +938,1136 @@ msgstr "شما عضو این کسب و کار نیستید."
 
 msgid "BUSINESS_USERS_LEAVE_FAILED"
 msgstr "خطا در خروج از کسب و کار."
+
+# Repair shop
+msgid "REPAIR_ORDER_NOT_FOUND"
+msgstr "سفارش تعمیر یافت نشد"
+
+msgid "TECHNICIAN_NOT_FOUND"
+msgstr "تعمیرکار یافت نشد"
+
+msgid "NO_ACTIVE_FISCAL_YEAR"
+msgstr "سال مالی فعالی یافت نشد"
+
+msgid "PERSON_ID_REQUIRED"
+msgstr "شناسه شخص الزامی است"
+
+msgid "PERSON_NOT_FOUND"
+msgstr "شخص یافت نشد"
+
+msgid "CODE_ALREADY_EXISTS"
+msgstr "کد تعمیرکار تکراری است"
+
+msgid "TECHNICIAN_HAS_ACTIVE_ORDERS"
+msgstr "این تعمیرکار سفارش فعال دارد. ابتدا سفارشات را تکمیل کنید."
+
+msgid "CUSTOMER_REQUIRED"
+msgstr "مشتری الزامی است"
+
+msgid "CUSTOMER_NOT_FOUND"
+msgstr "مشتری یافت نشد"
+
+msgid "PRODUCT_NOT_FOUND"
+msgstr "کالا یافت نشد"
+
+msgid "PRODUCT_NAME_REQUIRED"
+msgstr "نام کالا الزامی است"
+
+msgid "BUSINESS_NOT_FOUND"
+msgstr "کسب‌وکار یافت نشد"
+
+msgid "NO_DEFAULT_CURRENCY"
+msgstr "ارز پیش‌فرض برای این کسب‌وکار تنظیم نشده است"
+
+msgid "ORDER_NOT_EDITABLE"
+msgstr "این سفارش در وضعیت فعلی قابل ویرایش نیست"
+
+msgid "ORDER_NOT_DELETABLE"
+msgstr "سفارش تحویل داده شده قابل لغو نیست"
+
+msgid "ORDER_ALREADY_CANCELLED"
+msgstr "این سفارش قبلاً لغو شده است"
+
+msgid "ORDER_HAS_INVOICE"
+msgstr "این سفارش دارای فاکتور است و قابل لغو نیست. ابتدا فاکتور را حذف کنید."
+
+msgid "FILE_REQUIRED"
+msgstr "شناسه فایل الزامی است"
+
+msgid "INVALID_ATTACHMENT_TYPE"
+msgstr "نوع ضمیمه نامعتبر است"
+
+msgid "ATTACHMENT_NOT_FOUND"
+msgstr "ضمیمه یافت نشد"
+
+msgid "INVALID_STATUS"
+msgstr "وضعیت نامعتبر است"
+
+msgid "PARTS_REQUIRED"
+msgstr "حداقل یک قطعه باید اضافه شود"
+
+msgid "INVALID_PART_DATA"
+msgstr "اطلاعات قطعه نامعتبر است"
+
+msgid "WAREHOUSE_REQUIRED"
+msgstr "برای قطعه با کنترل موجودی، انتخاب انبار الزامی است"
+
+msgid "INSUFFICIENT_STOCK"
+msgstr "موجودی کافی نیست"
+
+msgid "PART_NOT_FOUND"
+msgstr "قطعه یافت نشد"
+
+msgid "INVALID_STATUS_FOR_COMPLETE"
+msgstr "سفارش تحویل‌شده یا لغوشده قابل تکمیل نیست"
+
+msgid "CANNOT_COMPLETE_REPAIR"
+msgstr "امکان تکمیل تعمیر وجود ندارد"
+
+msgid "INVALID_STATUS_FOR_DELIVERY"
+msgstr "سفارش در این وضعیت قابل تحویل نیست"
+
+msgid "INVOICE_CREATION_FAILED"
+msgstr "خطا در ایجاد فاکتور تعمیر"
+
+msgid "INVOICE_ALREADY_EXISTS"
+msgstr "فاکتور قبلاً برای این سفارش ایجاد شده است"
+
+msgid "INVALID_STATUS_FOR_INVOICE"
+msgstr "سفارش در این وضعیت قابل صدور فاکتور نیست. ابتدا تعمیر را تکمیل کنید."
+
+msgid "NO_INVOICE_LINES"
+msgstr "برای صدور فاکتور باید دستمزد یا حداقل یک قطعه ثبت شده باشد."
+
+msgid "NO_INVOICE_FOUND"
+msgstr "ابتدا باید فاکتور تعمیر ایجاد شود"
+
+msgid "ACCOUNT_REQUIRED"
+msgstr "حساب صندوق/بانک الزامی است"
+
+msgid "RECEIPT_CREATION_FAILED"
+msgstr "خطا در ایجاد سند دریافت"
+
+msgid "INVALID_PARAMETERS"
+msgstr "پارامترهای لازم یافت نشد"
+
+msgid "INVALID_DATE"
+msgstr "تاریخ نامعتبر است"
+
+msgid "TECHNICIAN_DEACTIVATED"
+msgstr "تعمیرکار با موفقیت غیرفعال شد"
+
+msgid "REPAIR_ORDER_CANCELLED"
+msgstr "سفارش تعمیر با موفقیت لغو شد"
+
+msgid "REPAIR_INVOICE_CREATED"
+msgstr "فاکتور تعمیر با موفقیت ثبت شد و اسناد حسابداری ایجاد گردید."
+
+msgid "PLUGIN_NOT_FOUND"
+msgstr "افزونه در سیستم یافت نشد"
+
+msgid "PLUGIN_NOT_PURCHASED"
+msgstr "افزونه خریداری نشده است"
+
+msgid "PLUGIN_ACTIVE"
+msgstr "افزونه فعال است"
+
+msgid "PLUGIN_EXPIRED"
+msgstr "افزونه منقضی شده است"
+
+
+msgid "PBX_NOT_FOUND"
+msgstr "مرکز تلفن یافت نشد"
+
+msgid "CALL_NOT_FOUND"
+msgstr "تماس یافت نشد"
+
+msgid "EXTENSION_NOT_FOUND"
+msgstr "داخلی یافت نشد"
+
+msgid "EXTENSION_MAPPING_NOT_FOUND"
+msgstr "نگاشت داخلی یافت نشد"
+
+msgid "COMMAND_NOT_FOUND"
+msgstr "دستور یافت نشد"
+
+msgid "TELEPHONY_USER_NOT_FOUND"
+msgstr "کاربر یافت نشد"
+
+msgid "DLQ_NOT_FOUND"
+msgstr "DLQ یافت نشد"
+
+msgid "SOFTPHONE_SESSION_NOT_FOUND"
+msgstr "سشن Softphone یافت نشد"
+
+msgid "RECORDING_NOT_FOUND"
+msgstr "ضبط تماس یافت نشد"
+
+msgid "PBX_NAME_REQUIRED"
+msgstr "نام مرکز تلفن الزامی است"
+
+msgid "PBX_ID_REQUIRED"
+msgstr "شناسه مرکز تلفن الزامی است"
+
+msgid "PBX_AND_EXTENSION_REQUIRED"
+msgstr "مرکز تلفن و داخلی الزامی است"
+
+msgid "USER_AND_EXTENSION_REQUIRED"
+msgstr "کاربر و داخلی الزامی است"
+
+msgid "INVALID_ENDPOINT_MODE"
+msgstr "حالت endpoint نامعتبر است"
+
+msgid "INVALID_ENDPOINT_MODE_VALUES"
+msgstr "حالت endpoint باید relay، direct یا desk باشد"
+
+msgid "DESTINATION_REQUIRED"
+msgstr "شماره مقصد الزامی است"
+
+msgid "INVALID_DESTINATION"
+msgstr "شماره مقصد نامعتبر است"
+
+msgid "EVENT_TYPE_REQUIRED"
+msgstr "نوع رویداد الزامی است"
+
+msgid "BUSINESS_AND_PBX_REQUIRED"
+msgstr "کسب‌وکار و مرکز تلفن الزامی است"
+
+msgid "INVALID_COMMAND_TYPE"
+msgstr "نوع دستور نامعتبر است"
+
+msgid "INVALID_RECORDING_ACCESS_MODE"
+msgstr "حالت دسترسی به ضبط نامعتبر است"
+
+msgid "INVALID_DTMF"
+msgstr "رقم DTMF نامعتبر است"
+
+msgid "SESSION_AND_DESTINATION_REQUIRED"
+msgstr "سشن و مقصد الزامی است"
+
+msgid "USER_NOT_ACTIVE_MEMBER"
+msgstr "کاربر عضو فعال این کسب‌وکار نیست"
+
+msgid "EXTENSION_OUT_OF_SCOPE"
+msgstr "داخلی در محدوده شما نیست"
+
+msgid "EXTENSION_IN_USE"
+msgstr "این داخلی به کاربر دیگری واگذار شده است. برای اشتراک، allow_shared را روی داخلی روشن کنید"
+
+msgid "MULTI_PBX_DISABLED"
+msgstr "چند مرکز تلفن برای این کسب‌وکار فعال نیست. ابتدا چند مرکز تلفن را در تنظیمات روشن کنید"
+
+msgid "NO_EXTENSION"
+msgstr "برای شما داخلی تعریف نشده است"
+
+msgid "PBX_OFFLINE"
+msgstr "مرکز تلفن در دسترس نیست"
+
+msgid "NO_LEAD_FUNNEL"
+msgstr "فانل سرنخ برای این کسب‌وکار تعریف نشده است"
+
+msgid "NO_LEAD_STAGE"
+msgstr "مرحله سرنخ یافت نشد"
+
+msgid "SOFTPHONE_NO_EXTENSION"
+msgstr "برای Softphone باید داخلی به کاربر نگاشت شده باشد"
+
+msgid "SOFTPHONE_DESK_MODE"
+msgstr "حالت این کاربر desk است؛ از Click-to-Call استفاده کنید یا حالت را به relay/direct تغییر دهید"
+
+msgid "SOFTPHONE_RELAY_DISABLED"
+msgstr "حالت رله روی این PBX غیرفعال است"
+
+msgid "SOFTPHONE_DIRECT_DISABLED"
+msgstr "حالت مستقیم روی این PBX غیرفعال است"
+
+msgid "SOFTPHONE_TUNNEL_OFFLINE"
+msgstr "تونل رسانه Connector قطع است. روی سرور تلفن Connector را به‌روز و سرویس را ری‌استارت کنید"
+
+msgid "SOFTPHONE_CAPACITY"
+msgstr "سقف سشن همزمان Softphone پر است"
+
+msgid "SOFTPHONE_SESSION_ENDED"
+msgstr "سشن Softphone پایان یافته است"
+
+msgid "SOFTPHONE_NO_SESSION"
+msgstr "سشن Softphone فعال نیست"
+
+msgid "SOFTPHONE_MODE"
+msgstr "خروجی relay فقط در حالت relay مجاز است"
+
+msgid "SOFTPHONE_SESSION_STATE"
+msgstr "سشن برای تماس آماده نیست. ابتدا Softphone را آنلاین کنید تا WebSocket وصل شود"
+
+msgid "SOFTPHONE_WS_REQUIRED"
+msgstr "کانال Softphone روی Media Edge ثبت نشده است. صفحه را رفرش کنید و دوباره آنلاین شوید"
+
+msgid "SOFTPHONE_INVALID_SESSION"
+msgstr "سشن نامعتبر است"
+
+msgid "SOFTPHONE_SESSION_EXPIRED"
+msgstr "سشن منقضی شده است"
+
+msgid "SOFTPHONE_INVALID_TICKET"
+msgstr "بلیت رسانه نامعتبر است"
+
+msgid "SOFTPHONE_MEDIA_EDGE_REQUIRED"
+msgstr "درخواست Softphone باید به Media Edge برسد. مسیر nginx برای /softphone و /ws/telephony را بررسی کنید"
+
+msgid "SOFTPHONE_FORBIDDEN"
+msgstr "دسترسی Softphone ندارید"
+
+msgid "RECORDING_LISTEN_FORBIDDEN"
+msgstr "مجوز گوش دادن به ضبط مکالمه را ندارید"
+
+msgid "TELEPHONY_INTERNAL_ONLY"
+msgstr "فقط دسترسی داخلی"
+
+msgid "TELEPHONY_PERMISSION_DENIED"
+msgstr "مجوز تلفن برای این عملیات را ندارید"
+
+msgid "CONNECTOR_AUTH_FAILED"
+msgstr "احراز هویت Connector ناموفق بود"
+
+msgid "INVALID_CONNECTOR_TOKEN"
+msgstr "توکن Connector نامعتبر است"
+
+msgid "MISSING_AUTHORIZATION"
+msgstr "هدر Authorization موجود نیست"
+
+msgid "INVALID_AUTHORIZATION"
+msgstr "هدر Authorization نامعتبر است"
+
+msgid "RATE_LIMITED"
+msgstr "محدودیت نرخ رویداد Connector رد شد"
+
+msgid "EVENT_PROCESSING_FAILED"
+msgstr "پردازش رویداد ناموفق بود"
+
+msgid "TELEPHONY_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه اتصال استریسک/ایزابل برای این کسب‌وکار فعال نیست"
+
+msgid "INVALID_BUSINESS_ID"
+msgstr "شناسه کسب‌وکار نامعتبر است"
+
+msgid "CANNOT_DELETE_AUTO_DOCUMENT"
+msgstr "اسناد اتوماتیک قابل حذف نیستند. از منبع اصلی حذف کنید."
+
+msgid "CANNOT_EDIT_AUTO_DOCUMENT"
+msgstr "اسناد اتوماتیک قابل ویرایش نیستند. از منبع اصلی ویرایش کنید."
+
+msgid "DELETE_FAILED"
+msgstr "حذف سند ناموفق بود"
+
+msgid "PROJECT_NOT_FOUND"
+msgstr "پروژه یافت نشد یا غیرفعال است"
+
+msgid "FIXED_ASSET_DOCUMENT_DELETE_SOURCE_ONLY"
+msgstr "اسناد دارایی ثابت فقط از بخش کنترل اموال قابل حذف هستند"
+
+msgid "FIXED_ASSET_DOCUMENT_EDIT_SOURCE_ONLY"
+msgstr "اسناد دارایی ثابت فقط از بخش کنترل اموال قابل ویرایش هستند"
+
+msgid "LOAN_DOCUMENT_DELETE_SOURCE_ONLY"
+msgstr "اسناد تسهیلات فقط از بخش تسهیلات و اقساط قابل حذف هستند"
+
+msgid "LOAN_DOCUMENT_EDIT_SOURCE_ONLY"
+msgstr "اسناد تسهیلات فقط از بخش تسهیلات و اقساط قابل ویرایش هستند"
+
+msgid "LOAN_DOCUMENT_FISCAL_YEAR_LOCKED"
+msgstr "سند تسهیلات متعلق به سال مالی جاری نیست و قابل حذف یا ویرایش نمی‌باشد"
+
+msgid "OPENPYXL_NOT_INSTALLED"
+msgstr "کتابخانه openpyxl نصب نشده است"
+
+msgid "EXCEL_GENERATION_FAILED"
+msgstr "تولید فایل اکسل ناموفق بود"
+
+msgid "DOCUMENT_PDF_NOT_IMPLEMENTED"
+msgstr "خروجی PDF هنوز پیاده‌سازی نشده است"
+
+msgid "CREATE_DOCUMENT_FAILED"
+msgstr "ایجاد سند ناموفق بود"
+
+msgid "UPDATE_FAILED"
+msgstr "به‌روزرسانی سند ناموفق بود"
+
+msgid "UPDATE_DOCUMENT_FAILED"
+msgstr "به‌روزرسانی سند ناموفق بود"
+
+msgid "DIGIPAY_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه پرداخت اعتباری دیجی‌پی برای این کسب‌وکار فعال نیست."
+
+msgid "DIGIPAY_DECRYPT_FAILED"
+msgstr "بازیابی اعتبارنامه دیجی‌پی ممکن نیست."
+
+msgid "DIGIPAY_INVALID_MOBILE"
+msgstr "شماره همراه مشتری نامعتبر است."
+
+msgid "DIGIPAY_INVALID_ENVIRONMENT"
+msgstr "محیط باید تست یا عملیاتی باشد."
+
+msgid "DIGIPAY_CREDENTIALS_MISSING"
+msgstr "اعتبارنامه UPG دیجی‌پی کامل نیست."
+
+msgid "DIGIPAY_AUTH_FAILED"
+msgstr "ورود به دیجی‌پی ناموفق بود. اعتبارنامه را بررسی کنید."
+
+msgid "DIGIPAY_INVALID_AMOUNT"
+msgstr "مبلغ باید بزرگ‌تر از صفر باشد."
+
+msgid "DIGIPAY_TICKET_FAILED"
+msgstr "صدور تیکت دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_VERIFY_FAILED"
+msgstr "تأیید پرداخت دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_DELIVER_FAILED"
+msgstr "ثبت تحویل در دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_PROVIDER_ID_REQUIRED"
+msgstr "شناسه خرید ارسال نشده است."
+
+msgid "DIGIPAY_PURCHASE_NOT_FOUND"
+msgstr "خرید دیجی‌پی یافت نشد."
+
+msgid "DIGIPAY_AMOUNT_MISMATCH"
+msgstr "مبلغ بازگشتی با خرید ثبت‌شده یکسان نیست."
+
+msgid "DIGIPAY_INVALID_STATUS"
+msgstr "وضعیت خرید برای تحویل مناسب نیست."
+
+msgid "DIGIPAY_REFUND_IN_PERSON_UNSUPPORTED"
+msgstr "عودت خرید حضوری QR/پوز از API پشتیبانی نمی‌شود."
+
+msgid "DIGIPAY_REFUND_FAILED"
+msgstr "عودت دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_PERSON_REQUIRED"
+msgstr "شخص دیجی‌پی در تنظیمات مشخص نشده است."
+
+msgid "DIGIPAY_NO_OPEN_PURCHASES"
+msgstr "خرید تسویه‌نشده‌ای برای ثبت وجود ندارد."
+
+msgid "DIGIPAY_SETTLEMENT_UNBALANCED"
+msgstr "مبالغ تسویه با هم تراز نیستند."
+
+msgid "DIGIPAY_SETTLEMENT_NEGATIVE"
+msgstr "مبلغ خالص تسویه منفی است."
+
+msgid "DIGIPAY_COMMISSION_LINE"
+msgstr "کارمزد توسعه فروش دیجی‌پی"
+
+msgid "DIGIPAY_COMMISSION_VAT_LINE"
+msgstr "مالیات ارزش افزوده کارمزد دیجی‌پی"
+
+msgid "DIGIPAY_SETTLEMENT_DOC"
+msgstr "تسویه دیجی‌پی"
+
+msgid "DIGIPAY_SETTLEMENT_PERSON"
+msgstr "بستن طلب دیجی‌پی"
+
+msgid "DIGIPAY_SETTLEMENT_BANK"
+msgstr "واریز تسویه دیجی‌پی"
+
+msgid "VARIANT_DIMENSIONS_UPDATED"
+msgstr "ویژگی‌های اثرگذار بر موجودی به‌روزرسانی شد"
+
+msgid "VARIANT_CREATED"
+msgstr "ترکیب کالا ایجاد شد"
+
+msgid "VARIANT_UPDATED"
+msgstr "ترکیب کالا به‌روزرسانی شد"
+
+msgid "VARIANT_DEACTIVATED"
+msgstr "ترکیب کالا غیرفعال شد"
+
+msgid "VARIANT_INVENTORY_ENABLED"
+msgstr "تفکیک موجودی ویژگی برای این کالا فعال شد"
+
+msgid "VARIANT_INSUFFICIENT_STOCK"
+msgstr "موجودی ترکیب انتخاب‌شده کافی نیست"
+
+msgid "VARIANT_REQUIRED"
+msgstr "برای این کالا انتخاب ویژگی انباری الزامی است"
+
+msgid "VARIANT_ALLOCATION_MISMATCH"
+msgstr "جمع تخصیص‌ها با مقدار ردیف برابر نیست"
+
+msgid "VARIANT_NOT_ALLOWED"
+msgstr "برای کالای بدون تفکیک موجودی نمی‌توان تخصیص ویژگی ثبت کرد"
+
+msgid "VARIANT_UNIQUE_NOT_SUPPORTED"
+msgstr "تفکیک موجودی ویژگی برای کالای یونیک پشتیبانی نمی‌شود"
+
+msgid "VARIANT_NOT_SUPPORTED_HERE"
+msgstr "کالای با تفکیک موجودی ویژگی در این بخش پشتیبانی نمی‌شود"
+
+msgid "VARIANT_COMBINATION_DUPLICATE"
+msgstr "این ترکیب قبلاً ساخته شده است"
+
+msgid "VARIANT_DIMENSION_LIMIT"
+msgstr "در نسخه اول حداکثر دو ویژگی انباری مجاز است"
+
+msgid "VARIANT_DIMENSION_IN_USE"
+msgstr "پس از گردش Variantدار، حذف یا جایگزینی ابعاد مجاز نیست"
+
+msgid "VARIANT_INACTIVE"
+msgstr "این ترکیب غیرفعال است"
+
+msgid "DUPLICATE_VARIANT_BARCODE"
+msgstr "این بارکد قبلاً برای ترکیب دیگری ثبت شده است"
+
+msgid "GENERAL_BARCODE_CONFLICTS_WITH_VARIANT"
+msgstr "این بارکد برای ترکیب ویژگی کالا ثبت شده است"
+
+msgid "BARCODE_NOT_FOUND"
+msgstr "بارکد یافت نشد"
+
+msgid "TRANSFER_VARIANT_MISMATCH"
+msgstr "تخصیص ویژگی دو سمت حواله انتقال یکسان نیست"
+
+msgid "VARIANT_NEGATIVE_STOCK"
+msgstr "تا اصلاح مانده منفی کالا، تفکیک موجودی ممکن نیست"
+
+msgid "OPTION_LABEL_CONFLICT"
+msgstr "دو گزینه پس از نرمال‌سازی یکسان شدند و ادغام خودکار انجام نمی‌شود"
+
+msgid "OA_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه اتوماسیون اداری برای این کسب‌وکار فعال نیست"
+
+msgid "OA_POSITION_REQUIRED"
+msgstr "سمت فعال لازم است"
+
+msgid "OA_POSITION_NOT_HELD"
+msgstr "در حال حاضر این سمت را تصدی نمی‌کنید"
+
+msgid "OA_LETTER_NOT_FOUND"
+msgstr "نامه پیدا نشد"
+
+msgid "OA_LETTER_NOT_DRAFT"
+msgstr "فقط پیش‌نویس قابل ویرایش است"
+
+msgid "OA_LETTER_FORBIDDEN"
+msgstr "به این نامه دسترسی ندارید"
+
+msgid "OA_SECRETARIAT_REQUIRED"
+msgstr "ثبت وارده و صادره فقط از سمت دبیرخانه مجاز است"
+
+msgid "OA_REFERRAL_NOT_FOUND"
+msgstr "ارجاع پیدا نشد"
+
+msgid "OA_ORG_UNIT_NOT_FOUND"
+msgstr "واحد سازمانی پیدا نشد"
+
+msgid "OA_POSITION_NOT_FOUND"
+msgstr "سمت پیدا نشد"
+
+msgid "OA_HOLDER_NOT_FOUND"
+msgstr "تصدی سمت پیدا نشد"
+
+msgid "OA_POSITION_INACTIVE"
+msgstr "این سمت غیرفعال است"
+
+msgid "OA_DELEGATION_VIEW_ONLY"
+msgstr "این جانشینی فقط اجازه مشاهده دارد"
+
+msgid "OA_DELEGATION_REFER_ONLY"
+msgstr "این جانشینی فقط اجازه ارجاع دارد"
+
+msgid "OA_DELEGATION_NOT_FOUND"
+msgstr "جانشینی پیدا نشد"
+
+msgid "OA_DISABLED"
+msgstr "اتوماسیون اداری در تنظیمات غیرفعال است"
+
+msgid "OA_LETTER_STILL_DRAFT"
+msgstr "قبل از ارجاع، نامه باید در دبیرخانه ثبت شود"
+
+msgid "OA_LETTER_ARCHIVED"
+msgstr "نامه بایگانی‌شده قابل ارجاع نیست"
+
+msgid "OA_REFERRAL_FORBIDDEN"
+msgstr "این ارجاع در کارتابل سمت فعال نیست"
+
+msgid "OA_REFERRAL_CLOSED"
+msgstr "این ارجاع قبلاً بسته شده است"
+
+msgid "OA_ATTACHMENT_NOT_FOUND"
+msgstr "پیوست پیدا نشد"
+
+msgid "OA_HOLDER_EXISTS"
+msgstr "این کاربر هم‌اکنون این سمت را تصدی می‌کند"
+
+msgid "OA_DELEGATION_EXISTS"
+msgstr "جانشینی فعال برای این کاربر و سمت از قبل وجود دارد"
+
+msgid "OA_ORG_UNIT_CYCLE"
+msgstr "واحد سازمانی نمی‌تواند زیرمجموعهٔ خودش باشد"
+
+msgid "OA_CODE_EXISTS"
+msgstr "این کد قبلاً استفاده شده است"
+
+msgid "AI_MCP_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه «سرور MCP هوش مصنوعی» برای این کسب‌وکار فعال نیست."
+
+msgid "AI_MCP_PLUGIN_EXPIRED"
+msgstr "اشتراک افزونه «سرور MCP هوش مصنوعی» تمام شده است."
+
+msgid "MCP_CONNECTION_NOT_FOUND"
+msgstr "اتصال دستیار پیدا نشد."
+
+msgid "MCP_CONNECTION_REVOKED"
+msgstr "این اتصال قبلاً قطع شده است."
+
+msgid "MCP_CONNECTION_EXPIRED"
+msgstr "این اتصال منقضی شده است."
+
+msgid "MCP_MEMBERSHIP_INACTIVE"
+msgstr "صاحب این اتصال دیگر عضو فعال کسب‌وکار نیست."
+
+msgid "MCP_TOOL_NOT_PERMITTED"
+msgstr "یکی از ابزارهای انتخاب‌شده برای این کاربر مجاز نیست."
+
+msgid "MCP_WRITE_TOOLS_REQUIRE_WRITE_SCOPE"
+msgstr "برای اتصال فقط‌خواندنی ابزارهای نوشتنی را بردارید."
+
+msgid "MCP_INVALID_TOOL_PERMISSIONS"
+msgstr "فهرست ابزارها نامعتبر است."
+
+msgid "MCP_REVOKE_ALL_OWNER_ONLY"
+msgstr "قطع همه اتصال‌ها فقط برای مالک کسب‌وکار مجاز است."
+
+msgid "ADVANCED_PRODUCTION_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه تولید پیشرفته برای این کسب‌وکار فعال نیست."
+
+msgid "AP_ACCOUNT_NOT_IN_BUSINESS"
+msgstr "حساب انتخاب‌شده متعلق به این کسب‌وکار نیست."
+
+msgid "AP_INVALID_COSTING_METHOD"
+msgstr "روش بهای گزارش معتبر نیست."
+
+msgid "AP_OVERHEAD_MODE_UNSUPPORTED"
+msgstr "این حالت سربار هنوز در دفتر کل پشتیبانی نمی‌شود."
+
+msgid "AP_REPORT_UNKNOWN"
+msgstr "گزارش تولید پیشرفته شناخته نشد."
+
+msgid "INVALID_DATE_RANGE"
+msgstr "بازه تاریخ معتبر نیست."
+
+msgid "INVALID_PRODUCTION_ORDER_STATUS"
+msgstr "وضعیت سفارش تولید معتبر نیست."
+
+msgid "AP_REPORT_ORDERS"
+msgstr "سفارش‌های تولید"
+
+msgid "AP_REPORT_PROGRESS"
+msgstr "پیشرفت تولید"
+
+msgid "AP_REPORT_OVERDUE"
+msgstr "تولید عقب‌افتاده"
+
+msgid "AP_REPORT_SCHEDULE"
+msgstr "برنامه تولید"
+
+msgid "AP_REPORT_PLAN_ACHIEVEMENT"
+msgstr "تحقق برنامه تولید"
+
+msgid "AP_REPORT_OPEN_ORDERS"
+msgstr "سفارش‌های باز"
+
+msgid "AP_REPORT_CYCLE_TIME"
+msgstr "زمان چرخه تولید"
+
+msgid "AP_REPORT_ORDER_COSTING"
+msgstr "بهای سفارش تولید"
+
+msgid "AP_REPORT_MATERIAL_REQUIREMENTS"
+msgstr "مواد موردنیاز تولید"
+
+msgid "AP_REPORT_MATERIAL_SHORTAGE"
+msgstr "کسری مواد اولیه"
+
+msgid "AP_REPORT_MATERIAL_VARIANCE"
+msgstr "انحراف مصرف مواد"
+
+msgid "AP_COL_CODE"
+msgstr "کد سفارش"
+
+msgid "AP_COL_PRODUCT_CODE"
+msgstr "کد کالا"
+
+msgid "AP_COL_PRODUCT_NAME"
+msgstr "نام کالا"
+
+msgid "AP_COL_STATUS"
+msgstr "وضعیت"
+
+msgid "AP_COL_PLANNED_QUANTITY"
+msgstr "مقدار برنامه"
+
+msgid "AP_COL_PRODUCED_QUANTITY"
+msgstr "مقدار تولید"
+
+msgid "AP_COL_REMAINING_QUANTITY"
+msgstr "مانده"
+
+msgid "AP_COL_DUE_DATE"
+msgstr "سررسید"
+
+msgid "AP_COL_PROGRESS_PERCENT"
+msgstr "درصد پیشرفت"
+
+msgid "AP_COL_PLANNED_START_DATE"
+msgstr "شروع برنامه"
+
+msgid "AP_COL_QUANTITY_VARIANCE"
+msgstr "انحراف مقدار"
+
+msgid "AP_COL_STARTED_AT"
+msgstr "شروع واقعی"
+
+msgid "AP_COL_COMPLETED_AT"
+msgstr "تکمیل"
+
+msgid "AP_COL_CYCLE_HOURS"
+msgstr "ساعت چرخه"
+
+msgid "AP_COL_COSTING_METHOD"
+msgstr "روش بها"
+
+msgid "AP_COL_STANDARD_TOTAL"
+msgstr "بهای استاندارد"
+
+msgid "AP_COL_ACTUAL_TOTAL"
+msgstr "بهای واقعی"
+
+msgid "AP_COL_VALUED_TOTAL"
+msgstr "بهای گزارش"
+
+msgid "AP_COL_COST_VARIANCE"
+msgstr "انحراف هزینه"
+
+msgid "AP_COL_WAREHOUSE_NAME"
+msgstr "انبار"
+
+msgid "AP_COL_REQUIRED_QUANTITY"
+msgstr "مقدار موردنیاز"
+
+msgid "AP_COL_RESERVED_QUANTITY"
+msgstr "رزرو"
+
+msgid "AP_COL_FREE_QUANTITY"
+msgstr "آزاد"
+
+msgid "AP_COL_SHORTAGE_QUANTITY"
+msgstr "کسری"
+
+msgid "AP_COL_ORDER_CODE"
+msgstr "کد سفارش"
+
+msgid "AP_COL_ISSUED_QUANTITY"
+msgstr "مقدار صادرشده"
+
+msgid "AP_COL_DOCUMENT_DATE"
+msgstr "تاریخ سند"
+
+msgid "AP_COL_DOCUMENT_CODE"
+msgstr "کد سند"
+
+msgid "AP_COL_QUANTITY"
+msgstr "مقدار"
+
+msgid "AP_COL_AMOUNT"
+msgstr "مبلغ"
+
+msgid "AP_COL_PRODUCED_QUANTITY"
+msgstr "مقدار تولید"
+
+msgid "AP_COL_SCRAP_PERCENT"
+msgstr "درصد ضایعات"
+
+msgid "AP_REPORT_SCRAP"
+msgstr "ضایعات تولید"
+
+msgid "AP_REPORT_SCRAP_BY_PRODUCT"
+msgstr "ضایعات به تفکیک محصول"
+
+msgid "AP_REPORT_SCRAP_RATE"
+msgstr "درصد ضایعات"
+
+msgid "AP_REPORT_FINISHED_GOODS"
+msgstr "تولید نهایی"
+
+msgid "AP_REPORT_FINISHED_BY_PRODUCT"
+msgstr "تولید به تفکیک محصول"
+
+msgid "AP_REPORT_UNPLANNED_PRODUCTION"
+msgstr "تولید بدون سفارش"
+
+msgid "AP_WORK_CENTER_NOT_FOUND"
+msgstr "مرکز تولید در این کسب‌وکار یافت نشد."
+
+msgid "AP_NOMINAL_RATE_INVALID"
+msgstr "ظرفیت اسمی نمی‌تواند منفی باشد."
+
+msgid "AP_ASSET_NOT_FOUND"
+msgstr "دارایی ثابت در این کسب‌وکار یافت نشد."
+
+msgid "AP_SHIFT_NOT_FOUND"
+msgstr "شیفت در این کسب‌وکار یافت نشد."
+
+msgid "AP_FISCAL_YEAR_NOT_FOUND"
+msgstr "سال مالی در این کسب‌وکار یافت نشد."
+
+msgid "AP_WAREHOUSE_NOT_FOUND"
+msgstr "انبار در این کسب‌وکار یافت نشد."
+
+msgid "AP_CURRENCY_NOT_FOUND"
+msgstr "ارز معتبر نیست."
+
+msgid "AP_VARIANCE_ACCOUNT_REQUIRED"
+msgstr "برای روش استاندارد یا میانگین موزون، حساب انحراف بها لازم است تا بهای واقعی به‌جای روش انتخابی سند نشود."
+
+msgid "AP_STATUS_DRAFT"
+msgstr "پیش‌نویس"
+
+msgid "AP_STATUS_RELEASED"
+msgstr "آزادشده"
+
+msgid "AP_STATUS_IN_PROGRESS"
+msgstr "در حال تولید"
+
+msgid "AP_STATUS_COMPLETED"
+msgstr "تکمیل‌شده"
+
+msgid "AP_STATUS_CANCELLED"
+msgstr "لغوشده"
+
+msgid "AP_STAGE_INCOMING"
+msgstr "ورود مواد"
+
+msgid "AP_STAGE_IN_PROCESS"
+msgstr "حین تولید"
+
+msgid "AP_STAGE_FINAL"
+msgstr "محصول نهایی"
+
+msgid "AP_RESULT_PASS"
+msgstr "قبول"
+
+msgid "AP_RESULT_FAIL"
+msgstr "مردود"
+
+msgid "AP_MAINTENANCE_BREAKDOWN"
+msgstr "خرابی"
+
+msgid "AP_MAINTENANCE_PREVENTIVE"
+msgstr "پیشگیرانه"
+
+msgid "AP_BASIS_ACTUAL"
+msgstr "واقعی"
+
+msgid "AP_BASIS_STANDARD"
+msgstr "استاندارد"
+
+msgid "AP_BASIS_WEIGHTED_AVERAGE"
+msgstr "میانگین موزون"
+
+msgid "AP_ROLE_MATERIAL"
+msgstr "ماده"
+
+msgid "AP_ROLE_OUTPUT"
+msgstr "خروجی"
+
+msgid "AP_RECYCLABLE_YES"
+msgstr "بله"
+
+msgid "AP_RECYCLABLE_NO"
+msgstr "خیر"
+
+msgid "AP_LINE_NOT_FOUND"
+msgstr "خط تولید در این کسب‌وکار یافت نشد."
+
+msgid "AP_PRODUCT_NOT_FOUND"
+msgstr "کالا در این کسب‌وکار یافت نشد."
+
+msgid "AP_MASTER_UNKNOWN"
+msgstr "نوع داده تولید پیشرفته شناخته نشد."
+
+msgid "AP_MINUTES_REQUIRED"
+msgstr "مدت به دقیقه باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_OUTPUT_QUANTITY_REQUIRED"
+msgstr "مقدار سالم یا ضایعات باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_QC_VALUE_INVALID"
+msgstr "مرحله یا نتیجه کنترل کیفیت معتبر نیست."
+
+msgid "AP_QC_QUANTITY_INVALID"
+msgstr "مقدار کنترل‌شده و مردود معتبر نیست."
+
+msgid "AP_CODE_REQUIRED"
+msgstr "کد الزامی است."
+
+msgid "AP_NAME_REQUIRED"
+msgstr "نام الزامی است."
+
+msgid "AP_TIME_INVALID"
+msgstr "ساعت باید به شکل HH:MM باشد."
+
+msgid "AP_MACHINE_NOT_FOUND"
+msgstr "دستگاه در این کسب‌وکار یافت نشد."
+
+msgid "AP_MAINTENANCE_KIND_INVALID"
+msgstr "نوع تعمیر باید خرابی یا پیشگیرانه باشد."
+
+msgid "AP_OPERATOR_NOT_FOUND"
+msgstr "اپراتور در این کسب‌وکار یافت نشد."
+
+msgid "AP_MACHINE_LINE_MISMATCH"
+msgstr "دستگاه به این خط تولید وصل نیست."
+
+msgid "AP_COST_INVALID"
+msgstr "مبلغ هزینه نمی‌تواند منفی باشد."
+
+msgid "AP_HOLD_NOT_FOUND"
+msgstr "توقف سفارش در این کسب‌وکار یافت نشد."
+
+msgid "AP_ORDER_NOT_FOUND"
+msgstr "سفارش تولید در این کسب‌وکار یافت نشد."
+
+msgid "AP_HOLD_REASON_REQUIRED"
+msgstr "علت توقف سفارش لازم است."
+
+msgid "AP_REPORT_MACHINE_OUTPUT"
+msgstr "بهره‌وری ماشین"
+
+msgid "AP_REPORT_DOWNTIME_COST"
+msgstr "هزینه توقف"
+
+msgid "AP_REPORT_HELD_ORDERS"
+msgstr "سفارش‌های متوقف"
+
+msgid "AP_COUNT_INVALID"
+msgstr "مقدار شمارش نمی‌تواند منفی باشد."
+
+msgid "AP_REPORT_MATERIAL_CONSUMPTION"
+msgstr "مصرف مواد تولید"
+
+msgid "AP_REPORT_CAPACITY_REQUIRED"
+msgstr "ظرفیت موردنیاز"
+
+msgid "AP_REPORT_WIP_COUNT"
+msgstr "مغایرت شمارش جریان ساخت"
+
+msgid "AP_REPORT_REWORK"
+msgstr "دوباره‌کاری"
+
+msgid "AP_REPORT_LINE_RETURNS"
+msgstr "برگشت به خط"
+
+msgid "AP_TRANSFER_LINES_SAME"
+msgstr "خط مبدأ و مقصد انتقال نمی‌تواند یکی باشد."
+
+msgid "AP_IDLE_DAYS_INVALID"
+msgstr "تعداد روز بدون حرکت باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_REPORT_WIP_BY_CENTER"
+msgstr "جریان ساخت به تفکیک مرکز"
+
+msgid "AP_REPORT_MATERIAL_SCRAP"
+msgstr "ضایعات مواد تولید"
+
+msgid "AP_REPORT_IDLE_MATERIALS"
+msgstr "مواد راکد تولید"
+
+msgid "AP_REPORT_STAGE_TRANSFERS"
+msgstr "انتقال بین خطوط"
+
+msgid "AP_LABOR_HOURS_REQUIRED"
+msgstr "ساعت واقعی دستمزد باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_LABOR_RATE_INVALID"
+msgstr "نرخ ساعتی دستمزد نمی‌تواند منفی باشد."
+
+msgid "AP_REPORT_WAGE_VARIANCE"
+msgstr "انحراف دستمزد"
+
+msgid "AP_SCRAP_RECYCLABLE_REQUIRED"
+msgstr "باید مشخص شود ضایعات قابل بازیافت است یا نه."
+
+msgid "AP_SCRAP_REASON_NOT_FOUND"
+msgstr "علت ضایعات در این کسب‌وکار یافت نشد."
+
+msgid "AP_SCRAP_QUANTITY_REQUIRED"
+msgstr "مقدار ضایعات باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_REPORT_SCRAP_BY_REASON"
+msgstr "علل ضایعات"
+
+msgid "AP_REPORT_RECYCLABLE_SCRAP"
+msgstr "ضایعات قابل بازیافت"
+
+msgid "AP_REPORT_NONRECYCLABLE_SCRAP"
+msgstr "ضایعات غیرقابل بازیافت"
+
+msgid "AP_REPORT_QC_CAUSES"
+msgstr "علل عدم انطباق"
+
+msgid "AP_LOT_CODE_REQUIRED"
+msgstr "کد بچ برای ردیابی لازم است."
+
+msgid "AP_BREAK_EVEN_INPUTS_REQUIRED"
+msgstr "برای نقطه سربه‌سر، کالا و هزینه ثابت همان کالا لازم است."
+
+msgid "AP_REPORT_YIELD_RATE"
+msgstr "بازده تولید"
+
+msgid "AP_REPORT_UNUSED_CAPACITY"
+msgstr "ظرفیت بلااستفاده"
+
+msgid "AP_REPORT_BREAK_EVEN"
+msgstr "نقطه سربه‌سر"
+
+msgid "AP_REPORT_MONTHLY_COMPARISON"
+msgstr "مقایسه ماهانه تولید"
+
+msgid "AP_REPORT_MATERIAL_FLOW"
+msgstr "گردش مواد تولید"
+
+msgid "AP_REPORT_PRODUCTION_BY_LOT"
+msgstr "تولید به تفکیک بچ"
+
+msgid "AP_REPORT_CONVERSION_EFFICIENCY"
+msgstr "راندمان تبدیل مواد"
+
+msgid "AP_REPORT_LOW_YIELD"
+msgstr "محصولات کم‌بازده"
+
+msgid "AP_REPORT_LINE_MAINTENANCE_COST"
+msgstr "هزینه نگهداری هر خط"
+
+msgid "AP_REPORT_MATERIAL_PRICE_VARIANCE"
+msgstr "انحراف نرخ مواد"
+
+msgid "AP_REPORT_PRODUCT_COST"
+msgstr "بهای تمام‌شده محصول"
+
+msgid "AP_REPORT_WIP_BALANCE"
+msgstr "مانده کالای در جریان ساخت"
+
+msgid "AP_REPORT_OPERATION_VARIANCE"
+msgstr "انحراف عملیات تولید"
+
+msgid "AP_COL_USAGE_VARIANCE"
+msgstr "انحراف مصرف"
+
+msgid "AP_COL_PRICE_VARIANCE"
+msgstr "انحراف نرخ"
+
+msgid "AP_COL_STANDARD_UNIT_COST"
+msgstr "نرخ استاندارد"
+
+msgid "AP_COL_TRANSFERRED_AMOUNT"
+msgstr "انتقال به محصول نهایی"
+
+msgid "AP_COL_REMAINING_WIP"
+msgstr "مانده در جریان ساخت"
+
+msgid "AP_COL_STANDARD_OPERATIONS"
+msgstr "عملیات استاندارد"
+
+msgid "AP_COL_STANDARD_MATERIALS"
+msgstr "مواد استاندارد"
+
+msgid "AP_COL_ACTUAL_MATERIALS"
+msgstr "مواد واقعی"
+
+msgid "AP_COL_ACTUAL_OPERATIONS"
+msgstr "عملیات واقعی"
+
+msgid "AP_COL_OPERATION_VARIANCE"
+msgstr "انحراف عملیات"
+
+msgid "AP_COL_PERIOD"
+msgstr "دوره"
+
+msgid "AP_COL_PURCHASED_QUANTITY"
+msgstr "خرید"
+
+msgid "AP_COL_RETURNED_QUANTITY"
+msgstr "برگشت خرید"
+
+msgid "AP_COL_CONSUMED_QUANTITY"
+msgstr "مصرف تولید"
+
+msgid "AP_COL_SCRAPPED_QUANTITY"
+msgstr "ضایعات"
+
+msgid "AP_COL_PERIOD_NET_QUANTITY"
+msgstr "خالص دوره"
+
+msgid "AP_COL_MATERIAL_NAME"
+msgstr "ماده"
+
+msgid "AP_COL_MATERIAL_COUNT"
+msgstr "تعداد مواد"
+
+msgid "AP_COL_CONVERSION_PERCENT"
+msgstr "درصد تبدیل"
+
+msgid "AP_COL_MANUFACTURING_DATE"
+msgstr "تاریخ ساخت"
+
+msgid "AP_COL_RECORD_COUNT"
+msgstr "تعداد رکورد"
+
+msgid "AP_COL_REPAIR_MINUTES"
+msgstr "دقیقه تعمیر"
+
+msgid "AP_COL_COST_AMOUNT"
+msgstr "مبلغ هزینه"
+
+msgid "AP_COL_LINE_CODE"
+msgstr "کد خط"
+
+msgid "AP_COL_LINE_NAME"
+msgstr "خط"
+
+msgid "AP_COL_QUANTITY_GOOD"
+msgstr "مقدار سالم"
+
+msgid "AP_COL_QUANTITY_SCRAP"
+msgstr "مقدار ضایعات"
+
+msgid "AP_COL_YIELD_PERCENT"
+msgstr "درصد بازده"
+
+msgid "AP_COL_IDEAL_QUANTITY"
+msgstr "ظرفیت اسمی"
+
+msgid "AP_COL_UNUSED_QUANTITY"
+msgstr "ظرفیت بلااستفاده"
+
+msgid "AP_COL_UTILIZATION_PERCENT"
+msgstr "درصد استفاده"
+
+msgid "AP_COL_PRODUCT_CODE"
+msgstr "کد کالا"
+
+msgid "AP_COL_PRODUCT_NAME"
+msgstr "کالا"
+
+msgid "AP_COL_FIXED_COST"
+msgstr "هزینه ثابت"
+
+msgid "AP_COL_UNIT_COST"
+msgstr "بهای واحد"
+
+msgid "AP_COL_SALES_AMOUNT"
+msgstr "مبلغ فروش"
+
+msgid "AP_COL_BREAK_EVEN_QUANTITY"
+msgstr "مقدار سربه‌سر"

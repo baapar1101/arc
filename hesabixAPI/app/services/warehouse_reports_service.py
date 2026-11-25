@@ -17,7 +17,39 @@ from adapters.db.models.warehouse import Warehouse
 from adapters.db.models.business import Business
 from adapters.db.models.currency import Currency
 from app.core.responses import ApiError
+from app.core.business_calendar import business_today
 from app.services.invoice_service import _compute_available_stock
+from app.services.invoice_unit_conversion_service import inventory_quantity_to_main
+
+
+def _operational_stock(db: Session, business_id: int, product: Product, warehouse_id: Optional[int], as_of: date) -> Decimal:
+    from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+    if is_expiry_tracked_product(product):
+        return Decimal(str(sellable_quantity(db, business_id, product, warehouse_id, as_of)))
+    return Decimal(str(_compute_available_stock(db, business_id, product.id, warehouse_id, as_of)))
+
+
+def _products_by_id(db: Session, business_id: int, product_ids) -> Dict[int, Product]:
+    pids = sorted({int(pid) for pid in product_ids if pid is not None})
+    if not pids:
+        return {}
+    return {
+        int(product.id): product
+        for product in db.query(Product).filter(
+            and_(Product.business_id == business_id, Product.id.in_(pids))
+        ).all()
+    }
+
+
+def _line_qty_main(line: WarehouseDocumentLine, products_by_id: Dict[int, Product]) -> Decimal:
+    product = products_by_id.get(int(line.product_id)) if line.product_id is not None else None
+    return inventory_quantity_to_main(
+        line.quantity,
+        product,
+        getattr(line, "extra_info", None),
+        strict=False,
+    )
 
 
 def get_warehouse_documents_summary_report(
@@ -79,6 +111,12 @@ def get_warehouse_documents_summary_report(
         WarehouseDocument.id.desc()
     ).offset(skip).limit(take).all()
     
+    products_by_id = _products_by_id(
+        db,
+        business_id,
+        [line.product_id for doc in documents for line in doc.lines],
+    )
+
     # محاسبه آمار
     summary_by_type = {}
     total_documents = 0
@@ -103,13 +141,12 @@ def get_warehouse_documents_summary_report(
         for line in doc.lines:
             summary_by_type[doc_type]["items_count"] += 1
             total_items += 1
+            qty = _line_qty_main(line, products_by_id)
             
             if line.movement == "in":
-                qty = Decimal(str(line.quantity))
                 summary_by_type[doc_type]["quantity_in"] += qty
                 total_quantity_in += qty
             elif line.movement == "out":
-                qty = Decimal(str(line.quantity))
                 summary_by_type[doc_type]["quantity_out"] += qty
                 total_quantity_out += qty
     
@@ -124,7 +161,7 @@ def get_warehouse_documents_summary_report(
             "warehouse_from_id": doc.warehouse_id_from,
             "warehouse_to_id": doc.warehouse_id_to,
             "items_count": len(doc.lines),
-            "total_quantity": sum(Decimal(str(line.quantity)) for line in doc.lines),
+            "total_quantity": sum(_line_qty_main(line, products_by_id) for line in doc.lines),
         })
     
     return {
@@ -157,7 +194,7 @@ def get_slow_moving_items_report(
     """
     گزارش کالاهای کم‌گردش
     """
-    cutoff_date = date.today() - timedelta(days=days_without_movement)
+    cutoff_date = business_today(business_id) - timedelta(days=days_without_movement)
     
     # Query محصولات
     query = db.query(Product).filter(Product.business_id == business_id)
@@ -202,7 +239,7 @@ def get_slow_moving_items_report(
     items = []
     for product in slow_moving[skip:skip + take]:
         # محاسبه موجودی فعلی
-        stock = _compute_available_stock(db, business_id, product.id, None, date.today())
+        stock = _operational_stock(db, business_id, product, None, business_today(business_id))
         
         items.append({
             "product_id": product.id,
@@ -233,14 +270,16 @@ def get_critical_stock_report(
     """
     گزارش کالاهای با موجودی بحرانی
     """
+    from app.services.inventory_lot_service import business_as_of
     from app.services.transfer_service import _parse_iso_date as _parse_date
-    
-    as_of_date_obj = date.today()
+
+    explicit = None
     if as_of_date:
         try:
-            as_of_date_obj = _parse_date(as_of_date) if isinstance(as_of_date, str) else as_of_date
+            explicit = _parse_date(as_of_date) if isinstance(as_of_date, str) else as_of_date
         except Exception:
-            pass
+            explicit = None
+    as_of_date_obj = business_as_of(business_id, explicit)
     
     # Query محصولات با حداقل موجودی
     query = db.query(Product).filter(
@@ -269,7 +308,7 @@ def get_critical_stock_report(
     for product in products:
         if warehouse_ids:
             for wh_id in warehouse_ids:
-                stock = _compute_available_stock(db, business_id, product.id, wh_id, as_of_date_obj)
+                stock = _operational_stock(db, business_id, product, wh_id, as_of_date_obj)
                 reorder_point = Decimal(str(product.reorder_point or 0))
                 if stock < reorder_point:
                     critical_items.append({
@@ -280,7 +319,7 @@ def get_critical_stock_report(
                         "difference": stock - reorder_point,
                     })
         else:
-            stock = _compute_available_stock(db, business_id, product.id, None, as_of_date_obj)
+            stock = _operational_stock(db, business_id, product, None, as_of_date_obj)
             reorder_point = Decimal(str(product.reorder_point or 0))
             if stock < reorder_point:
                 critical_items.append({
@@ -392,6 +431,12 @@ def get_inter_warehouse_transfers_report(
         for wh in wh_list:
             warehouses[wh.id] = wh
     
+    products_by_id = _products_by_id(
+        db,
+        business_id,
+        [line.product_id for doc in documents for line in doc.lines],
+    )
+
     items = []
     for doc in documents:
         warehouse_from_name = None
@@ -406,7 +451,7 @@ def get_inter_warehouse_transfers_report(
         
         # محاسبه تعداد اقلام و مقدار
         items_count = len(doc.lines)
-        total_quantity = sum(Decimal(str(line.quantity)) for line in doc.lines)
+        total_quantity = sum(_line_qty_main(line, products_by_id) for line in doc.lines)
         
         items.append({
             "id": doc.id,
@@ -467,6 +512,12 @@ def get_adjustment_documents_report(
         WarehouseDocument.document_date.desc(),
         WarehouseDocument.id.desc()
     ).offset(skip).limit(take).all()
+
+    products_by_id = _products_by_id(
+        db,
+        business_id,
+        [line.product_id for doc in documents for line in doc.lines],
+    )
     
     # محاسبه آمار تعدیل‌ها
     total_increases = Decimal(0)
@@ -481,7 +532,7 @@ def get_adjustment_documents_report(
         
         for line in doc.lines:
             items_count += 1
-            qty = Decimal(str(line.quantity))
+            qty = _line_qty_main(line, products_by_id)
             if line.movement == "in":
                 increases += qty
             elif line.movement == "out":
@@ -576,6 +627,11 @@ def get_warehouse_performance_report(
             docs_query = docs_query.filter(WarehouseDocument.document_date <= date_to_obj)
         
         documents = docs_query.all()
+        products_by_id = _products_by_id(
+            db,
+            business_id,
+            [line.product_id for doc in documents for line in doc.lines],
+        )
         
         # محاسبه آمار
         total_documents = len(documents)
@@ -613,7 +669,7 @@ def get_warehouse_performance_report(
                 # فقط خطوط مربوط به این انبار
                 if line_warehouse_id == warehouse.id:
                     total_items += 1
-                    qty = Decimal(str(line.quantity))
+                    qty = _line_qty_main(line, products_by_id)
                     if line.movement == "in":
                         total_quantity_in += qty
                     elif line.movement == "out":
@@ -713,6 +769,8 @@ def get_product_movement_history_report(
         ).all()
         for wh in wh_list:
             warehouses[wh.id] = wh
+
+    products_by_id = {int(product.id): product}
     
     items = []
     for line in lines:
@@ -731,7 +789,8 @@ def get_product_movement_history_report(
             "warehouse_id": line.warehouse_id,
             "warehouse_name": warehouse_name,
             "movement": line.movement,
-            "quantity": float(line.quantity),
+            "quantity": float(_line_qty_main(line, products_by_id)),
+            "unit": product.main_unit or "",
             "created_by_user_id": doc.created_by_user_id,
         })
     
@@ -762,13 +821,15 @@ def get_inventory_valuation_report(
     """
     from app.services.transfer_service import _parse_iso_date as _parse_date
     from app.services.business_currency_rate_service import resolve_rate_to_base
+    from app.services.inventory_lot_service import business_as_of
 
-    as_of_date_obj = date.today()
+    explicit = None
     if as_of_date:
         try:
-            as_of_date_obj = _parse_date(as_of_date) if isinstance(as_of_date, str) else as_of_date
+            explicit = _parse_date(as_of_date) if isinstance(as_of_date, str) else as_of_date
         except Exception:
-            pass
+            explicit = None
+    as_of_date_obj = business_as_of(business_id, explicit)
 
     business = db.get(Business, int(business_id))
     base_currency_id = (
@@ -1161,5 +1222,132 @@ def get_inventory_turnover_report(
         "page": page,
         "limit": safe_per_page,
         "total_pages": total_pages,
+    }
+
+
+def get_expiry_stock_report(
+    db: Session,
+    business_id: int,
+    warehouse_ids: Optional[List[int]] = None,
+    statuses: Optional[List[str]] = None,
+    as_of_date: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """گزارش لات‌های موجود به‌تفکیک وضعیت انقضا."""
+    from app.services.inventory_lot_service import (
+        compute_available_lot_stock,
+        dual_unit_qty,
+        instance_expiry_view,
+        is_expiry_tracked_product,
+        lot_to_dict,
+    )
+    from adapters.db.models.product_instance import ProductInstance
+    from adapters.db.models.inventory_lot import InventoryLot
+    from adapters.db.models.warehouse import Warehouse
+
+    from app.services.inventory_lot_service import business_as_of
+
+    explicit = None
+    if as_of_date:
+        try:
+            explicit = datetime.fromisoformat(str(as_of_date)[:10]).date()
+        except Exception:
+            explicit = None
+    as_of = business_as_of(business_id, explicit)
+
+    products = (
+        db.query(Product)
+        .filter(Product.business_id == business_id, Product.track_inventory == True, Product.track_expiry == True)  # noqa: E712
+        .all()
+    )
+    warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+    if warehouse_ids:
+        warehouses = [w for w in warehouses if int(w.id) in {int(x) for x in warehouse_ids}]
+    wanted = {str(s) for s in (statuses or []) if s}
+
+    items: List[Dict[str, Any]] = []
+    summary = {"sellable": 0.0, "near_expiry": 0.0, "blocked": 0.0, "expired": 0.0, "undated": 0.0}
+    for product in products:
+        if str(getattr(product, "inventory_mode", None) or "bulk") == "unique":
+            inst_q = db.query(ProductInstance).filter(
+                ProductInstance.business_id == business_id,
+                ProductInstance.product_id == int(product.id),
+                ProductInstance.status == "available",
+            )
+            if warehouse_ids:
+                inst_q = inst_q.filter(ProductInstance.warehouse_id.in_([int(w.id) for w in warehouses if w is not None]))
+            for inst in inst_q.all():
+                view = instance_expiry_view(inst, product, as_of)
+                if wanted and str(view.get("status")) not in wanted:
+                    continue
+                qty = Decimal("1")
+                dual = dual_unit_qty(product, qty)
+                wh = next((w for w in warehouses if w is not None and int(w.id) == int(inst.warehouse_id or 0)), None)
+                row = {
+                    "id": int(inst.id),
+                    "product_id": int(product.id),
+                    "variant_id": None,
+                    "lot_code": inst.serial_number,
+                    "serial_number": inst.serial_number,
+                    "inventory_mode": "unique",
+                    "manufacturing_date": view.get("manufacturing_date").isoformat() if view.get("manufacturing_date") else None,
+                    "expiry_date": view.get("expiry_date").isoformat() if view.get("expiry_date") else None,
+                    "best_before_date": view.get("best_before_date").isoformat() if view.get("best_before_date") else None,
+                    "removal_date": view.get("removal_date").isoformat() if view.get("removal_date") else None,
+                    "alert_date": view.get("alert_date").isoformat() if view.get("alert_date") else None,
+                    "status": view.get("status"),
+                    "remaining_days": view.get("remaining_days"),
+                    "product_code": product.code,
+                    "product_name": product.name,
+                    "warehouse_id": int(inst.warehouse_id) if inst.warehouse_id else None,
+                    "warehouse_name": wh.name if wh is not None else None,
+                    **dual,
+                }
+                items.append(row)
+                st = str(row.get("status") or "")
+                if st in summary:
+                    summary[st] += 1.0
+            continue
+        lots = (
+            db.query(InventoryLot)
+            .filter(InventoryLot.business_id == business_id, InventoryLot.product_id == int(product.id))
+            .all()
+        )
+        for lot in lots:
+            targets = warehouses if warehouses else [None]
+            for wh in targets:
+                wh_id = int(wh.id) if wh is not None else None
+                qty = compute_available_lot_stock(
+                    db, business_id, int(product.id), wh_id, int(lot.id), as_of
+                )
+                if qty <= 0:
+                    continue
+                row = lot_to_dict(lot, product, qty, as_of)
+                if wanted and str(row.get("status")) not in wanted:
+                    continue
+                row["product_code"] = product.code
+                row["product_name"] = product.name
+                row["warehouse_id"] = wh_id
+                row["warehouse_name"] = wh.name if wh is not None else None
+                items.append(row)
+                st = str(row.get("status") or "")
+                if st in summary:
+                    summary[st] += float(qty)
+
+    items.sort(key=lambda r: (r.get("expiry_date") or "9999-12-31", r.get("product_name") or ""))
+    total = len(items)
+    sliced = items[skip:skip + take]
+    return {
+        "items": sliced,
+        "total": total,
+        "summary": summary,
+        "as_of_date": as_of.isoformat(),
+        "pagination": {
+            "total": total,
+            "page": (skip // take) + 1 if take else 1,
+            "per_page": take,
+            "total_pages": (total + take - 1) // take if take else 1,
+        },
     }
 

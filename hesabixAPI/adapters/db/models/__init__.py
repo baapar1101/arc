@@ -12,6 +12,7 @@ from .captcha import Captcha  # noqa: F401
 from .auth_security_event import AuthSecurityEvent  # noqa: F401
 from .sms_destination_send_log import SmsDestinationSendLog  # noqa: F401
 from .firewall_rule import FirewallRule, FirewallRequestLog, FirewallAuditLog  # noqa: F401
+from .admin_audit_log import AdminAuditLog  # noqa: F401
 from .firewall_rate_policy import FirewallRatePolicy  # noqa: F401
 from .password_reset import PasswordReset  # noqa: F401
 from .email_verification import EmailVerificationToken  # noqa: F401
@@ -56,13 +57,26 @@ from .business_fx_auto_sync import BusinessFxAutoSyncSettings, BusinessFxAutoSyn
 # Documents
 from .document import Document  # noqa: F401
 from .document_invoice_tag import DocumentInvoiceTag, DocumentInvoiceTagLink  # noqa: F401
+from .report_template import ReportTemplate  # noqa: F401
 from .report_template_status_event import ReportTemplateStatusEvent  # noqa: F401
 from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401
 from .product_attribute import ProductAttribute  # noqa: F401
+from .product_attribute_option import ProductAttributeOption  # noqa: F401
 from .business_catalog_spec_field import BusinessCatalogSpecField  # noqa: F401
 from .product import Product  # noqa: F401
+from .product_variant import ProductVariantDimension, ProductVariant, ProductVariantValue  # noqa: F401
+from .product_variant_allocation import (  # noqa: F401
+	InvoiceItemLineVariantAllocation,
+	WarehouseLineVariantAllocation,
+)
+from .inventory_variant_balance import InventoryVariantBalance  # noqa: F401
+from .inventory_lot import (  # noqa: F401
+	InventoryLot,
+	InvoiceItemLineLotAllocation,
+	WarehouseLineLotAllocation,
+)
 from .product_bundle import ProductBundle, ProductBundleItem  # noqa: F401
 from .product_supplier import ProductSupplier, ProductSupplierSocialContact  # noqa: F401
 from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401
@@ -85,6 +99,17 @@ from .received_loan_facility import (  # noqa: F401
 	ReceivedLoanInstallment,
 	ReceivedLoanInstallmentPayment,
 )
+from .fixed_asset import (  # noqa: F401
+	FixedAssetSettings,
+	FixedAssetClass,
+	FixedAssetLocation,
+	FixedAsset,
+	FixedAssetDocumentLink,
+	FixedAssetDepreciationRun,
+	FixedAssetDepreciationRunLine,
+	FixedAssetSubsequentExpenditure,
+	FixedAssetEstimateChange,
+)
 from .check import Check  # noqa: F401
 from .warehouse import Warehouse  # noqa: F401
 from .warehouse_location import WarehouseLocation  # noqa: F401
@@ -97,6 +122,32 @@ from .quick_sales_payment_button import QuickSalesPaymentButton  # noqa: F401
 from .quick_sale_invoice_job import QuickSaleInvoiceJob  # noqa: F401
 from .hscript_report import HScriptReport, HScriptReportVersion, HScriptReportRun, HScriptReportSchedule  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
+from .production_order import (  # noqa: F401
+	ProductionOrder,
+	ProductionOrderMaterial,
+	ProductionOrderOperation,
+	ProductionOrderOutput,
+)
+from .advanced_production import (  # noqa: F401
+	AdvancedProductionDowntime,
+	AdvancedProductionInspection,
+	AdvancedProductionLabor,
+	AdvancedProductionLine,
+	AdvancedProductionMaintenance,
+	AdvancedProductionMachine,
+	AdvancedProductionLineReturn,
+	AdvancedProductionOrderHold,
+	AdvancedProductionOrderLine,
+	AdvancedProductionRework,
+	AdvancedProductionWipCount,
+	AdvancedProductionOutputLog,
+	AdvancedProductionScrapEvent,
+	AdvancedProductionScrapReason,
+	AdvancedProductionSettings,
+	AdvancedProductionStageTransfer,
+	AdvancedProductionShift,
+	AdvancedProductionWorkCenter,
+)
 from .ping_pong_score import PingPongScore  # noqa: F401
 from .storage_plan import StoragePlan, BusinessStorageSubscription, StorageInvoice, StorageUsageTransaction  # noqa: F401
 from .document_monetization import (  # noqa: F401
@@ -109,6 +160,14 @@ from .document_monetization import (  # noqa: F401
 )
 # Wallet models
 from .wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSetting  # noqa: F401
+from .payment_gateway import PaymentGateway  # noqa: F401
+from .business_pay_page import (  # noqa: F401
+	BusinessPayPage,
+	BusinessPayPageRequest,
+	BusinessPayPageUsernameHistory,
+	PublicPayPageAbuseReport,
+	PublicPayPageReceipt,
+)
 from .business_backup_import_log import BusinessBackupImportLog  # noqa: F401
 # AI models
 from .ai_config import AIConfig, AIProvider  # noqa: F401
@@ -226,6 +285,14 @@ from .crm import (  # noqa: F401
     CrmSequenceStep,
     CrmSequenceEnrollment,
     CrmReminderDedup,
+    CrmPersonStats,
+    CrmOrganization,
+    CrmOrganizationContact,
+    CrmQuota,
+    CrmManagerLink,
+    CrmLeadQueue,
+    CrmLeadQueueMember,
+    CrmRecordAcl,
 )
 from .customer_club import (  # noqa: F401
 	CustomerClubSettings,
@@ -234,6 +301,13 @@ from .customer_club import (  # noqa: F401
 	CustomerClubInvoiceSnapshot,
 	CustomerClubTier,
 	CustomerClubRfmSnapshot,
+	CustomerClubPointLot,
+	CustomerClubReward,
+	CustomerClubVoucher,
+	CustomerClubCampaign,
+	CustomerClubCampaignMember,
+	CustomerClubMember,
+	CustomerClubSurveyResponse,
 )
 from .distribution import (  # noqa: F401
 	DistributionBusinessSettings,
@@ -261,12 +335,55 @@ from .distribution import (  # noqa: F401
 	DistributionAssortment,
 	DistributionCustomerProfile,
 	DistributionVanLot,
+	DistributionUserPreference,
+	DistributionDailyPlanLock,
+)
+from .digipay import DigipaySettings, DigipayPurchase, DigipaySettlement  # noqa: F401
+from .oa_enterprise import (  # noqa: F401
+	OaBranch,
+	OaLetterCommercialLink,
+	OaLetterExchange,
+	OaQualifiedSignRequest,
+	OaRetentionPolicy,
+	OaSignatureProvider,
+)
+from .oa_mcp_confirmation import OaMcpConfirmation  # noqa: F401
+from .oa_document import (  # noqa: F401
+	OaDocument,
+	OaDocumentVersion,
+	OaOcrJob,
+	OaExtractionSuggestion,
+)
+from .oa_process import (  # noqa: F401
+	OaProcessDefinition,
+	OaProcessVersion,
+	OaProcessInstance,
+	OaProcessToken,
+	OaProcessTask,
+)
+from .office_automation import (  # noqa: F401
+	OaSettings,
+	OaOrgUnit,
+	OaPosition,
+	OaPositionHolder,
+	OaDelegation,
+	OaLetterFormat,
+	OaLetterTemplate,
+	OaLetter,
+	OaLetterNumberCounter,
+	OaReferral,
+	OaParaph,
+	OaLetterAttachment,
+	OaLetterLink,
+	OaAuditLog,
 )
 from .telephony import (  # noqa: F401
 	TelephonySettings,
 	TelephonyPbxConnection,
 	TelephonyExtension,
 	TelephonyUserExtension,
+	TelephonyTeamSupervisor,
+	TelephonyAuditLog,
 	TelephonySoftphoneSession,
 	TelephonyQueue,
 	TelephonyCall,
@@ -282,4 +399,36 @@ from .advanced_plugins import (  # noqa: F401
 	AdvancedPluginAudit,
 	AdvancedPluginPostingConfig,
 	AdvancedPluginPosting,
+)
+from .procurement import (  # noqa: F401
+	ProcApproval,
+	ProcBudget,
+	ProcBudgetMovement,
+	ProcCommitment,
+	ProcContract,
+	ProcContractLine,
+	ProcCostCenter,
+	ProcDelegation,
+	ProcGuarantee,
+	ProcInvoiceLink,
+	ProcMatchLine,
+	ProcOrder,
+	ProcOrderLine,
+	ProcPortalInvoice,
+	ProcPrepayment,
+	ProcReceipt,
+	ProcReceiptLine,
+	ProcReorderSuggestion,
+	ProcRequisition,
+	ProcRequisitionLine,
+	ProcScore,
+	ProcSettings,
+	ProcShareLink,
+	ProcSourcingBid,
+	ProcSourcingBidLine,
+	ProcSourcingEvent,
+	ProcSourcingInvite,
+	ProcSourcingLine,
+	ProcSupplierDocument,
+	ProcSupplierProfile,
 )

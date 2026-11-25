@@ -147,6 +147,8 @@ class ExpenseIncomeDocument {
             personName: extra['person_name'] as String?,
             accountId: m['account_id'] as int?,
             accountName: m['account_name'] as String?,
+            accountCode: m['account_code'] as String?,
+            accountType: m['account_type'] as String?,
           );
         }).toList();
       }
@@ -278,6 +280,8 @@ class CounterpartyLine {
   final String? personName;
   final int? accountId;
   final String? accountName;
+  final String? accountCode;
+  final String? accountType;
 
   const CounterpartyLine({
     required this.id,
@@ -299,6 +303,8 @@ class CounterpartyLine {
     this.personName,
     this.accountId,
     this.accountName,
+    this.accountCode,
+    this.accountType,
   });
 
   /// نام نمایشی طرف‌حساب
@@ -317,6 +323,9 @@ class CounterpartyLine {
       case 'person':
         return personName ?? 'شخص';
       case 'account':
+        if (personName != null && personName!.trim().isNotEmpty) {
+          return '${accountName ?? 'حساب'} — $personName';
+        }
         return accountName ?? 'حساب';
       default:
         return transactionTypeName;
@@ -345,6 +354,8 @@ class CounterpartyLine {
       personName: json['person_name'] as String?,
       accountId: json['account_id'] as int?,
       accountName: json['account_name'] as String?,
+      accountCode: json['account_code'] as String?,
+      accountType: json['account_type'] as String?,
     );
   }
 
@@ -369,6 +380,8 @@ class CounterpartyLine {
       'person_name': personName,
       'account_id': accountId,
       'account_name': accountName,
+      'account_code': accountCode,
+      'account_type': accountType,
     };
   }
 

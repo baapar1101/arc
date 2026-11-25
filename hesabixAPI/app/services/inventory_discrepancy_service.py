@@ -19,6 +19,11 @@ from adapters.db.models.inventory_discrepancy import (
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from app.core.responses import ApiError
 from app.core.transaction_lock import acquire_transaction_lock
+from app.services.invoice_unit_conversion_service import (
+    inventory_quantity_to_main,
+    price_main_to_line,
+    quantity_main_to_line,
+)
 
 _QUICK_SALES_CORRECTION_TOKEN_RE = re.compile(r"^[A-Za-z0-9._:-]{16,160}$")
 
@@ -404,9 +409,26 @@ def resolve_case_with_goods_income(
                     previous_unit = _decimal(sale_line.ledger_unit_cogs)
                     # اگر موجودی پیش از این فروش منفی بوده، مقدار اصلاح می‌تواند از
                     # تعداد همین فاکتور بیشتر باشد؛ فقط سهم همین ردیف به COGS آن تخصیص می‌یابد.
-                    allocated_qty = min(_decimal(case_line.shortage_quantity), sale_qty)
+                    product = getattr(sale_line, "product", None) or getattr(case_line, "product", None)
+                    invoice_unit = extra.get("unit")
+                    sale_qty_main = inventory_quantity_to_main(
+                        sale_qty,
+                        product,
+                        extra,
+                        strict=False,
+                    )
+                    allocated_main = min(_decimal(case_line.shortage_quantity), sale_qty_main)
+                    allocated_qty = quantity_main_to_line(
+                        allocated_main,
+                        product,
+                        invoice_unit,
+                        strict=False,
+                    )
+                    if allocated_qty > sale_qty:
+                        allocated_qty = sale_qty
                     normal_qty = sale_qty - allocated_qty
-                    new_total = normal_qty * previous_unit + allocated_qty * unit_cost
+                    unit_cost_line = price_main_to_line(unit_cost, product, invoice_unit, strict=False)
+                    new_total = normal_qty * previous_unit + allocated_qty * unit_cost_line
                     sale_line.ledger_unit_cogs = new_total / sale_qty
                     sale_line.ledger_line_cogs = new_total
                     sale_amount = _decimal(extra.get("line_total"))

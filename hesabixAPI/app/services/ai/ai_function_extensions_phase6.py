@@ -21,14 +21,15 @@ def register_phase6_business_functions(registry: "AIFunctionRegistry") -> None:
             ctx,
             business_id=business_id,
             category=args.get("category"),
+            db=context.get("db"),
         )
 
     registry.register(
         AIFunction(
             name="list_available_reports",
             description=(
-                "لیست گزارش‌هایی که کاربر مجاز به دریافت آن‌هاست. "
-                "category اختیاری: financial, sales, warehouse, accounting, integration. "
+                "لیست گزارش‌هایی که کاربر مجاز به دریافت آن‌هاست؛ گزارش افزونه فقط با افزونهٔ فعال می‌آید. "
+                "category اختیاری: financial, sales, warehouse, accounting, integration, system. "
                 "سپس از get_report با report_type استفاده کنید."
             ),
             parameters_schema={
@@ -42,6 +43,7 @@ def register_phase6_business_functions(registry: "AIFunctionRegistry") -> None:
                             "warehouse",
                             "accounting",
                             "integration",
+                            "system",
                         ],
                     },
                 },

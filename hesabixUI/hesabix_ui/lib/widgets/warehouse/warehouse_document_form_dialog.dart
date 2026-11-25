@@ -16,6 +16,8 @@ import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/attribute_formatter.dart';
 import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
+import '../invoice/invoice_line_variant_picker_dialog.dart';
+import '../invoice/invoice_line_lot_picker_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../constants/frequent_description_scope.dart';
@@ -99,22 +101,177 @@ class _WarehouseDocumentFormDialogState
       widget.lockDocType || _isFromInvoice || _isEditMode;
   bool get _isPosted => _documentStatus == 'posted'; // آیا حواله قطعی شده است؟
 
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
+
+  int? _invoiceItemLineId(Map<String, dynamic> line) {
+    return _asInt(line['invoice_item_line_id']) ??
+        _asInt(_lineExtra(line)['invoice_item_line_id']);
+  }
+
   Map<String, double>? _quantitiesForLine(Map<String, dynamic> line) {
     if (_lineQuantitiesIndex == null) return null;
-    final lineId = line['invoice_item_line_id'];
-    final productId = line['product_id'];
     return _lineQuantitiesIndex!.lookup(
-      invoiceItemLineId: lineId is int
-          ? lineId
-          : (lineId is num ? lineId.toInt() : null),
-      productId: productId is int
-          ? productId
-          : (productId is num ? productId.toInt() : null),
+      invoiceItemLineId: _invoiceItemLineId(line),
+      productId: _asInt(line['product_id']),
     );
+  }
+
+  Map<String, double>? _quantitiesForLineInFieldUnit(Map<String, dynamic> line) {
+    final raw = _quantitiesForLine(line);
+    if (raw == null) return null;
+    return {
+      'required': _invoiceQtyToFieldUnit(line, raw['required'] ?? 0.0),
+      'processed': _invoiceQtyToFieldUnit(line, raw['processed'] ?? 0.0),
+      'remaining': _invoiceQtyToFieldUnit(line, raw['remaining'] ?? 0.0),
+    };
   }
 
   double _lineQuantity(Map<String, dynamic> line) {
     return (line['quantity'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Map<String, dynamic> _lineExtra(Map<String, dynamic> line) {
+    final extra = line['extra_info'];
+    if (extra is Map) {
+      return Map<String, dynamic>.from(extra);
+    }
+    return <String, dynamic>{};
+  }
+
+  bool _lineQuantityStoredAsMain(Map<String, dynamic> line) {
+    final flag = _lineExtra(line)['inventory_quantity_unit']?.toString().toLowerCase();
+    return flag == 'main' || flag == 'main_unit';
+  }
+
+  bool _isSecondaryUnitName(Map<String, dynamic> line, String? unit) {
+    final selected = (unit ?? '').trim();
+    if (selected.isEmpty) return false;
+    final lower = selected.toLowerCase();
+    if (lower == 'secondary' ||
+        lower == 'secondary_unit' ||
+        lower == 'sub' ||
+        lower == 'alt') {
+      return true;
+    }
+    if (lower == 'main' || lower == 'main_unit' || lower == 'primary') {
+      return false;
+    }
+    final main = (line['main_unit'] ?? line['product_main_unit'] ?? '')
+        .toString()
+        .trim();
+    final secondary = (line['secondary_unit'] ?? line['product_secondary_unit'] ?? '')
+        .toString()
+        .trim();
+    if (main.isNotEmpty && selected == main) return false;
+    if (secondary.isNotEmpty && selected == secondary) return true;
+    return false;
+  }
+
+  double _invoiceQtyToFieldUnit(Map<String, dynamic> line, double invoiceQty) {
+    if (!_lineQuantityStoredAsMain(line)) return invoiceQty;
+    final factor =
+        (line['unit_conversion_factor'] as num?)?.toDouble() ?? 0.0;
+    if (factor <= 0) return invoiceQty;
+    final source = (_lineExtra(line)['source_line_unit'] ?? '').toString().trim();
+    if (source.isEmpty) return invoiceQty;
+    if (_isSecondaryUnitName(line, source)) return invoiceQty / factor;
+    return invoiceQty;
+  }
+
+  String? _lineSelectedUnit(Map<String, dynamic> line) {
+    final extraUnit = _lineExtra(line)['unit']?.toString().trim();
+    if (extraUnit != null && extraUnit.isNotEmpty) return extraUnit;
+    final selected = line['selected_unit']?.toString().trim();
+    if (selected != null && selected.isNotEmpty) return selected;
+    final main = line['main_unit']?.toString().trim();
+    return (main != null && main.isNotEmpty) ? main : null;
+  }
+
+  List<String> _lineUnitChoices(Map<String, dynamic> line) {
+    final units = <String>[];
+    void add(String? value) {
+      final text = value?.trim();
+      if (text != null && text.isNotEmpty && !units.contains(text)) {
+        units.add(text);
+      }
+    }
+
+    add(line['main_unit']?.toString());
+    add(line['secondary_unit']?.toString());
+    add(_lineSelectedUnit(line));
+    return units;
+  }
+
+  void _setLineUnit(int index, String unit) {
+    final line = _lines[index];
+    final extra = _lineExtra(line);
+    extra['unit'] = unit;
+    _updateLine(index, {'selected_unit': unit, 'extra_info': extra});
+  }
+
+  InputDecoration _quantityDecoration(Map<String, dynamic> line) {
+    final unit = _lineSelectedUnit(line);
+    return InputDecoration(
+      labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
+      helperText: _isFromInvoice ? 'صفر = ارسال نمی‌شود' : null,
+      suffixText: unit,
+      border: const OutlineInputBorder(),
+      isDense: true,
+    );
+  }
+
+  Widget _buildQuantityField(int index) {
+    final line = _lines[index];
+    final quantityField = TextFormField(
+      decoration: _quantityDecoration(line),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      initialValue: line['quantity'].toString(),
+      enabled: !_isPosted,
+      onChanged: _isPosted
+          ? null
+          : (value) {
+              final qty = parseFormattedNumber(value) ?? 0.0;
+              _updateLine(index, {'quantity': qty});
+            },
+      validator: _quantityFieldValidator,
+    );
+    final units = _lineUnitChoices(line);
+    final selected = _lineSelectedUnit(line);
+    final canSwitchUnit = !_isPosted &&
+        !_isFromInvoice &&
+        !_lineQuantityStoredAsMain(line) &&
+        units.length > 1;
+    if (!canSwitchUnit) {
+      return quantityField;
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 2, child: quantityField),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            value: units.contains(selected) ? selected : units.first,
+            decoration: const InputDecoration(
+              labelText: 'واحد',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              for (final unit in units)
+                DropdownMenuItem(value: unit, child: Text(unit)),
+            ],
+            onChanged: (value) {
+              if (value != null) _setLineUnit(index, value);
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   bool _isLineActive(Map<String, dynamic> line) => _lineQuantity(line) > 0;
@@ -278,6 +435,7 @@ class _WarehouseDocumentFormDialogState
       if (_docType == 'transfer') {
         final splitLine = line['movement'] != null &&
             (line['movement'] as String).isNotEmpty;
+        final allocations = extra['allocations'] ?? line['allocations'];
         final row = <String, dynamic>{
           'product_id': line['product_id'],
           'warehouse_id_from': warehouseResolved['warehouse_id_from'],
@@ -285,6 +443,7 @@ class _WarehouseDocumentFormDialogState
           'quantity': line['quantity'],
           'instance_data': instanceData,
           'instance_ids': instanceIds,
+          if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
           'extra_info': extra,
         };
         if (!splitLine) {
@@ -297,10 +456,11 @@ class _WarehouseDocumentFormDialogState
         return row;
       }
 
+      final allocations = extra['allocations'] ?? line['allocations'];
       return {
         'product_id': line['product_id'],
-        if (line['invoice_item_line_id'] != null)
-          'invoice_item_line_id': line['invoice_item_line_id'],
+        if (_invoiceItemLineId(line) != null)
+          'invoice_item_line_id': _invoiceItemLineId(line),
         'warehouse_id': warehouseResolved['warehouse_id'],
         'movement': movement,
         'quantity': line['quantity'],
@@ -308,6 +468,7 @@ class _WarehouseDocumentFormDialogState
         'instance_data':
             instanceData, // برای حواله ورود (receipt/production_in)
         'instance_ids': instanceIds, // برای حواله خروج (issue/production_out)
+        if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
         'extra_info': extra,
       };
     }).toList();
@@ -421,7 +582,9 @@ class _WarehouseDocumentFormDialogState
     double value,
     BuildContext context, {
     bool isRemaining = false,
+    String? unit,
   }) {
+    final unitText = (unit ?? '').trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -434,7 +597,9 @@ class _WarehouseDocumentFormDialogState
         ),
         const SizedBox(height: 2),
         Text(
-          formatWithThousands(value, decimalPlaces: 2),
+          unitText.isEmpty
+              ? formatWithThousands(value, decimalPlaces: 2)
+              : '${formatWithThousands(value, decimalPlaces: 2)} $unitText',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: isRemaining && value > 0
@@ -505,30 +670,41 @@ class _WarehouseDocumentFormDialogState
     super.dispose();
   }
 
+  Map<String, dynamic> _productUnitFields(
+    Map<String, dynamic> line,
+    Map<String, dynamic> product,
+  ) {
+    final extra = _lineExtra(line);
+    if (!_lineQuantityStoredAsMain(line)) {
+      extra['unit'] ??= product['main_unit'];
+    }
+    return {
+      'main_unit': product['main_unit'],
+      'secondary_unit': product['secondary_unit'],
+      'unit_conversion_factor': product['unit_conversion_factor'],
+      'selected_unit': extra['unit'] ?? product['main_unit'],
+      'extra_info': extra,
+    };
+  }
+
   /// بارگذاری اطلاعات کامل کالاها برای خطوط اولیه
   Future<void> _loadInitialLinesProductInfo() async {
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
       final productId = line['product_id'] as int?;
       if (productId != null) {
-        // بررسی اینکه آیا اطلاعات کامل (name و code) موجود است یا نه
-        final hasName = line['product_name'] != null;
-        final hasCode = line['product_code'] != null;
-
-        // اگر اطلاعات کامل موجود نیست، از API بارگذاری کن
-        if (!hasName || !hasCode) {
-          try {
-            await _loadProductInfo(productId);
-            if (_productCache.containsKey(productId)) {
-              final product = _productCache[productId]!;
-              _updateLine(i, {
-                'product_name': product['name'],
-                'product_code': product['code'],
-              });
-            }
-          } catch (e) {
-            debugPrint('Error loading product info for line $i: $e');
+        try {
+          await _loadProductInfo(productId);
+          if (_productCache.containsKey(productId)) {
+            final product = _productCache[productId]!;
+            _updateLine(i, {
+              'product_name': line['product_name'] ?? product['name'],
+              'product_code': line['product_code'] ?? product['code'],
+              ..._productUnitFields(line, product),
+            });
           }
+        } catch (e) {
+          debugPrint('Error loading product info for line $i: $e');
         }
       }
     }
@@ -717,6 +893,10 @@ class _WarehouseDocumentFormDialogState
         lineMap['extra_info'] = Map<String, dynamic>.from(
           lineMap['extra_info'] ?? const {},
         );
+        lineMap['invoice_item_line_id'] ??=
+            lineMap['extra_info']['invoice_item_line_id'];
+        lineMap['main_unit'] ??= lineMap['product_main_unit'];
+        lineMap['secondary_unit'] ??= lineMap['product_secondary_unit'];
         if (lineMap['movement'] == null) {
           lineMap['movement'] = _movementForDocType(_docType);
         }
@@ -768,6 +948,7 @@ class _WarehouseDocumentFormDialogState
             _updateLine(i, {
               'product_name': product['name'],
               'product_code': product['code'],
+              ..._productUnitFields(line, product),
             });
           }
         } catch (e) {
@@ -1397,15 +1578,31 @@ class _WarehouseDocumentFormDialogState
                 'product_id': productId,
                 'product_name': productName,
                 'product_code': productCode,
+                'main_unit': product?['main_unit'],
+                'secondary_unit': product?['secondary_unit'],
+                'unit_conversion_factor': product?['unit_conversion_factor'],
+                'selected_unit': product?['main_unit'],
                 'instance_data': null,
+                'extra_info': {
+                  ..._lineExtra(line),
+                  if (product?['main_unit'] != null) 'unit': product?['main_unit'],
+                },
               });
               if (productId != null) {
                 _loadProductInfo(productId).then((_) {
                   if (_productCache.containsKey(productId)) {
                     final cachedProduct = _productCache[productId]!;
+                    final extra = _lineExtra(_lines[index]);
+                    extra['unit'] ??= cachedProduct['main_unit'];
                     _updateLine(index, {
                       'product_name': cachedProduct['name'],
                       'product_code': cachedProduct['code'],
+                      'main_unit': cachedProduct['main_unit'],
+                      'secondary_unit': cachedProduct['secondary_unit'],
+                      'unit_conversion_factor':
+                          cachedProduct['unit_conversion_factor'],
+                      'selected_unit': extra['unit'] ?? cachedProduct['main_unit'],
+                      'extra_info': extra,
                     });
                   }
                   if (mounted) setState(() {});
@@ -1419,6 +1616,10 @@ class _WarehouseDocumentFormDialogState
         _registerUniqueProductInstances(index);
       } else if (value == 'unique_out') {
         _selectUniqueProductInstances(index);
+      } else if (value == 'variant_alloc') {
+        _selectVariantAllocations(index);
+      } else if (value == 'lot_alloc') {
+        _selectLotAllocations(index);
       } else if (value == 'auto_line') {
         _autoCompleteLine(index);
       } else if (value == 'delete') {
@@ -1429,13 +1630,20 @@ class _WarehouseDocumentFormDialogState
     final iconRow = <Widget>[
       if ((_docType == 'receipt' || _docType == 'production_in') &&
           line['product_id'] != null &&
-          _isProductUnique(line['product_id'] as int))
+          _isProductUnique(line['product_id'] as int)) ...[
         IconButton(
           icon: Icon(Icons.qr_code_scanner, size: 20),
           onPressed: () => _registerUniqueProductInstances(index),
           tooltip: 'ثبت اطلاعات کالاهای یونیک',
           color: Theme.of(context).colorScheme.primary,
         ),
+        IconButton(
+          icon: const Icon(Icons.undo, size: 20),
+          onPressed: () => _selectUniqueProductInstances(index),
+          tooltip: 'برگشت واحدهای فروخته‌شده',
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ],
       if ((_docType == 'issue' ||
               _docType == 'production_out' ||
               _docType == 'transfer') &&
@@ -1447,6 +1655,20 @@ class _WarehouseDocumentFormDialogState
           tooltip: _docType == 'transfer'
               ? 'انتخاب کالاهای یونیک از انبار مبدا'
               : 'انتخاب کالاهای یونیک',
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      if (line['product_id'] != null && _isProductInventoryVariant(line['product_id'] as int))
+        IconButton(
+          icon: const Icon(Icons.tune, size: 20),
+          onPressed: () => _selectVariantAllocations(index),
+          tooltip: AppLocalizations.of(context).productVariantSelectCombination,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      if (line['product_id'] != null && _isProductExpiryTracked(line['product_id'] as int))
+        IconButton(
+          icon: const Icon(Icons.event, size: 20),
+          onPressed: () => _selectLotAllocations(index),
+          tooltip: AppLocalizations.of(context).lotAndDates,
           color: Theme.of(context).colorScheme.primary,
         ),
       if (_isFromInvoice && line['product_id'] != null)
@@ -1504,6 +1726,30 @@ class _WarehouseDocumentFormDialogState
                   ? 'انتخاب یونیک از مبدا'
                   : 'انتخاب کالاهای یونیک',
             ),
+          ),
+        ),
+      );
+    }
+    if (line['product_id'] != null && _isProductInventoryVariant(line['product_id'] as int)) {
+      entries.add(
+        PopupMenuItem(
+          value: 'variant_alloc',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.tune),
+            title: Text(AppLocalizations.of(context).productVariantSelectCombination),
+          ),
+        ),
+      );
+    }
+    if (line['product_id'] != null && _isProductExpiryTracked(line['product_id'] as int)) {
+      entries.add(
+        PopupMenuItem(
+          value: 'lot_alloc',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event),
+            title: Text(AppLocalizations.of(context).lotAndDates),
           ),
         ),
       );
@@ -1649,6 +1895,91 @@ class _WarehouseDocumentFormDialogState
     return product['inventory_mode'] == 'unique';
   }
 
+  bool _isProductInventoryVariant(int productId) {
+    final product = _productCache[productId];
+    if (product == null) return false;
+    return (product['variant_mode']?.toString() ?? 'none') == 'inventory';
+  }
+
+  bool _isProductExpiryTracked(int productId) {
+    final product = _productCache[productId];
+    if (product == null) return false;
+    if (product['track_expiry'] != true) return false;
+    if ((product['inventory_mode']?.toString() ?? 'bulk') == 'unique') return false;
+    return true;
+  }
+
+  bool get _lotPickerInbound =>
+      _docType == 'receipt' || _docType == 'production_in';
+
+  Future<void> _selectLotAllocations(int lineIndex) async {
+    final line = _lines[lineIndex];
+    final productId = line['product_id'] as int?;
+    if (productId == null) return;
+    await _loadProductInfo(productId);
+    if (!mounted) return;
+    if (!_isProductExpiryTracked(productId)) return;
+    final product = _productCache[productId]!;
+    final extra = Map<String, dynamic>.from(line['extra_info'] ?? const {});
+    final warehouseId = _docType == 'transfer'
+        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
+    final variantAllocs = allocationsFromExtra(extra);
+    int? variantId;
+    if (variantAllocs.length == 1) {
+      variantId = (variantAllocs.first['variant_id'] as num?)?.toInt();
+    } else {
+      variantId = (extra['variant_id'] as num?)?.toInt();
+    }
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineLotPickerDialog(
+        businessId: widget.businessId,
+        productId: productId,
+        productName: product['name']?.toString() ?? '',
+        lineQuantity: (line['quantity'] as num?) ?? 0,
+        warehouseId: warehouseId,
+        variantId: variantId,
+        initialAllocations: lotAllocationsFromExtra(extra),
+        inbound: _lotPickerInbound || (_docType == 'adjustment' && line['movement'] == 'in'),
+        includeUnsellable: _docType == 'issue' ||
+            _docType == 'production_out' ||
+            (_docType == 'adjustment' && line['movement'] == 'out'),
+        calendarController: widget.calendarController,
+      ),
+    );
+    if (result == null || !mounted) return;
+    extra['lot_allocations'] = result;
+    _updateLine(lineIndex, {'extra_info': extra, 'lot_allocations': result});
+  }
+
+  Future<void> _selectVariantAllocations(int lineIndex) async {
+    final line = _lines[lineIndex];
+    final productId = line['product_id'] as int?;
+    if (productId == null) return;
+    await _loadProductInfo(productId);
+    if (!_isProductInventoryVariant(productId)) return;
+    final product = _productCache[productId]!;
+    final extra = Map<String, dynamic>.from(line['extra_info'] ?? const {});
+    final warehouseId = _docType == 'transfer'
+        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineVariantPickerDialog(
+        businessId: widget.businessId,
+        productId: productId,
+        productName: product['name']?.toString() ?? '',
+        lineQuantity: (line['quantity'] as num?) ?? 0,
+        warehouseId: warehouseId,
+        initialAllocations: allocationsFromExtra(extra),
+      ),
+    );
+    if (result == null || !mounted) return;
+    extra['allocations'] = result;
+    _updateLine(lineIndex, {'extra_info': extra, 'allocations': result});
+  }
+
   Future<void> _registerUniqueProductInstances(int lineIndex) async {
     final line = _lines[lineIndex];
     final productId = line['product_id'] as int?;
@@ -1687,6 +2018,7 @@ class _WarehouseDocumentFormDialogState
         productName: productName,
         trackSerial: trackSerial,
         trackBarcode: trackBarcode,
+        trackExpiry: product['track_expiry'] == true,
         productAttributes: attributes,
         existingInstances: existingInstances,
         requiredQuantity: quantity,
@@ -1733,9 +2065,12 @@ class _WarehouseDocumentFormDialogState
     final quantity = (line['quantity'] as num?)?.toInt();
     // برای transfer، از انبار مبدا استفاده می‌کنیم (از خط یا سطح سند)
     // برای issue/production_out، از انبار خروج استفاده می‌کنیم
-    final warehouseId = _docType == 'transfer'
-        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
-        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
+    final forReturn = _docType == 'receipt' || _docType == 'production_in';
+    final warehouseId = forReturn
+        ? null
+        : (_docType == 'transfer'
+            ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+            : (_warehouseIdFrom ?? line['warehouse_id'] as int?));
 
     // نمایش دیالوگ انتخاب
     final selectedIds = await showGlassDialog<List<int>>(
@@ -1748,6 +2083,7 @@ class _WarehouseDocumentFormDialogState
         selectedInstanceIds: line['instance_ids'] as List<int>?,
         requiredQuantity: quantity,
         calendarController: _calendarController,
+        forReturn: forReturn,
       ),
     );
 
@@ -1777,7 +2113,7 @@ class _WarehouseDocumentFormDialogState
 
   void _autoCompleteLine(int index) {
     final line = _lines[index];
-    final quantities = _quantitiesForLine(line);
+    final quantities = _quantitiesForLineInFieldUnit(line);
     if (quantities == null) return;
 
     final remaining = quantities['remaining'] ?? 0.0;
@@ -1789,7 +2125,7 @@ class _WarehouseDocumentFormDialogState
   void _autoCompleteAllLines() {
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
-      final quantities = _quantitiesForLine(line);
+      final quantities = _quantitiesForLineInFieldUnit(line);
       if (quantities == null) continue;
 
       final remaining = quantities['remaining'] ?? 0.0;
@@ -1863,9 +2199,9 @@ class _WarehouseDocumentFormDialogState
       activeLineCount++;
 
       if (_isFromInvoice) {
-        final quantities = _quantitiesForLine(line);
+        final quantities = _quantitiesForLineInFieldUnit(line);
         final remaining = quantities?['remaining'] ?? 0.0;
-        if (qty > remaining) {
+        if (qty > remaining + 0.000001) {
           SnackBarHelper.show(
             context,
             message:
@@ -2039,12 +2375,13 @@ class _WarehouseDocumentFormDialogState
             if (_isFromInvoice && line['product_id'] != null)
               Builder(
                 builder: (context) {
-                  final quantities = _quantitiesForLine(line);
+                  final quantities = _quantitiesForLineInFieldUnit(line);
                   if (quantities == null) return const SizedBox.shrink();
 
                   final required = quantities['required'] ?? 0.0;
                   final processed = quantities['processed'] ?? 0.0;
                   final remaining = quantities['remaining'] ?? 0.0;
+                  final unit = _lineSelectedUnit(line);
 
                   return Container(
                     margin: const EdgeInsets.only(top: 8, bottom: 8),
@@ -2072,15 +2409,26 @@ class _WarehouseDocumentFormDialogState
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildQuantityRow('مورد نیاز', required, context),
+                              _buildQuantityRow(
+                                'مورد نیاز',
+                                required,
+                                context,
+                                unit: unit,
+                              ),
                               const SizedBox(height: 4),
-                              _buildQuantityRow('از قبل', processed, context),
+                              _buildQuantityRow(
+                                'از قبل',
+                                processed,
+                                context,
+                                unit: unit,
+                              ),
                               const SizedBox(height: 4),
                               _buildQuantityRow(
                                 'باقی مانده',
                                 remaining,
                                 context,
                                 isRemaining: true,
+                                unit: unit,
                               ),
                             ],
                           );
@@ -2088,13 +2436,24 @@ class _WarehouseDocumentFormDialogState
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildQuantityRow('مورد نیاز', required, context),
-                            _buildQuantityRow('از قبل', processed, context),
+                            _buildQuantityRow(
+                              'مورد نیاز',
+                              required,
+                              context,
+                              unit: unit,
+                            ),
+                            _buildQuantityRow(
+                              'از قبل',
+                              processed,
+                              context,
+                              unit: unit,
+                            ),
                             _buildQuantityRow(
                               'باقی مانده',
                               remaining,
                               context,
                               isRemaining: true,
+                              unit: unit,
                             ),
                           ],
                         );
@@ -2712,28 +3071,7 @@ class _WarehouseDocumentFormDialogState
                         ),
                         const SizedBox(height: 8),
                       ],
-                      TextFormField(
-                        decoration: InputDecoration(
-                          labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
-                          helperText: _isFromInvoice
-                              ? 'صفر = ارسال نمی‌شود'
-                              : null,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        initialValue: line['quantity'].toString(),
-                        enabled: !_isPosted,
-                        onChanged: _isPosted
-                            ? null
-                            : (value) {
-                                final qty = parseFormattedNumber(value) ?? 0.0;
-                                _updateLine(index, {'quantity': qty});
-                              },
-                        validator: _quantityFieldValidator,
-                      ),
+                      _buildQuantityField(index),
                     ],
                   );
                 }
@@ -2779,30 +3117,7 @@ class _WarehouseDocumentFormDialogState
                       ),
                       const SizedBox(width: 8),
                     ],
-                    Expanded(
-                      child: TextFormField(
-                        decoration: InputDecoration(
-                          labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
-                          helperText: _isFromInvoice
-                              ? 'صفر = ارسال نمی‌شود'
-                              : null,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        initialValue: line['quantity'].toString(),
-                        enabled: !_isPosted,
-                        onChanged: _isPosted
-                            ? null
-                            : (value) {
-                                final qty = parseFormattedNumber(value) ?? 0.0;
-                                _updateLine(index, {'quantity': qty});
-                              },
-                        validator: _quantityFieldValidator,
-                      ),
-                    ),
+                    Expanded(child: _buildQuantityField(index)),
                   ],
                 );
               },
@@ -3183,6 +3498,7 @@ class _ProductInstancesManagerDialog extends StatefulWidget {
   final String productName;
   final bool trackSerial;
   final bool trackBarcode;
+  final bool trackExpiry;
   final List<Map<String, dynamic>> productAttributes;
   final List<Map<String, dynamic>> existingInstances;
   final int requiredQuantity;
@@ -3194,6 +3510,7 @@ class _ProductInstancesManagerDialog extends StatefulWidget {
     required this.productName,
     required this.trackSerial,
     required this.trackBarcode,
+    this.trackExpiry = false,
     required this.productAttributes,
     required this.existingInstances,
     required this.requiredQuantity,
@@ -3224,6 +3541,7 @@ class _ProductInstancesManagerDialogState
         productName: widget.productName,
         trackSerial: widget.trackSerial,
         trackBarcode: widget.trackBarcode,
+        trackExpiry: widget.trackExpiry,
         productAttributes: widget.productAttributes,
         calendarController: widget.calendarController,
       ),
@@ -3246,6 +3564,7 @@ class _ProductInstancesManagerDialogState
         productName: widget.productName,
         trackSerial: widget.trackSerial,
         trackBarcode: widget.trackBarcode,
+        trackExpiry: widget.trackExpiry,
         productAttributes: widget.productAttributes,
         initialData: existing,
         calendarController: widget.calendarController,
@@ -3276,6 +3595,14 @@ class _ProductInstancesManagerDialogState
     }
     if (barcode != null && barcode.isNotEmpty) {
       parts.add('بارکد: $barcode');
+    }
+    final mfg = instance['manufacturing_date']?.toString();
+    final exp = instance['expiry_date']?.toString();
+    if (mfg != null && mfg.isNotEmpty) {
+      parts.add('${AppLocalizations.of(context).expiryColManufacturing}: $mfg');
+    }
+    if (exp != null && exp.isNotEmpty) {
+      parts.add('${AppLocalizations.of(context).expiryColExpiry}: $exp');
     }
     if (attrs != null && attrs.isNotEmpty) {
       // ساخت attributesMap از productAttributes

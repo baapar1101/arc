@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth_store.dart';
 import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../l10n/app_localizations.dart';
 
 class TelephonyReportsPage extends StatefulWidget {
   final int businessId;
@@ -25,7 +26,11 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    _load();
+    if (_canReports) {
+      _load();
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -54,8 +59,28 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
     }
   }
 
+  bool get _canReports =>
+      widget.authStore.hasBusinessPermission('telephony', 'reports') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    if (!_canReports) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(t.telephonyReportsShort),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(t.telephonyReportsForbidden),
+          ),
+        ),
+      );
+    }
     final scheme = Theme.of(context).colorScheme;
     final totals = _summary?['totals'] as Map? ?? {};
     final hourly = (_summary?['hourly'] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -64,11 +89,11 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('گزارش تماس‌ها'),
+        title: Text(t.telephonyReportsTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabs,
-          tabs: const [Tab(text: 'خلاصه'), Tab(text: 'اپراتورها')],
+          tabs: [Tab(text: t.summary), Tab(text: t.telephonyOperators)],
         ),
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
       ),
@@ -84,17 +109,17 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _StatCard('کل', '${totals['all'] ?? 0}', scheme.primary),
-                        _StatCard('ورودی', '${totals['inbound'] ?? 0}', scheme.tertiary),
-                        _StatCard('خروجی', '${totals['outbound'] ?? 0}', scheme.secondary),
-                        _StatCard('پاسخ', '${totals['answered'] ?? 0}', const Color(0xFF159947)),
-                        _StatCard('از دست‌رفته', '${totals['missed'] ?? 0}', scheme.error),
-                        _StatCard('نرخ پاسخ', '${totals['answer_rate'] ?? 0}%', const Color(0xFFD97706)),
-                        _StatCard('میانگین مکالمه', '${totals['avg_talk_sec'] ?? 0}s', scheme.outline),
+                        _StatCard(t.telephonyTotal, '${totals['all'] ?? 0}', scheme.primary),
+                        _StatCard(t.telephonyInbound, '${totals['inbound'] ?? 0}', scheme.tertiary),
+                        _StatCard(t.telephonyOutbound, '${totals['outbound'] ?? 0}', scheme.secondary),
+                        _StatCard(t.telephonyAnswer, '${totals['answered'] ?? 0}', const Color(0xFF159947)),
+                        _StatCard(t.telephonyMissed, '${totals['missed'] ?? 0}', scheme.error),
+                        _StatCard(t.telephonyAnswerRate, '${totals['answer_rate'] ?? 0}%', const Color(0xFFD97706)),
+                        _StatCard(t.telephonyAvgTalk, '${totals['avg_talk_sec'] ?? 0}s', scheme.outline),
                       ],
                     ),
                     const SizedBox(height: 20),
-                    Text('توزیع ساعتی', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(t.telephonyHourlyDistribution, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 12),
                     SizedBox(
                       height: 160,
@@ -106,7 +131,7 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 1),
                                 child: Tooltip(
-                                  message: 'ساعت ${h['hour']}: ${h['count']}',
+                                  message: t.telephonyHourCount('${h['hour']}', '${h['count']}'),
                                   child: Container(
                                     height: 20 + (((h['count'] as int? ?? 0) / maxHour) * 120),
                                     decoration: BoxDecoration(
@@ -136,7 +161,7 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
                       leading: CircleAvatar(child: Text('${i + 1}')),
                       title: Text('${o['user_name']}'),
                       subtitle: Text(
-                        'کل ${o['total']} · پاسخ ${o['answered']} · از دست‌رفته ${o['missed']} · خروجی ${o['outbound']}',
+                        t.telephonyOperatorStats('${o['total']}', '${o['answered']}', '${o['missed']}', '${o['outbound']}'),
                       ),
                       trailing: Text('${o['avg_talk_sec']}s'),
                     );

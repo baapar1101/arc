@@ -79,6 +79,10 @@ String aiToolLabel(AppLocalizations l10n, String toolName, {String? toolKey}) {
       return l10n.aiToolListWarehouses;
     case 'aiToolGetWarehouseStockSummary':
       return l10n.aiToolGetWarehouseStockSummary;
+    case 'aiToolListInventoryLots':
+      return l10n.aiToolListInventoryLots;
+    case 'aiToolGetExpiryStockReport':
+      return l10n.aiToolGetExpiryStockReport;
     case 'aiToolSearchChecks':
       return l10n.aiToolSearchChecks;
     case 'aiToolGetCheckDetails':
@@ -215,6 +219,8 @@ String _toolNameToKey(String name) {
     'get_warehouse_document_details': 'aiToolGetWarehouseDocumentDetails',
     'list_warehouses': 'aiToolListWarehouses',
     'get_warehouse_stock_summary': 'aiToolGetWarehouseStockSummary',
+    'list_inventory_lots': 'aiToolListInventoryLots',
+    'get_expiry_stock_report': 'aiToolGetExpiryStockReport',
     'search_checks': 'aiToolSearchChecks',
     'get_check_details': 'aiToolGetCheckDetails',
     'search_transfers': 'aiToolSearchTransfers',
@@ -368,6 +374,38 @@ const _toolLabelFallbackFa = <String, String>{
   'read_memory': 'خواندن حافظه دستیار',
   'upsert_memory_entry': 'ذخیره در حافظه',
   'delete_memory_entry': 'حذف از حافظه',
+  'get_oa_dashboard': 'داشبورد اتوماسیون اداری',
+  'get_oa_settings': 'تنظیمات اتوماسیون اداری',
+  'update_oa_settings': 'ویرایش تنظیمات اتوماسیون',
+  'list_oa_org_units': 'واحدهای سازمانی',
+  'create_oa_org_unit': 'ساخت واحد سازمانی',
+  'update_oa_org_unit': 'ویرایش واحد سازمانی',
+  'list_oa_positions': 'فهرست سمت‌ها',
+  'create_oa_position': 'ساخت سمت',
+  'update_oa_position': 'ویرایش سمت',
+  'list_my_oa_positions': 'سمت‌های من',
+  'list_oa_position_holders': 'تصدی سمت‌ها',
+  'assign_oa_position_holder': 'واگذاری سمت',
+  'end_oa_position_holder': 'پایان تصدی سمت',
+  'list_oa_delegations': 'فهرست جانشینی',
+  'create_oa_delegation': 'تعیین جانشین',
+  'end_oa_delegation': 'پایان جانشینی',
+  'list_oa_cartable': 'کارتابل نامه',
+  'get_oa_letter': 'جزئیات نامه',
+  'get_oa_letter_print': 'چاپ نامه',
+  'create_oa_letter_draft': 'پیش‌نویس نامه',
+  'update_oa_letter_draft': 'ویرایش پیش‌نویس نامه',
+  'delete_oa_letter_draft': 'حذف پیش‌نویس نامه',
+  'register_oa_letter': 'ثبت و شماره‌گذاری نامه',
+  'refer_oa_letter': 'ارجاع نامه',
+  'complete_oa_referral': 'اقدام روی ارجاع',
+  'return_oa_referral': 'عودت ارجاع',
+  'add_oa_paraph': 'ثبت پاراف',
+  'add_oa_letter_attachment': 'پیوست نامه',
+  'remove_oa_letter_attachment': 'حذف پیوست نامه',
+  'archive_oa_letter': 'بایگانی نامه',
+  'set_oa_follow_up': 'تعیین پیگیری نامه',
+  'link_oa_letters': 'پیوند نامه‌ها',
 };
 
 /// خلاصهٔ بودجه agent برای نمایش در استریم.

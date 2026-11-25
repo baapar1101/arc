@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from adapters.db.models.ai_model import AIModel
@@ -22,12 +23,15 @@ from app.services.ai.ai_model_service import (
 
 @pytest.fixture
 def db():
-    db_gen = get_db()
-    session = next(db_gen)
+    # Model routing needs only its catalog; never use a configured live DB.
+    engine = create_engine('sqlite:///:memory:')
+    AIModel.__table__.create(engine)
+    session = Session(engine)
     try:
         yield session
     finally:
         session.close()
+        engine.dispose()
 
 
 def _plan_with_pricing(pricing: dict) -> AIPlan:

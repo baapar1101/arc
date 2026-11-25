@@ -41,6 +41,25 @@ hesabix_nginx_ssl_block_for_live_dir() {
   fi
 }
 
+# HTTP vhost that keeps ACME challenges on :80 and redirects everything else to HTTPS.
+hesabix_nginx_http_to_https_redirect_server() {
+  local domain="$1"
+  [[ -z "${domain}" ]] && return 0
+  cat <<EOF
+server {
+  listen 80;
+  server_name ${domain};
+  location /.well-known/acme-challenge/ {
+    root /var/www/html;
+  }
+  location / {
+    return 301 https://\$host\$request_uri;
+  }
+}
+
+EOF
+}
+
 hesabix_domain_has_ssl() {
   local dom="$1"
   hesabix_pick_letsencrypt_live_for_domain "${dom}" >/dev/null 2>&1

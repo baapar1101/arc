@@ -55,7 +55,7 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
   String _iso(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  bool get _shareLive => _data?['share_live_location'] != false;
+  bool get _shareLive => _data?['share_live_location'] == true;
 
   List<Map<String, dynamic>> get _visitors {
     final raw = _data?['visitors'] ?? _data?['markers'];

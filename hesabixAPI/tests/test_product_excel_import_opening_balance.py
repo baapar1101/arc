@@ -4,6 +4,9 @@ from types import SimpleNamespace
 
 from app.services.product_excel_import_opening_balance import (
     OPENING_BALANCE_COST_KEY,
+    OPENING_BALANCE_EXPIRY_KEY,
+    OPENING_BALANCE_LOT_CODE_KEY,
+    OPENING_BALANCE_MFG_KEY,
     OPENING_BALANCE_QUANTITY_KEY,
     WarehouseImportIndex,
     opening_balance_columns_mapped,
@@ -163,3 +166,34 @@ def test_prepare_opening_balance_can_defer_document_queries():
     assert ob.cost_price == 120
     assert ob.warehouse_id == 1
     assert preview["action"] == "upsert"
+
+
+def test_prepare_opening_balance_keeps_lot_dates():
+    idx = WarehouseImportIndex([_warehouse(1, "W", "W", True)])
+    item = {
+        "item_type": "کالا",
+        "track_inventory": True,
+        OPENING_BALANCE_QUANTITY_KEY: 5,
+        OPENING_BALANCE_COST_KEY: 120,
+        OPENING_BALANCE_LOT_CODE_KEY: "OB-A",
+        OPENING_BALANCE_MFG_KEY: "2026-01-15",
+        OPENING_BALANCE_EXPIRY_KEY: "2026-07-15",
+        "default_warehouse_id": 1,
+    }
+    ob, errors, warnings, preview = prepare_opening_balance_for_import_row(
+        item=item,
+        mapped_keys={OPENING_BALANCE_QUANTITY_KEY, OPENING_BALANCE_COST_KEY},
+        business_id=1,
+        db=None,  # type: ignore[arg-type]
+        can_edit_opening_balance=True,
+        is_update=False,
+        existing_product=None,
+        warehouse_index=idx,
+        validate_document_context=False,
+    )
+    assert errors == []
+    assert ob is not None
+    assert ob.lot_code == "OB-A"
+    assert str(ob.manufacturing_date) == "2026-01-15"
+    assert str(ob.expiry_date) == "2026-07-15"
+    assert preview["lot_code"] == "OB-A"

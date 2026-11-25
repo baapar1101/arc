@@ -43,3 +43,12 @@ exten => _X.,1,NoOp(Hesabix Softphone inbound ${EXTEN} from ${CALLERID(num)})
 ;   Channel: Local/{destination}@from-internal/n
 ;   Application: AudioSocket
 ;   Data: {uuid},127.0.0.1:9092
+;   EarlyMedia: true
+;
+; اگر ترانک early media نفرستد، این کانتکست AudioSocket را از لحظهٔ زنگ شروع می‌کند:
+; Channel: Local/{destination}@hesabix-softphone-outbound/n
+[hesabix-softphone-outbound]
+exten => _X.,1,NoOp(Hesabix SF outbound ${EXTEN})
+ same => n,Answer()
+ same => n,Dial(Local/${EXTEN}@from-internal/n,30,r)
+ same => n,Hangup()

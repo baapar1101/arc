@@ -14,6 +14,7 @@ from adapters.db.repositories.file_storage_repository import (
     FileVerificationRepository,
 )
 from adapters.db.models.file_storage import FileStorage, StorageConfig
+from app.core.runtime_paths import file_storage_dir
 
 from PIL import Image
 import io
@@ -425,7 +426,7 @@ class FileStorageService:
 
     # Helper methods
     async def _get_local_file_path(self, stored_name: str, config_data: Dict) -> str:
-        base_path = config_data.get("base_path", "/tmp/hesabix_files")
+        base_path = config_data.get("base_path") or str(file_storage_dir())
         os.makedirs(base_path, exist_ok=True)
         return os.path.join(base_path, stored_name)
 

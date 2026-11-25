@@ -208,6 +208,26 @@ class QuickSalesService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  Future<Map<String, dynamic>> listPinnedProducts({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/pinned-products',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updatePinnedProducts({
+    required int businessId,
+    required List<int> productIds,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/pinned-products',
+      data: {'product_ids': productIds},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   Future<Map<String, dynamic>> resolveStockDiscrepancy({
     required int businessId,
     required int caseId,

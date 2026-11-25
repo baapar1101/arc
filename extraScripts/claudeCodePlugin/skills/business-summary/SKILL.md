@@ -14,7 +14,7 @@ Prepare a useful overview for the business currently connected to Hesabix.
 4. Summarize the indicators, their period, currency/unit, and source. Separate directly returned values from calculations you derive.
 5. Flag missing data, mismatched periods, and limitations. Never claim that a report was checked if no corresponding tool call succeeded.
 
-Use the Hesabix tool named `ask_hesabix_agent` for a multi-step read-only question when the direct tool path is unclear. Do not use it to perform writes. This agent is analyzer-only.
+Use `ask_hesabix_agent` for a multi-step read-only question only if it appears in the live tool list. OAuth connections with a per-tool allowlist hide this tool; use the selected read-only tools directly in that case. Do not use the agent to perform writes. It runs in Analyzer mode.
 
 ## Accounting conventions
 

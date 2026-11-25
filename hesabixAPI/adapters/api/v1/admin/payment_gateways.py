@@ -39,7 +39,7 @@ def list_payment_gateways(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	items = db.query(PaymentGateway).order_by(PaymentGateway.id.desc()).all()
 	data = []
@@ -70,7 +70,7 @@ def create_payment_gateway(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	provider = str(payload.get("provider") or "").strip().lower()
 	display_name = str(payload.get("display_name") or "").strip()
@@ -104,7 +104,7 @@ def get_payment_gateway(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first()
 	if not gw:
@@ -136,7 +136,7 @@ def update_payment_gateway(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first()
 	if not gw:
@@ -167,7 +167,7 @@ def delete_payment_gateway(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first()
 	if not gw:

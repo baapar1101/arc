@@ -10,6 +10,7 @@ import '../../models/business_dashboard_models.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/business_menu_preferences_service.dart';
 import '../../theme/theme_controller.dart';
+import '../../utils/business_menu_labels.dart';
 import '../../widgets/theme_palette_switcher.dart';
 
 /// کلیدهای جداکننده در [business_shell] — همیشه در rootOrder حفظ می‌شوند.
@@ -72,7 +73,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   static const List<String> _defaultOrderPrograms = [
     'basalam',
     'woocommerce',
-    'plugin-marketplace',
+    'digipay',
+    'hscript',
     'group:warehouses',
     'storage-files',
     'tax-workspace',
@@ -84,26 +86,65 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'warranty',
     'repair-shop',
     'customer-club',
+    'payroll',
+    'advanced-production',
+    'group:office-automation',
+    'fixed-assets',
+    'telephony',
     'distribution',
     'zohal/inquiries',
   ];
 
-  static const List<String> _defaultOrderOther = [
+  /// آخر منو: بازار افزونه‌ها، سپس تنظیمات.
+  static const List<String> _footerRootKeys = [
+    'plugin-marketplace',
     'settings',
+  ];
+
+  static const List<String> _defaultOrderOther = [
     'report-templates',
+    'plugin-marketplace',
+    'settings',
   ];
 
   static const Map<String, List<String>> _defaultChildrenOrder = {
-    'group:products': ['products', 'categories', 'product-attributes'],
-    'group:accounts': ['accounts', 'petty-cash', 'cash-box', 'wallet'],
+    'group:products': [
+      'products',
+      'product-bundles',
+      'categories',
+      'product-attributes',
+      'catalog-spec-fields',
+      'barcode-labels',
+    ],
+    'group:accounts': [
+      'accounts',
+      'petty-cash',
+      'cash-box',
+      'wallet',
+      'loan-facilities',
+    ],
     'group:chart-of-accounts': [
       'chart-of-accounts',
       'opening-balance',
       'year-end-closing',
       'currency-revaluation',
     ],
-    'group:warehouses': ['warehouses', 'warehouse-docs', 'stock-count'],
-    'group:ai': ['ai/chat', 'ai/subscription', 'ai/usage'],
+    'group:warehouses': [
+      'warehouses',
+      'warehouse-docs',
+      'stock-count',
+      'quick-sales-stock-discrepancies',
+      'goods-expense-income',
+      'production-orders',
+    ],
+    'group:ai': [
+      'ai/chat',
+      'ai/mcp-connections',
+      'ai/subscription',
+      'ai/usage',
+      'ai/skills/marketplace',
+      'ai/skills/publisher',
+    ],
     'group:crm': [
       'crm/dashboard',
       'crm/tasks',
@@ -116,73 +157,19 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       'crm/activities',
       'crm/reports',
       'crm/sequences',
+      'crm/enterprise',
     ],
-  };
-
-  /// برچسب نمایشی آیتم ریشه (فقط فارسی؛ با منوی فعلی هم‌خوان است).
-  static const Map<String, String> _rootLabelsFa = {
-    'dashboard': 'داشبورد',
-    'persons': 'اشخاص',
-    'group:products': 'کالاها و خدمات',
-    'group:accounts': 'بانکداری',
-    'quick-sales': 'فروش سریع',
-    'invoice': 'فاکتور',
-    'receipts-payments': 'دریافت و پرداخت',
-    'expense-income': 'هزینه و درآمد',
-    'transfers': 'انتقال وجه',
-    'checks': 'چک‌ها',
-    'documents': 'اسناد',
-    'group:chart-of-accounts': 'حسابداری پیشرفته',
-    'reports': 'گزارش‌ها',
-    'basalam': 'باسلام',
-    'woocommerce': 'ووکامرس',
-    'group:warehouses': 'مدیریت انبار',
-    'storage-files': 'فضای ذخیره‌سازی',
-    'tax-workspace': 'مودیان',
-    'group:ai': 'هوش مصنوعی',
-    'projects': 'پروژه‌ها',
-    'tasks': 'مدیریت کارها',
-    'workflows': 'اتوماسیون‌ها',
-    'group:crm': 'CRM',
-    'warranty': 'گارانتی',
-    'repair-shop': 'تعمیرگاه',
-    'customer-club': 'باشگاه مشتریان',
-    'distribution': 'پخش مویرگی',
-    'zohal/inquiries': 'استعلامات',
-    'settings': 'تنظیمات',
-    'report-templates': 'قالب‌ها',
-    'plugin-marketplace': 'بازار افزونه‌ها',
-  };
-
-  static const Map<String, String> _childLabelsFa = {
-    'products': 'کالاها',
-    'categories': 'دسته‌بندی‌ها',
-    'product-attributes': 'خصوصیات کالا',
-    'accounts': 'حساب‌های بانکی',
-    'petty-cash': 'تنخواه',
-    'cash-box': 'صندوق',
-    'wallet': 'کیف‌پول',
-    'chart-of-accounts': 'جدول حساب‌ها',
-    'opening-balance': 'مانده اول دوره',
-    'year-end-closing': 'بستن سال مالی',
-    'currency-revaluation': 'محاسبات ارزی',
-    'warehouses': 'انبارها',
-    'warehouse-docs': 'حواله‌های انبار',
-    'stock-count': 'انبار گردانی',
-    'ai/chat': 'دستیار هوشمند',
-    'ai/subscription': 'اشتراک AI',
-    'ai/usage': 'آمار استفاده',
-    'crm/dashboard': 'داشبورد CRM',
-    'crm/tasks': 'صف کار',
-    'crm/customer-360': 'نمای ۳۶۰ مشتری',
-    'crm/notes-calendar': 'یادداشت‌ها و تقویم',
-    'crm/web-chat': 'چت وب',
-    'crm/process-definitions': 'فرایندها و مراحل قیف',
-    'crm/leads': 'سرنخ‌ها',
-    'crm/deals': 'فرصت‌های فروش',
-    'crm/activities': 'فعالیت‌ها',
-    'crm/reports': 'گزارشات CRM',
-    'crm/sequences': 'توالی‌های خودکار',
+    'group:office-automation': [
+      'office-automation',
+      'office-automation/desk',
+      'office-automation/processes',
+      'office-automation/documents',
+      'office-automation/enterprise',
+      'office-automation/org',
+      'office-automation/external-orgs',
+      'office-automation/archive',
+      'office-automation/reports',
+    ],
   };
 
   /// نگاشت کلیدهای قدیمی (در صورت ذخیره قبلی) به کلیدهای فعلی.
@@ -276,6 +263,15 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     }
     for (final k in defaults) {
       if (seen.add(k)) out.add(k);
+    }
+    return _pinFooterMenuKeys(out);
+  }
+
+  static List<String> _pinFooterMenuKeys(List<String> keys) {
+    final rest = keys.where((k) => !_footerRootKeys.contains(k)).toList();
+    final out = [...rest];
+    for (final k in _footerRootKeys) {
+      if (keys.contains(k)) out.add(k);
     }
     return out;
   }
@@ -597,7 +593,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                           setOrder: (v) => setState(() => _orderPrograms = v), onResetSection: () => _resetSectionToDefault('programs')),
                       const Divider(height: 24),
                       _menuSection(theme, title: 'سایر', order: _orderOther,
-                          setOrder: (v) => setState(() => _orderOther = v), onResetSection: () => _resetSectionToDefault('other')),
+                          setOrder: (v) => setState(() => _orderOther = _pinFooterMenuKeys(v)), onResetSection: () => _resetSectionToDefault('other')),
                     ],
                     const SizedBox(height: 8),
                     Text(
@@ -688,11 +684,12 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
 
   Widget _dashboardRow(ThemeData theme) {
     const key = 'dashboard';
+    final t = AppLocalizations.of(context);
     final hidden = _hiddenKeys.contains(key);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(Icons.dashboard_outlined, color: theme.colorScheme.primary),
-      title: Text(_rootLabelsFa[key] ?? key, style: theme.textTheme.titleSmall),
+      title: Text(businessMenuItemLabel(t, key), style: theme.textTheme.titleSmall),
       subtitle: Text(
         hidden ? 'مخفی' : 'بعد از ذخیره، در اول منو نمایش داده می‌شود',
         style: theme.textTheme.bodySmall?.copyWith(
@@ -760,7 +757,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
 
   Widget _menuKeyTile(ThemeData theme, List<String> orderList, int index, String sectionTitle) {
     final key = orderList[index];
-    final label = _rootLabelsFa[key] ?? key;
+    final t = AppLocalizations.of(context);
+    final label = businessMenuItemLabel(t, key);
     final hidden = _hiddenKeys.contains(key);
     final childKeys = _defaultChildrenOrder[key];
 
@@ -873,7 +871,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                       dense: true,
                       visualDensity: VisualDensity.compact,
                       leading: ReorderableDragStartListener(index: ci, child: Icon(Icons.drag_handle, size: 18, color: theme.colorScheme.outline)),
-                      title: Text(_childLabelsFa[ck] ?? ck),
+                      title: Text(businessMenuItemLabel(t, ck)),
                       subtitle: Text(
                         cHidden ? 'مخفی' : 'نمایش',
                         style: TextStyle(fontSize: 11, color: cHidden ? theme.colorScheme.error : theme.colorScheme.primary),

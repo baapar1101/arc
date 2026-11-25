@@ -220,7 +220,14 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 			return '<span class="hesabix-v2-badge hesabix-v2-badge-pending">' . esc_html__('در انتظار', 'hesabix-v2') . '</span><br /><small>' . esc_html($label) . '</small>';
 		}
 
-		return '<span class="hesabix-v2-badge hesabix-v2-badge-ok">' . esc_html__('ارسال شده', 'hesabix-v2') . '</span><br /><small>' . esc_html($label) . '</small>';
+		$html = '<span class="hesabix-v2-badge hesabix-v2-badge-ok">' . esc_html__('ارسال شده', 'hesabix-v2') . '</span><br /><small>' . esc_html($label) . '</small>';
+		$return_ids = Hesabix_V2_Invoice_Service::get_sales_return_invoice_ids((int) $item->get_id());
+		if (!empty($return_ids)) {
+			$html .= '<br /><span class="hesabix-v2-badge hesabix-v2-badge-warn">' . esc_html__('برگشت از فروش', 'hesabix-v2') . '</span>';
+			$html .= '<br /><small>' . esc_html__('شناسه برگشت:', 'hesabix-v2') . ' ' . esc_html(implode(', ', $return_ids)) . '</small>';
+		}
+
+		return $html;
 	}
 
 	/**

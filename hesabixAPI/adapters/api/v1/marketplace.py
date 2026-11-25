@@ -25,6 +25,7 @@ router = APIRouter(prefix="/marketplace", tags=["یکپارچه‌سازی"])
 @router.get(
 	"/plugins",
 	summary="لیست افزونه‌ها و پلن‌ها",
+	description="ابزار MCP: `list_marketplace_plugins`.",
 )
 def list_plugins_endpoint(
 	request: Request,
@@ -38,6 +39,7 @@ def list_plugins_endpoint(
 @router.post(
 	"/business/{business_id}/purchase",
 	summary="خرید افزونه برای کسب‌وکار (پرداخت از کیف‌پول در صورت کفایت)",
+	description="بدنه: plugin_id و plan_id الزامی. در صورت موجودی کافی از کیف‌پول کسر و لایسنس فعال می‌شود. ابزار MCP: purchase_marketplace_plugin.",
 )
 def purchase_plugin_endpoint(
 	request: Request,
@@ -54,6 +56,7 @@ def purchase_plugin_endpoint(
 @router.get(
 	"/business/{business_id}/orders",
 	summary="لیست سفارش‌های بازار افزونه برای کسب‌وکار",
+	description="سفارش‌های خرید افزونه همین کسب‌وکار. ابزار MCP: list_marketplace_orders.",
 )
 def list_orders_endpoint(
 	request: Request,
@@ -71,6 +74,7 @@ def list_orders_endpoint(
 @router.get(
 	"/business/{business_id}/invoices",
 	summary="لیست صورتحساب‌های بازار افزونه برای کسب‌وکار",
+	description="صورتحساب‌های افزونه همین کسب‌وکار. ابزار MCP: list_marketplace_invoices.",
 )
 def list_invoices_endpoint(
 	request: Request,
@@ -88,7 +92,7 @@ def list_invoices_endpoint(
 @router.get(
 	"/business/{business_id}/plugins",
 	summary="لیست افزونه‌های فعال کسب‌وکار",
-	description="دریافت لیست تمام افزونه‌های فعال و غیرفعال کسب‌وکار",
+	description="افزونه‌های فعال و غیرفعال همین کسب‌وکار. ابزار MCP: `list_business_plugins`.",
 )
 def list_business_plugins_endpoint(
 	request: Request,
@@ -142,7 +146,7 @@ def list_business_plugins_endpoint(
 @router.get(
 	"/business/{business_id}/plugins/{plugin_id}/status",
 	summary="وضعیت افزونه برای کسب‌وکار",
-	description="بررسی وضعیت یک افزونه خاص برای کسب‌وکار",
+	description="لایسنس، انقضا یا trial افزونه برای همین کسب‌وکار. ابزار MCP: get_marketplace_plugin_status.",
 )
 def get_business_plugin_status_endpoint(
 	request: Request,
@@ -161,7 +165,7 @@ def get_business_plugin_status_endpoint(
 @router.post(
 	"/business/{business_id}/plugins/{plugin_id}/start-trial",
 	summary="شروع دوره trial برای افزونه",
-	description="شروع دوره تست رایگان برای یک افزونه (هر کسب‌وکار فقط یکبار می‌تواند از trial استفاده کند)",
+	description="شروع دوره تست رایگان برای یک افزونه (هر کسب‌وکار فقط یک‌بار). ابزار MCP: `start_marketplace_plugin_trial` (نیازمند تأیید).",
 )
 def start_trial_plugin_endpoint(
 	request: Request,

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class RedisSettingsPage extends StatefulWidget {
   const RedisSettingsPage({super.key});
@@ -73,7 +74,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
         final t = AppLocalizations.of(context);
         setState(() {
           _error =
-              'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}';
+              '${adminTx(context, 'خطا در بارگذاری تنظیمات', 'Could not load settings')}: ${ErrorExtractor.forContext(e, context)}';
         });
         SnackBarHelper.showError(
         context,
@@ -126,11 +127,11 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
         final connectionStatus = result['connection_status']?.toString() ?? 'unknown';
         
         if (connectionStatus == 'connected') {
-          SnackBarHelper.showSuccess(context, message: 'تنظیمات Redis با موفقیت ذخیره شد و اتصال برقرار است');
+          SnackBarHelper.showSuccess(context, message: adminTx(context, 'تنظیمات ذخیره شد و اتصال برقرار است', 'Settings saved and the connection works'));
         } else if (connectionStatus == 'connection_failed') {
-          SnackBarHelper.showWarning(context, message: 'تنظیمات ذخیره شد اما اتصال به Redis برقرار نشد. لطفاً تنظیمات را بررسی کنید.');
+          SnackBarHelper.showWarning(context, message: adminTx(context, 'تنظیمات ذخیره شد، ولی اتصال برقرار نشد', 'Settings were saved, but the connection failed'));
         } else {
-          SnackBarHelper.showSuccess(context, message: 'تنظیمات Redis با موفقیت ذخیره شد');
+          SnackBarHelper.showSuccess(context, message: adminTx(context, 'تنظیمات ذخیره شد', 'Settings saved'));
         }
 
         // به‌روزرسانی _hasPassword
@@ -147,12 +148,12 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
       if (mounted) {
         setState(() {
           _error =
-              'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}';
+              '${adminTx(context, 'خطا در ذخیره تنظیمات', 'Could not save settings')}: ${ErrorExtractor.forContext(e, context)}';
         });
         SnackBarHelper.showError(
         context,
         message:
-            'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+            '${adminTx(context, 'خطا در ذخیره تنظیمات', 'Could not save settings')}: ${ErrorExtractor.forContext(e, context)}',
       );
       }
     } finally {
@@ -182,14 +183,14 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
         if (connected) {
           SnackBarHelper.showSuccess(
             context,
-            message: 'اتصال به Redis موفق بود!\n'
-            'نسخه: ${result['redis_version'] ?? 'نامشخص'}\n'
-            'حافظه استفاده شده: ${result['used_memory'] ?? 'نامشخص'}',
+            message: adminTx(context, 'اتصال برقرار شد', 'Connected') + '\n'
+            '${adminTx(context, 'نسخه', 'Version')}: ${result['redis_version'] ?? adminTx(context, 'نامشخص', 'Unknown')}\n'
+            '${adminTx(context, 'حافظه', 'Memory')}: ${result['used_memory'] ?? adminTx(context, 'نامشخص', 'Unknown')}',
           );
         } else {
           SnackBarHelper.showError(
             context,
-            message: 'اتصال به Redis ناموفق بود: ${result['message'] ?? 'خطای نامشخص'}',
+            message: '${adminTx(context, 'اتصال ناموفق بود', 'Connection failed')}: ${result['message'] ?? adminTx(context, 'خطای نامشخص', 'Unknown error')}',
           );
         }
       }
@@ -197,11 +198,11 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
       if (mounted) {
         setState(() {
           _error =
-              'خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}';
+              '${adminTx(context, 'خطا در تست اتصال', 'Connection test failed')}: ${ErrorExtractor.forContext(e, context)}';
         });
         SnackBarHelper.showError(
         context,
-        message: 'خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}',
+        message: '${adminTx(context, 'خطا در تست اتصال', 'Connection test failed')}: ${ErrorExtractor.forContext(e, context)}',
       );
       }
     } finally {
@@ -219,48 +220,25 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
     final t = AppLocalizations.of(context);
 
     if (_isLoadingData) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('تنظیمات Redis Cache'),
-          backgroundColor: theme.colorScheme.surface,
-          foregroundColor: theme.colorScheme.onSurface,
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+      return AdminCompactScaffold(
+        title: adminTx(context, 'ردیس', 'Redis'),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'تنظیمات Redis Cache',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: theme.colorScheme.surface,
-        foregroundColor: theme.colorScheme.onSurface,
-        actions: [
-          if (!_isLoading && !_isLoadingData)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'بارگذاری مجدد',
-              onPressed: _loadConfiguration,
-            ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.surface,
-            ],
+    return AdminCompactScaffold(
+      title: adminTx(context, 'ردیس', 'Redis'),
+      subtitle: adminTx(context, 'کش و صف پس‌زمینه', 'Cache and background queue'),
+      actions: [
+        if (!_isLoading)
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: adminTx(context, 'بارگذاری مجدد', 'Reload'),
+            onPressed: _loadConfiguration,
           ),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+      ],
+      body: SingleChildScrollView(
+          padding: context.settingsHub.pagePadding,
           child: Form(
             key: _formKey,
             child: Column(
@@ -273,30 +251,30 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                 // Card برای تنظیمات اصلی
                 _buildSectionCard(
                   theme,
-                  'تنظیمات اتصال',
+                  adminTx(context, 'تنظیمات اتصال', 'Connection'),
                   Icons.settings_outlined,
                   [
                     _buildSwitchField(
-                      label: 'فعال/غیرفعال',
+                      label: adminTx(context, 'فعال', 'Enabled'),
                       value: _enabled,
                       onChanged: (value) => setState(() => _enabled = value),
-                      description: 'فعال یا غیرفعال کردن استفاده از Redis برای Cache',
+                      description: adminTx(context, 'ردیس برای کش استفاده شود', 'Use Redis for cache'),
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
-                      label: 'آدرس سرور (Host)',
+                      label: adminTx(context, 'آدرس سرور', 'Host'),
                       controller: _hostController,
                       enabled: _enabled,
                       validator: (value) {
                         if (_enabled && (value == null || value.trim().isEmpty)) {
-                          return 'آدرس سرور الزامی است';
+                          return adminTx(context, 'آدرس سرور الزامی است', 'Host is required');
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
-                      label: 'پورت (Port)',
+                      label: adminTx(context, 'پورت', 'Port'),
                       controller: _portController,
                       enabled: _enabled,
                       keyboardType: TextInputType.number,
@@ -305,7 +283,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                         if (_enabled) {
                           final port = int.tryParse(value ?? '');
                           if (port == null || port < 1 || port > 65535) {
-                            return 'پورت باید بین 1 تا 65535 باشد';
+                            return adminTx(context, 'پورت باید بین ۱ و ۶۵۵۳۵ باشد', 'Port must be between 1 and 65535');
                           }
                         }
                         return null;
@@ -313,7 +291,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
-                      label: 'شماره دیتابیس (DB)',
+                      label: adminTx(context, 'شماره دیتابیس', 'Database number'),
                       controller: _dbController,
                       enabled: _enabled,
                       keyboardType: TextInputType.number,
@@ -322,7 +300,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                         if (_enabled) {
                           final db = int.tryParse(value ?? '');
                           if (db == null || db < 0 || db > 15) {
-                            return 'شماره دیتابیس باید بین 0 تا 15 باشد';
+                            return adminTx(context, 'شماره دیتابیس باید بین ۰ و ۱۵ باشد', 'Database number must be between 0 and 15');
                           }
                         }
                         return null;
@@ -330,15 +308,15 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                     ),
                     const SizedBox(height: 16),
                     _buildPasswordField(
-                      label: 'رمز عبور (Password)',
+                      label: adminTx(context, 'رمز عبور', 'Password'),
                       controller: _passwordController,
                       enabled: _enabled,
                       visible: _passwordVisible,
                       hasPassword: _hasPassword,
                       onToggleVisibility: () => setState(() => _passwordVisible = !_passwordVisible),
                       description: _hasPassword 
-                        ? 'رمز عبور فعلی تنظیم شده است. برای تغییر، رمز جدید را وارد کنید.'
-                        : 'رمز عبور Redis (اختیاری)',
+                        ? adminTx(context, 'رمز فعلی ذخیره شده است. برای تغییر، رمز جدید را وارد کنید.', 'A password is saved. Enter a new one to replace it.')
+                        : adminTx(context, 'رمز ردیس، اختیاری', 'Redis password, optional'),
                     ),
                   ],
                 ),
@@ -356,62 +334,34 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
             ),
           ),
         ),
-      ),
     );
   }
 
   Widget _buildInfoCard(ThemeData theme) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.memory_outlined,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
+            Icon(Icons.memory_outlined, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Redis Cache',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                    adminTx(context, 'کش ردیس', 'Redis cache'),
+                    style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    'Redis برای بهبود عملکرد و کاهش بار دیتابیس استفاده می‌شود. '
-                    'با فعال کردن Redis، API keys و system settings در cache ذخیره می‌شوند.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    adminTx(
+                      context,
+                      'کش را نگه می‌دارد تا بار دیتابیس کمتر شود.',
+                      'Holds cache so the database does less work.',
                     ),
+                    style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -444,10 +394,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                 const SizedBox(width: 12),
                 Text(
                   title,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
+                  style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                 ),
               ],
             ),
@@ -557,7 +504,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
               icon: Icon(visible ? Icons.visibility : Icons.visibility_off),
               onPressed: enabled ? onToggleVisibility : null,
             ),
-            hintText: hasPassword ? 'رمز عبور فعلی تنظیم شده است' : 'رمز عبور (اختیاری)',
+            hintText: hasPassword ? adminTx(context, 'رمز فعلی ذخیره شده است', 'A password is already saved') : adminTx(context, 'رمز عبور، اختیاری', 'Password, optional'),
           ),
         ),
         if (description != null) ...[
@@ -604,7 +551,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  connected ? 'اتصال موفق' : 'اتصال ناموفق',
+                  connected ? adminTx(context, 'اتصال موفق', 'Connected') : adminTx(context, 'اتصال ناموفق', 'Not connected'),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: connected 
@@ -622,14 +569,14 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
             if (connected && version != null) ...[
               const SizedBox(height: 8),
               Text(
-                'نسخه Redis: $version',
+                '${adminTx(context, 'نسخه ردیس', 'Redis version')}: $version',
                 style: theme.textTheme.bodySmall,
               ),
             ],
             if (connected && memory != null) ...[
               const SizedBox(height: 4),
               Text(
-                'حافظه استفاده شده: $memory',
+                '${adminTx(context, 'حافظه استفاده‌شده', 'Memory used')}: $memory',
                 style: theme.textTheme.bodySmall,
               ),
             ],
@@ -646,7 +593,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    testPassed ? 'تست set/get موفق بود' : 'تست set/get ناموفق بود',
+                    testPassed ? adminTx(context, 'تست خواندن و نوشتن موفق بود', 'Read and write test passed') : adminTx(context, 'تست خواندن و نوشتن ناموفق بود', 'Read and write test failed'),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: testPassed 
                         ? theme.colorScheme.primary 
@@ -675,7 +622,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.network_check),
-            label: const Text('تست اتصال'),
+            label: Text(adminTx(context, 'تست اتصال', 'Test connection')),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -699,7 +646,7 @@ class _RedisSettingsPageState extends State<RedisSettingsPage> {
                   ),
                 )
               : const Icon(Icons.save),
-            label: const Text('ذخیره تنظیمات'),
+            label: Text(adminTx(context, 'ذخیره تنظیمات', 'Save settings')),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(

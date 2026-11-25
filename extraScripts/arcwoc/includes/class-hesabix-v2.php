@@ -77,6 +77,7 @@ class Hesabix_V2
 		/**
 		 * The class responsible for API communication.
 		 */
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-brand.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-api.php';
 
 		/**
@@ -129,7 +130,9 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-customer-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-invoice-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sales-return-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sync-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-native-variation-sync.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-orphan-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-opening-inventory-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';
@@ -172,6 +175,7 @@ class Hesabix_V2
 
 		$plugin_admin = new Hesabix_V2_Admin($this->get_plugin_name(), $this->get_version());
 
+		$this->loader->add_action('admin_init', 'Hesabix_V2_Brand', 'maybe_refresh_from_api');
 		$this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_styles');
 		$this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
 		$this->loader->add_action('admin_menu', $plugin_admin, 'add_admin_menu');
@@ -190,6 +194,13 @@ class Hesabix_V2
 			$this->loader->add_action('woocommerce_checkout_order_processed', $plugin_admin, 'maybe_sync_order_on_checkout', 20, 3);
 			$this->loader->add_action('woocommerce_payment_complete', $plugin_admin, 'maybe_sync_order_on_payment_complete', 10, 1);
 			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_sync_order_on_status_change', 10, 4);
+			$this->loader->add_action('woocommerce_new_order', $plugin_admin, 'maybe_sync_order_on_new_order', 20, 2);
+			$this->loader->add_action('woocommerce_process_shop_order_meta', $plugin_admin, 'maybe_sync_order_on_admin_save', 50, 1);
+			$this->loader->add_action('woocommerce_saved_order_items', $plugin_admin, 'maybe_sync_order_on_saved_items', 20, 1);
+			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_reverse_order_on_status_change', 20, 4);
+			$this->loader->add_action('woocommerce_order_refunded', $plugin_admin, 'maybe_reverse_order_on_refund', 10, 2);
+			$this->loader->add_action('woocommerce_before_delete_order', $plugin_admin, 'maybe_reverse_order_on_permanent_delete', 5, 2);
+			$this->loader->add_action('before_delete_post', $plugin_admin, 'maybe_reverse_shop_order_on_delete_post', 5, 1);
 			
 			// Customer sync hooks (پروفایل وردپرس + ذخیرهٔ مشتری از «حساب کاربری من» ووکامرس)
 			$this->loader->add_action('user_register', $plugin_admin, 'on_customer_register');

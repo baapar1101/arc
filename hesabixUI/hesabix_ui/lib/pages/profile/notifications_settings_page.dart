@@ -10,9 +10,18 @@ import '../../services/admin_system_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/in_app_notification_behavior_section.dart';
+import '../admin/admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
+
+enum NotificationsSettingsScope { personal, systemChannels }
 
 class NotificationsSettingsPage extends StatefulWidget {
-  const NotificationsSettingsPage({super.key});
+  final NotificationsSettingsScope scope;
+
+  const NotificationsSettingsPage({
+    super.key,
+    this.scope = NotificationsSettingsScope.personal,
+  });
 
   @override
   State<NotificationsSettingsPage> createState() =>
@@ -131,7 +140,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       });
       final s = await _svc.getSettings();
       bool proxyEnabled = _tgProxyEnabled;
-      // Load admin config (ignore errors silently if no permission)
+      if (widget.scope == NotificationsSettingsScope.systemChannels && _isAdmin) {
       try {
         final admin = await _adminSvc.getNotificationsConfig();
         _tgTokenCtrl.text = '${admin['telegram_bot_token'] ?? ''}';
@@ -176,6 +185,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _inappRetentionDaysCtrl.text =
             '${rd is int ? rd : int.tryParse('$rd') ?? 0}';
       } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _telegram = (s['telegram_enabled'] ?? true) == true;
@@ -432,11 +442,21 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+
+    final page = SingleChildScrollView(
+      padding: widget.scope == NotificationsSettingsScope.systemChannels
+          ? context.settingsHub.pagePadding
+          : const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: widget.scope == NotificationsSettingsScope.systemChannels
+            ? [
+                _buildTelegramAdvancedSection(t, theme, colorScheme),
+                _buildBaleAdvancedSection(t, theme, colorScheme),
+                _buildSmsAdvancedSection(t, theme, colorScheme),
+                _buildInappRetentionSection(t, theme, colorScheme),
+              ]
+            : [
           _buildHeader(t, theme, colorScheme),
           const SizedBox(height: 16),
           _buildTelegramCard(t, theme, colorScheme),
@@ -454,6 +474,18 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         ],
       ),
     );
+    if (widget.scope == NotificationsSettingsScope.systemChannels) {
+      return AdminCompactScaffold(
+        title: adminTx(context, 'کانال‌های اعلان سیستم', 'System notification channels'),
+        subtitle: adminTx(
+          context,
+          'توکن ربات، وب‌هوک و پیامک. ترجیح شخصی در تنظیمات حساب است.',
+          'Bot tokens, webhooks, and SMS. Personal preferences stay in account settings.',
+        ),
+        body: page,
+      );
+    }
+    return page;
   }
 
   Widget _buildHeader(
@@ -552,7 +584,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                     ),
                   ),
                   // تنظیمات پیشرفته ادمین
-                  if (_isAdmin) ...[
+                  if (widget.scope == NotificationsSettingsScope.systemChannels && _isAdmin) ...[
                     const SizedBox(height: 24),
                     _buildTelegramAdvancedSection(t, theme, colorScheme),
                   ],
@@ -608,7 +640,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                       ),
                     ),
                   ),
-                  if (_isAdmin) ...[
+                  if (widget.scope == NotificationsSettingsScope.systemChannels && _isAdmin) ...[
                     const SizedBox(height: 24),
                     _buildBaleAdvancedSection(t, theme, colorScheme),
                   ],
@@ -714,6 +746,11 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                       ),
                     ),
                   ),
+                  // تنظیمات پیشرفته ادمین
+                  if (widget.scope == NotificationsSettingsScope.systemChannels && _isAdmin) ...[
+                    const SizedBox(height: 24),
+                    _buildSmsAdvancedSection(t, theme, colorScheme),
+                  ],
                 ],
               ),
             ),
@@ -789,7 +826,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                     onSoundAssetChanged: (id) =>
                         setState(() => _inappSoundAssetId = id),
                   ),
-                  if (_isAdmin) ...[
+                  if (widget.scope == NotificationsSettingsScope.systemChannels && _isAdmin) ...[
                     const SizedBox(height: 24),
                     _buildInappRetentionSection(t, theme, colorScheme),
                   ],
@@ -889,16 +926,12 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           color: colorScheme.primary,
         ),
         title: Text(
-          'تنظیمات پیشرفته تلگرام',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          adminTx(context, 'تنظیمات پیشرفته تلگرام', 'Advanced Telegram'),
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          'تنظیمات ادمین برای پیکربندی تلگرام',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+          adminTx(context, 'توکن ربات، نام کاربری و وب‌هوک', 'Bot token, username, and webhook'),
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
@@ -910,27 +943,16 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           else ...[
             Column(
               children: [
-                _buildCredentialField(
-                  _tgTokenCtrl,
-                  t.notificationsFieldTelegramToken,
-                  helper: t.notificationsFieldTelegramTokenHint,
-                ),
+                _buildCredentialField(_tgTokenCtrl, t.notificationsFieldTelegramToken, helper: t.notificationsFieldTelegramTokenHint, secret: true),
                 const SizedBox(height: 12),
                 _buildCredentialField(
                   _tgUsernameCtrl,
                   t.notificationsFieldTelegramUsername,
                 ),
                 const SizedBox(height: 12),
-                _buildCredentialField(
-                  _tgWebhookSecretCtrl,
-                  t.notificationsFieldTelegramWebhookSecret,
-                  helper: t.notificationsFieldTelegramWebhookSecretHint,
-                ),
+                _buildCredentialField(_tgWebhookSecretCtrl, t.notificationsFieldTelegramWebhookSecret, helper: t.notificationsFieldTelegramWebhookSecretHint, secret: true),
                 const SizedBox(height: 12),
-                _buildCredentialField(
-                  _tgSecretHeaderCtrl,
-                  t.notificationsFieldTelegramSecretHeader,
-                ),
+                _buildCredentialField(_tgSecretHeaderCtrl, t.notificationsFieldTelegramSecretHeader, secret: true),
               ],
             ),
             const SizedBox(height: 12),
@@ -999,21 +1021,14 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           else ...[
             Column(
               children: [
-                _buildCredentialField(
-                  _baleTokenCtrl,
-                  t.notificationsFieldBaleToken,
-                  helper: t.notificationsFieldBaleTokenHint,
-                ),
+                _buildCredentialField(_baleTokenCtrl, t.notificationsFieldBaleToken, helper: t.notificationsFieldBaleTokenHint, secret: true),
                 const SizedBox(height: 12),
                 _buildCredentialField(
                   _baleUsernameCtrl,
                   t.notificationsFieldBaleUsername,
                 ),
                 const SizedBox(height: 12),
-                _buildCredentialField(
-                  _baleWebhookSecretCtrl,
-                  t.notificationsFieldBaleWebhookSecret,
-                ),
+                _buildCredentialField(_baleWebhookSecretCtrl, t.notificationsFieldBaleWebhookSecret, secret: true),
               ],
             ),
             const SizedBox(height: 16),
@@ -1059,16 +1074,12 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           color: colorScheme.primary,
         ),
         title: Text(
-          'تنظیمات پیشرفته پیامک',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          adminTx(context, 'تنظیمات پیشرفته پیامک', 'Advanced SMS'),
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          'تنظیمات ادمین برای پیکربندی SMS',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+          adminTx(context, 'ارائه‌دهنده، کلید و فرستنده', 'Provider, key, and sender'),
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
@@ -1085,20 +1096,17 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                   value: _selectedSmsProvider,
                   decoration: InputDecoration(
                     labelText: t.notificationsFieldSmsProvider,
-                    helperText:
-                        'انتخاب provider از لیست یا وارد کردن نام دلخواه',
+                    helperText: adminTx(context, 'از فهرست انتخاب کنید یا نام دلخواه بنویسید', 'Pick from the list or type a custom name'),
                     border: const OutlineInputBorder(),
                   ),
                   items: [
-                    ..._predefinedSmsProviders.map(
-                      (provider) => DropdownMenuItem(
-                        value: provider,
-                        child: Text(provider),
-                      ),
-                    ),
-                    const DropdownMenuItem(
+                    ..._predefinedSmsProviders.map((provider) => DropdownMenuItem(
+                      value: provider,
+                      child: Text(provider),
+                    )),
+                    DropdownMenuItem(
                       value: _customProviderValue,
-                      child: Text('سایر (Custom)'),
+                      child: Text(adminTx(context, 'سایر', 'Other')),
                     ),
                   ],
                   onChanged: (value) {
@@ -1149,7 +1157,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                   _buildCredentialField(
                     _smsApiKeyCtrl,
                     t.notificationsFieldSmsApiKey,
-                    helper: t.notificationsFieldSmsApiKeyHint,
+                    helper: t.notificationsFieldSmsApiKeyHint, secret: true,
                   ),
                 const SizedBox(height: 12),
                 if (_selectedSmsProvider != 'payamresan') ...[
@@ -1280,18 +1288,24 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     );
   }
 
-  Widget _buildCredentialField(
-    TextEditingController controller,
-    String label, {
-    String? helper,
-  }) {
+
+  Widget _buildCredentialField(TextEditingController controller, String label, {String? helper, bool secret = false}) {
+    final clearHint = secret
+        ? adminTx(
+            context,
+            'خالی کردن و ذخیره، رمز را پاک می‌کند. مقدار ماسک را عوض نکنید تا همان رمز بماند.',
+            'Clear and save to remove the secret. Leave the mask unchanged to keep it.',
+          )
+        : null;
+    final helperText = [helper, clearHint].whereType<String>().where((part) => part.isNotEmpty).join(' ');
     return TextField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        helperText: helper,
-        helperMaxLines: 3,
+        helperText: helperText.isEmpty ? null : helperText,
+        helperMaxLines: 4,
         border: const OutlineInputBorder(),
+        isDense: true,
       ),
       textDirection: TextDirection.ltr,
       textInputAction: TextInputAction.next,
@@ -1555,10 +1569,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
             t.notificationsFieldTelegramProxyBaseUrl,
           ),
           const SizedBox(height: 12),
-          _buildCredentialField(
-            _tgProxyApiKeyCtrl,
-            t.notificationsFieldTelegramProxyApiKey,
-          ),
+          _buildCredentialField(_tgProxyApiKeyCtrl, t.notificationsFieldTelegramProxyApiKey, secret: true),
         ],
       ],
     );

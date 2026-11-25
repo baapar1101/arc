@@ -342,6 +342,7 @@ def prepare_standalone_receipt_payment_cross_currency(
 	data: Dict[str, Any],
 	*,
 	is_receipt: bool,
+	invoice_allocations: dict[int, dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
 	"""
 	V2-P4: اگر حساب‌ها با ارز سند (تسویه) فرق دارند، سند را به پایه (E2) بازنویسی می‌کند.
@@ -482,6 +483,12 @@ def prepare_standalone_receipt_payment_cross_currency(
 	for i, pl in enumerate(person_lines):
 		if not isinstance(pl, dict):
 			continue
+		if is_receipt and invoice_allocations is not None:
+			from app.services.receipt_invoice_allocation_service import capture_invoice_allocation
+
+			allocation = capture_invoice_allocation(db, business_id, settle_cur, pl)
+			if allocation is not None:
+				invoice_allocations[i] = allocation
 		native_p = _d(pl.get("amount"))
 		p_base = quantize_money(native_p * r_settle, base_quant, round_on=round_on)
 		extra = dict(pl.get("extra_info") or {}) if isinstance(pl.get("extra_info"), dict) else {}

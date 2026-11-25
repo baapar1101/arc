@@ -5,9 +5,10 @@ import secrets
 import uuid
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import and_, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.crm import CrmActivity, Lead
@@ -20,17 +21,34 @@ from adapters.db.models.telephony import (
 	TelephonyNumberAlias,
 	TelephonyPbxConnection,
 	TelephonySettings,
+	TelephonyTeamSupervisor,
 	TelephonyUserExtension,
 )
 from adapters.db.models.user import User
 from app.core.responses import ApiError
 from app.core.security import generate_api_key, hash_api_key
 from app.core.telephony_plugin_dependency import check_telephony_plugin_active
-from app.services.telephony.phone_normalizer import extract_digits, normalize_iran_phone, numbers_match
+from app.services.telephony.phone_normalizer import extract_digits, identity_candidates, normalize_iran_phone, numbers_match
+from app.services.telephony.telephony_access import (
+	TelephonyScope,
+	exclusive_extension_taken,
+	list_assignable_users,
+	require_business_member,
+	require_call_in_scope,
+	resolve_scope,
+	upsert_team_supervisor,
+	user_display_name,
+)
 from app.services.realtime import realtime_manager
 
 
 DEFAULT_PHONE_FIELDS = ["mobile", "mobile_2", "mobile_3", "phone"]
+_NORMALIZED_PERSON_ATTR = {
+	"mobile": "mobile_normalized",
+	"mobile_2": "mobile_2_normalized",
+	"mobile_3": "mobile_3_normalized",
+	"phone": "phone_normalized",
+}
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
@@ -72,7 +90,7 @@ def settings_to_dict(row: TelephonySettings) -> Dict[str, Any]:
 		"default_category": row.default_category,
 		"missed_call_create_task": bool(row.missed_call_create_task),
 		"missed_call_task_due_minutes": row.missed_call_task_due_minutes,
-		"recording_access_mode": row.recording_access_mode,
+		"recording_access_mode": row.recording_access_mode or "permission_based",
 		"multi_pbx_enabled": bool(row.multi_pbx_enabled),
 		"ui_preferences": row.ui_preferences or {},
 		"extra_settings": row.extra_settings or {},
@@ -97,7 +115,17 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
 		"extra_settings",
 	):
 		if key in payload:
-			setattr(row, key, payload[key])
+			if key == "recording_access_mode":
+				mode = str(payload[key] or "permission_based").strip()
+				if mode not in ("permission_based", "all_operators", "owner_and_managers"):
+					raise ApiError(
+						"INVALID_RECORDING_ACCESS_MODE",
+						"INVALID_RECORDING_ACCESS_MODE",
+						http_status=400,
+					)
+				setattr(row, key, mode)
+			else:
+				setattr(row, key, payload[key])
 	row.updated_at = _now()
 	db.commit()
 	db.refresh(row)
@@ -132,20 +160,33 @@ def pbx_to_dict(row: TelephonyPbxConnection, *, include_token_hint: bool = True)
 	}
 
 
-def list_pbx(db: Session, business_id: int) -> List[Dict[str, Any]]:
+def list_pbx(db: Session, business_id: int, *, include_token_hint: bool = True) -> List[Dict[str, Any]]:
 	rows = (
 		db.query(TelephonyPbxConnection)
 		.filter(TelephonyPbxConnection.business_id == business_id)
 		.order_by(TelephonyPbxConnection.id.asc())
 		.all()
 	)
-	return [pbx_to_dict(r) for r in rows]
+	return [pbx_to_dict(r, include_token_hint=include_token_hint) for r in rows]
 
 
 def create_pbx(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	name = (payload.get("name") or "").strip()
 	if not name:
-		raise ApiError("VALIDATION_ERROR", "نام مرکز تلفن الزامی است.", http_status=400)
+		raise ApiError("PBX_NAME_REQUIRED", "PBX_NAME_REQUIRED", http_status=400)
+	settings_row = get_or_create_settings(db, business_id)
+	existing_count = (
+		db.query(func.count(TelephonyPbxConnection.id))
+		.filter(TelephonyPbxConnection.business_id == business_id)
+		.scalar()
+		or 0
+	)
+	if existing_count and not settings_row.multi_pbx_enabled:
+		raise ApiError(
+			"MULTI_PBX_DISABLED",
+			"MULTI_PBX_DISABLED",
+			http_status=400,
+		)
 	api_key, key_hash = generate_api_key(prefix="hsx_tel_", length=36)
 	row = TelephonyPbxConnection(
 		business_id=business_id,
@@ -189,7 +230,7 @@ def rotate_pbx_token(db: Session, business_id: int, pbx_id: int) -> Dict[str, An
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	api_key, key_hash = generate_api_key(prefix="hsx_tel_", length=36)
 	row.connector_token_hash = key_hash
 	row.connector_token_prefix = api_key[:12]
@@ -209,7 +250,7 @@ def update_pbx(db: Session, business_id: int, pbx_id: int, payload: Dict[str, An
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	for key in ("name", "pbx_type", "host_hint", "settings", "is_active"):
 		if key in payload:
 			setattr(row, key, payload[key])
@@ -223,7 +264,7 @@ def authenticate_connector(
 	db: Session, *, token: str, business_id: int, pbx_id: int
 ) -> TelephonyPbxConnection:
 	if not token or not check_telephony_plugin_active(db, business_id):
-		raise ApiError("UNAUTHORIZED", "Connector authentication failed.", http_status=401)
+		raise ApiError("CONNECTOR_AUTH_FAILED", "CONNECTOR_AUTH_FAILED", http_status=401)
 	token_hash = hash_api_key(token)
 	row = (
 		db.query(TelephonyPbxConnection)
@@ -236,8 +277,23 @@ def authenticate_connector(
 		.first()
 	)
 	if not row:
-		raise ApiError("UNAUTHORIZED", "Invalid connector token.", http_status=401)
+		raise ApiError("INVALID_CONNECTOR_TOKEN", "INVALID_CONNECTOR_TOKEN", http_status=401)
+	_rate_limit_connector(int(pbx_id))
 	return row
+
+
+_CONNECTOR_HITS: Dict[int, List[float]] = {}
+
+
+def _rate_limit_connector(pbx_id: int, *, max_per_sec: int = 50) -> None:
+	import time
+
+	now = time.time()
+	window = _CONNECTOR_HITS.setdefault(pbx_id, [])
+	window[:] = [t for t in window if now - t < 1.0]
+	if len(window) >= max_per_sec:
+		raise ApiError("RATE_LIMITED", "RATE_LIMITED", http_status=429)
+	window.append(now)
 
 
 def connector_heartbeat(
@@ -253,6 +309,9 @@ def connector_heartbeat(
 	else:
 		pbx.last_error = None
 	pbx.updated_at = _now()
+	ext_payload = payload.get("extensions")
+	if isinstance(ext_payload, list) and ext_payload:
+		sync_extensions(db, pbx.business_id, pbx.id, ext_payload, commit=False)
 	db.commit()
 	return {"ok": True, "pbx_id": pbx.id, "status": pbx.status}
 
@@ -267,6 +326,8 @@ def extension_to_dict(row: TelephonyExtension) -> Dict[str, Any]:
 		"pbx_id": row.pbx_id,
 		"extension": row.extension,
 		"display_name": row.display_name,
+		"team_code": getattr(row, "team_code", None),
+		"allow_shared": bool(getattr(row, "allow_shared", False)),
 		"queue_codes": row.queue_codes,
 		"is_active": bool(row.is_active),
 		"presence_status": row.presence_status,
@@ -274,10 +335,21 @@ def extension_to_dict(row: TelephonyExtension) -> Dict[str, Any]:
 	}
 
 
-def list_extensions(db: Session, business_id: int, pbx_id: Optional[int] = None) -> List[Dict[str, Any]]:
+def list_extensions(
+	db: Session,
+	business_id: int,
+	pbx_id: Optional[int] = None,
+	*,
+	scope: Optional[TelephonyScope] = None,
+) -> List[Dict[str, Any]]:
 	q = db.query(TelephonyExtension).filter(TelephonyExtension.business_id == business_id)
 	if pbx_id:
 		q = q.filter(TelephonyExtension.pbx_id == pbx_id)
+	if scope is not None and not scope.view_all:
+		if scope.extension_ids:
+			q = q.filter(TelephonyExtension.id.in_(list(scope.extension_ids)))
+		else:
+			return []
 	rows = q.order_by(TelephonyExtension.extension.asc()).all()
 	return [extension_to_dict(r) for r in rows]
 
@@ -286,14 +358,14 @@ def upsert_extension(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 	pbx_id = int(payload.get("pbx_id") or 0)
 	ext = str(payload.get("extension") or "").strip()
 	if not pbx_id or not ext:
-		raise ApiError("VALIDATION_ERROR", "pbx_id و extension الزامی است.", http_status=400)
+		raise ApiError("PBX_AND_EXTENSION_REQUIRED", "PBX_AND_EXTENSION_REQUIRED", http_status=400)
 	pbx = (
 		db.query(TelephonyPbxConnection)
 		.filter(TelephonyPbxConnection.id == pbx_id, TelephonyPbxConnection.business_id == business_id)
 		.first()
 	)
 	if not pbx:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	row = (
 		db.query(TelephonyExtension)
 		.filter(TelephonyExtension.pbx_id == pbx_id, TelephonyExtension.extension == ext)
@@ -313,25 +385,91 @@ def upsert_extension(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 		row.queue_codes = payload.get("queue_codes")
 	if "is_active" in payload:
 		row.is_active = bool(payload.get("is_active"))
+	if "team_code" in payload:
+		code = payload.get("team_code")
+		row.team_code = str(code).strip() if code else None
+	if "allow_shared" in payload:
+		row.allow_shared = bool(payload.get("allow_shared"))
 	row.updated_at = _now()
 	db.commit()
 	db.refresh(row)
 	return extension_to_dict(row)
 
 
-def user_extension_to_dict(row: TelephonyUserExtension) -> Dict[str, Any]:
+def sync_extensions(
+	db: Session,
+	business_id: int,
+	pbx_id: int,
+	items: List[Any],
+	*,
+	commit: bool = True,
+) -> Dict[str, Any]:
+	pbx = (
+		db.query(TelephonyPbxConnection)
+		.filter(TelephonyPbxConnection.id == pbx_id, TelephonyPbxConnection.business_id == business_id)
+		.first()
+	)
+	if not pbx:
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
+	upserted = 0
+	for raw in items:
+		if isinstance(raw, str):
+			payload = {"pbx_id": pbx_id, "extension": raw}
+		elif isinstance(raw, dict):
+			payload = dict(raw)
+			payload["pbx_id"] = pbx_id
+		else:
+			continue
+		ext = str(payload.get("extension") or "").strip()
+		if not ext:
+			continue
+		row = (
+			db.query(TelephonyExtension)
+			.filter(TelephonyExtension.pbx_id == pbx_id, TelephonyExtension.extension == ext)
+			.first()
+		)
+		if not row:
+			row = TelephonyExtension(
+				business_id=business_id,
+				pbx_id=pbx_id,
+				extension=ext,
+				created_at=_now(),
+				updated_at=_now(),
+			)
+			db.add(row)
+		if payload.get("display_name"):
+			row.display_name = str(payload.get("display_name"))[:120]
+		if "team_code" in payload:
+			code = payload.get("team_code")
+			row.team_code = str(code).strip() if code else None
+		if "is_active" in payload:
+			row.is_active = bool(payload.get("is_active"))
+		row.updated_at = _now()
+		upserted += 1
+	if commit:
+		db.commit()
+	return {"ok": True, "upserted": upserted, "pbx_id": pbx_id}
+
+
+def user_extension_to_dict(
+	row: TelephonyUserExtension, *, user_name: Optional[str] = None, can_supervise_team: Optional[bool] = None
+) -> Dict[str, Any]:
 	ext = row.extension_row
 	return {
 		"id": row.id,
 		"business_id": row.business_id,
 		"user_id": row.user_id,
+		"user_name": user_name,
 		"pbx_id": row.pbx_id,
 		"extension_id": row.extension_id,
 		"extension": ext.extension if ext else None,
 		"extension_display_name": ext.display_name if ext else None,
+		"team_code": getattr(ext, "team_code", None) if ext else None,
+		"allow_shared": bool(getattr(ext, "allow_shared", False)) if ext else False,
 		"is_primary": bool(row.is_primary),
 		"receive_screen_pop": bool(row.receive_screen_pop),
 		"can_click_to_call": bool(row.can_click_to_call),
+		"can_supervise_team": bool(can_supervise_team),
 		"caller_id_override": row.caller_id_override,
 		"endpoint_mode": getattr(row, "endpoint_mode", None) or "desk",
 		"allow_mode_fallback": bool(getattr(row, "allow_mode_fallback", True)),
@@ -340,34 +478,85 @@ def user_extension_to_dict(row: TelephonyUserExtension) -> Dict[str, Any]:
 
 
 def list_user_extensions(
-	db: Session, business_id: int, user_id: Optional[int] = None
+	db: Session,
+	business_id: int,
+	user_id: Optional[int] = None,
+	*,
+	scope: Optional[TelephonyScope] = None,
 ) -> List[Dict[str, Any]]:
 	q = (
 		db.query(TelephonyUserExtension)
 		.options(joinedload(TelephonyUserExtension.extension_row))
 		.filter(TelephonyUserExtension.business_id == business_id)
 	)
-	if user_id:
+	if scope is not None and not scope.view_all:
+		if user_id and int(user_id) != int(scope.user_id) and not scope.can_supervise:
+			user_id = scope.user_id
+		if user_id:
+			q = q.filter(TelephonyUserExtension.user_id == user_id)
+			if scope.can_supervise and int(user_id) != int(scope.user_id) and scope.extension_ids:
+				q = q.filter(TelephonyUserExtension.extension_id.in_(list(scope.extension_ids)))
+		elif scope.can_supervise and scope.extension_ids:
+			q = q.filter(
+				or_(
+					TelephonyUserExtension.user_id == scope.user_id,
+					TelephonyUserExtension.extension_id.in_(list(scope.extension_ids)),
+				)
+			)
+		else:
+			q = q.filter(TelephonyUserExtension.user_id == scope.user_id)
+	elif user_id:
 		q = q.filter(TelephonyUserExtension.user_id == user_id)
 	rows = q.order_by(TelephonyUserExtension.id.asc()).all()
-	return [user_extension_to_dict(r) for r in rows]
+	user_ids = {r.user_id for r in rows}
+	users = {u.id: u for u in db.query(User).filter(User.id.in_(list(user_ids))).all()} if user_ids else {}
+	sup_rows = (
+		db.query(TelephonyTeamSupervisor)
+		.filter(TelephonyTeamSupervisor.business_id == business_id)
+		.all()
+	)
+	sup_pairs = {(int(r.user_id), str(r.team_code)) for r in sup_rows}
+	out = []
+	for r in rows:
+		team = getattr(r.extension_row, "team_code", None) if r.extension_row else None
+		out.append(
+			user_extension_to_dict(
+				r,
+				user_name=user_display_name(users.get(r.user_id)),
+				can_supervise_team=bool(team and (int(r.user_id), str(team)) in sup_pairs),
+			)
+		)
+	return out
 
 
 def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	user_id = int(payload.get("user_id") or 0)
 	extension_id = int(payload.get("extension_id") or 0)
 	if not user_id or not extension_id:
-		raise ApiError("VALIDATION_ERROR", "user_id و extension_id الزامی است.", http_status=400)
+		raise ApiError("USER_AND_EXTENSION_REQUIRED", "USER_AND_EXTENSION_REQUIRED", http_status=400)
 	ext = (
 		db.query(TelephonyExtension)
 		.filter(TelephonyExtension.id == extension_id, TelephonyExtension.business_id == business_id)
 		.first()
 	)
 	if not ext:
-		raise ApiError("NOT_FOUND", "داخلی یافت نشد.", http_status=404)
-	user = db.get(User, user_id)
-	if not user:
-		raise ApiError("NOT_FOUND", "کاربر یافت نشد.", http_status=404)
+		raise ApiError("EXTENSION_NOT_FOUND", "EXTENSION_NOT_FOUND", http_status=404)
+	user = require_business_member(db, business_id, user_id)
+	if payload.get("allow_shared") is not None:
+		ext.allow_shared = bool(payload.get("allow_shared"))
+	taken = exclusive_extension_taken(
+		db,
+		business_id=business_id,
+		extension_id=extension_id,
+		user_id=user_id,
+		allow_shared=bool(getattr(ext, "allow_shared", False)),
+	)
+	if taken:
+		raise ApiError(
+			"EXTENSION_IN_USE",
+			"EXTENSION_IN_USE",
+			http_status=409,
+		)
 
 	row = (
 		db.query(TelephonyUserExtension)
@@ -405,7 +594,7 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 	if "endpoint_mode" in payload:
 		mode = str(payload.get("endpoint_mode") or "desk").strip().lower()
 		if mode not in ("relay", "direct", "desk"):
-			raise ApiError("VALIDATION_ERROR", "endpoint_mode باید relay، direct یا desk باشد.", http_status=400)
+			raise ApiError("INVALID_ENDPOINT_MODE_VALUES", "INVALID_ENDPOINT_MODE_VALUES", http_status=400)
 		row.endpoint_mode = mode
 	if "allow_mode_fallback" in payload:
 		row.allow_mode_fallback = bool(payload.get("allow_mode_fallback"))
@@ -413,6 +602,11 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 		row.direct_sip_user = payload.get("direct_sip_user")
 	row.pbx_id = ext.pbx_id
 	row.updated_at = _now()
+	if "can_supervise_team" in payload:
+		team = (getattr(ext, "team_code", None) or payload.get("team_code") or "").strip()
+		upsert_team_supervisor(
+			db, business_id, user_id, team, enabled=bool(payload.get("can_supervise_team"))
+		)
 	db.commit()
 	db.refresh(row)
 	row = (
@@ -421,7 +615,21 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 		.filter(TelephonyUserExtension.id == row.id)
 		.first()
 	)
-	return user_extension_to_dict(row)
+	team = getattr(row.extension_row, "team_code", None) if row and row.extension_row else None
+	sup = False
+	if team:
+		sup = (
+			db.query(TelephonyTeamSupervisor)
+			.filter(
+				TelephonyTeamSupervisor.business_id == business_id,
+				TelephonyTeamSupervisor.user_id == user_id,
+				TelephonyTeamSupervisor.team_code == str(team),
+			)
+			.first()
+			is not None
+		)
+	data = user_extension_to_dict(row, user_name=user_display_name(user), can_supervise_team=sup)
+	return data
 
 
 def delete_user_extension(db: Session, business_id: int, link_id: int) -> None:
@@ -431,16 +639,20 @@ def delete_user_extension(db: Session, business_id: int, link_id: int) -> None:
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "نگاشت داخلی یافت نشد.", http_status=404)
+		raise ApiError("EXTENSION_MAPPING_NOT_FOUND", "EXTENSION_MAPPING_NOT_FOUND", http_status=404)
 	db.delete(row)
 	db.commit()
 
 
-def get_my_extension_context(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
-	links = list_user_extensions(db, business_id, user_id=user_id)
+def get_my_extension_context(db: Session, business_id: int, user_id: int, auth_ctx=None) -> Dict[str, Any]:
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
+	links = list_user_extensions(db, business_id, user_id=user_id, scope=scope)
 	primary = next((x for x in links if x.get("is_primary")), links[0] if links else None)
-	pbx_list = list_pbx(db, business_id)
+	include_token = bool(scope.can_manage) if scope else False
+	pbx_list = list_pbx(db, business_id, include_token_hint=include_token)
 	settings = settings_to_dict(get_or_create_settings(db, business_id))
+	if scope is not None and not scope.can_manage:
+		settings.pop("extra_settings", None)
 	missed_today = (
 		db.query(func.count(TelephonyCall.id))
 		.filter(
@@ -474,10 +686,52 @@ def get_my_extension_context(db: Session, business_id: int, user_id: int) -> Dic
 		"missed_today": int(missed_today),
 		"has_extension": bool(links),
 		"softphone": softphone_ctx,
+		"access": scope.to_dict() if scope else None,
+		"assignable_users": list_assignable_users(db, business_id) if scope and scope.can_manage else [],
 	}
 
 
 # ─── Caller ID match ────────────────────────────────────────────────────────
+
+
+def _business_phone_region(db: Session, business_id: int) -> str:
+	from app.services.customer_quick_entry_service import get_business_default_phone_region
+
+	return get_business_default_phone_region(db, int(business_id))
+
+
+def _dedupe_persons(rows: List[Person]) -> List[Person]:
+	seen: set[int] = set()
+	out: List[Person] = []
+	for p in rows:
+		if p.id not in seen:
+			seen.add(p.id)
+			out.append(p)
+	return out
+
+
+def _persons_by_normalized(
+	db: Session,
+	business_id: int,
+	e164: str,
+	fields: List[str],
+) -> List[Person]:
+	ors = []
+	for field in fields:
+		attr = _NORMALIZED_PERSON_ATTR.get(field)
+		if not attr:
+			continue
+		col = getattr(Person, attr, None)
+		if col is not None:
+			ors.append(col == e164)
+	if not ors:
+		return []
+	return (
+		db.query(Person)
+		.filter(Person.business_id == business_id, or_(*ors))
+		.limit(10)
+		.all()
+	)
 
 
 def match_caller(
@@ -486,10 +740,20 @@ def match_caller(
 	raw_number: Optional[str],
 	phone_fields: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-	norm = normalize_iran_phone(raw_number)
-	candidates = norm["candidates"]
+	region = _business_phone_region(db, business_id)
+	ident = identity_candidates(raw_number, default_region=region)
+	candidates = ident["candidates"]
 	if not candidates:
-		return {"person": None, "lead": None, "persons": [], "leads": [], "is_anonymous": True, "normalized": None}
+		return {
+			"person": None,
+			"lead": None,
+			"persons": [],
+			"leads": [],
+			"is_anonymous": True,
+			"normalized": None,
+			"e164": None,
+			"ambiguous": False,
+		}
 
 	# aliases
 	alias = (
@@ -509,34 +773,49 @@ def match_caller(
 			"persons": [],
 			"leads": [],
 			"is_anonymous": person is None and lead is None,
-			"normalized": norm["canonical"],
+			"normalized": ident["canonical"],
+			"e164": ident["e164"],
 			"match_method": "alias",
+			"ambiguous": False,
+		}
+
+	# داخلی کوتاه را با موبایل دفترچه تطبیق نده
+	if ident["is_short"]:
+		return {
+			"person": None,
+			"lead": None,
+			"persons": [],
+			"leads": [],
+			"is_anonymous": True,
+			"normalized": ident["canonical"],
+			"e164": None,
+			"match_method": None,
+			"ambiguous": False,
 		}
 
 	fields = phone_fields or DEFAULT_PHONE_FIELDS
-	ors = []
-	for field in fields:
-		col = getattr(Person, field, None)
-		if col is not None:
-			ors.append(col.in_(candidates))
-	persons: List[Person] = []
-	if ors:
-		persons = (
-			db.query(Person)
-			.filter(Person.business_id == business_id, or_(*ors))
-			.limit(10)
-			.all()
-		)
-	# de-dupe keeping order
-	seen = set()
-	uniq_persons = []
-	for p in persons:
-		if p.id not in seen:
-			seen.add(p.id)
-			uniq_persons.append(p)
+	uniq_persons: List[Person] = []
+	e164 = ident.get("e164")
+	if e164:
+		uniq_persons = _dedupe_persons(_persons_by_normalized(db, business_id, str(e164), fields))
 
-	# soft suffix match فقط اگر exact چیزی پیدا نشد (حداقل ۱۰ رقم)
 	if not uniq_persons:
+		ors = []
+		for field in fields:
+			col = getattr(Person, field, None)
+			if col is not None:
+				ors.append(col.in_(candidates))
+		if ors:
+			uniq_persons = _dedupe_persons(
+				db.query(Person)
+				.filter(Person.business_id == business_id, or_(*ors))
+				.limit(10)
+				.all()
+			)
+
+	# soft suffix match فقط اگر exact/E.164 چیزی پیدا نشد (حداقل ۱۰ رقم)
+	if not uniq_persons:
+		seen = {p.id for p in uniq_persons}
 		suffixes = [extract_digits(c)[-10:] for c in candidates if len(extract_digits(c)) >= 10]
 		suffixes = list({s for s in suffixes if len(s) == 10})
 		soft_ors = []
@@ -554,7 +833,6 @@ def match_caller(
 				.all()
 			)
 			for p in soft_persons:
-				# تأیید نهایی با numbers_match
 				vals = [getattr(p, f, None) for f in fields]
 				if any(numbers_match(raw_number, v) for v in vals if v):
 					if p.id not in seen:
@@ -583,7 +861,8 @@ def match_caller(
 		"persons": [_person_brief(p) for p in uniq_persons],
 		"leads": [_lead_brief(l) for l in leads],
 		"is_anonymous": is_anon,
-		"normalized": norm["canonical"],
+		"normalized": ident["canonical"],
+		"e164": ident["e164"],
 		"match_method": "auto" if not is_anon else None,
 		"ambiguous": len(uniq_persons) > 1 or (len(uniq_persons) == 0 and len(leads) > 1),
 	}
@@ -606,6 +885,31 @@ def _person_brief(p: Optional[Person]) -> Optional[Dict[str, Any]]:
 	}
 
 
+def _peer_canonical_phone(call: TelephonyCall) -> Optional[str]:
+	raw = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
+	raw = raw or (call.from_number_raw if call.direction == "inbound" else call.to_number_raw)
+	canon = normalize_iran_phone(raw)["canonical"]
+	if canon:
+		return str(canon)[:20]
+	digits = extract_digits(raw or "")
+	if len(digits) >= 10 and digits[-10:].startswith("9"):
+		return ("0" + digits[-10:])[:20]
+	text = str(raw).strip() if raw else ""
+	return text[:20] if text else None
+
+
+def _remember_call_match(call: TelephonyCall, *, person: Optional[Person] = None, lead: Optional[Lead] = None) -> None:
+	extra = dict(call.extra_info or {})
+	match = dict(extra.get("match") or {}) if isinstance(extra.get("match"), dict) else {}
+	if person is not None:
+		match["person"] = _person_brief(person)
+	if lead is not None:
+		match["lead"] = _lead_brief(lead)
+	match["is_anonymous"] = not (match.get("person") or match.get("lead"))
+	extra["match"] = match
+	call.extra_info = extra
+
+
 def _lead_brief(l: Optional[Lead]) -> Optional[Dict[str, Any]]:
 	if not l:
 		return None
@@ -621,7 +925,76 @@ def _lead_brief(l: Optional[Lead]) -> Optional[Dict[str, Any]]:
 # ─── Calls ───────────────────────────────────────────────────────────────────
 
 
-def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
+_PUBLIC_EXTRA_BLOCKED = frozenset(
+	{"recording_url", "recording_path", "recording_file", "connector_token", "install_hint"}
+)
+
+
+def _public_extra(info: Any) -> Dict[str, Any]:
+	if not isinstance(info, dict):
+		return {}
+	return {k: v for k, v in info.items() if k not in _PUBLIC_EXTRA_BLOCKED}
+
+
+def _peer_number(row: TelephonyCall) -> Optional[str]:
+	if getattr(row, "direction", None) == "inbound":
+		return row.from_number_normalized or row.from_number_raw
+	if getattr(row, "direction", None) == "outbound":
+		return row.to_number_normalized or row.to_number_raw
+	return (
+		row.from_number_normalized
+		or row.to_number_normalized
+		or row.from_number_raw
+		or row.to_number_raw
+	)
+
+
+def _name_from_match_extra(row: TelephonyCall, key: str) -> Optional[str]:
+	extra = getattr(row, "extra_info", None) or {}
+	if not isinstance(extra, dict):
+		return None
+	match = extra.get("match")
+	if not isinstance(match, dict):
+		return None
+	brief = match.get(key)
+	if isinstance(brief, dict):
+		name = str(brief.get("name") or "").strip()
+		return name or None
+	return None
+
+
+def _load_party_names(
+	db: Session, rows: List[TelephonyCall]
+) -> Tuple[Dict[int, str], Dict[int, str]]:
+	pids = {int(r.person_id) for r in rows if getattr(r, "person_id", None)}
+	lids = {int(r.lead_id) for r in rows if getattr(r, "lead_id", None)}
+	persons: Dict[int, str] = {}
+	if pids:
+		for p in db.query(Person).filter(Person.id.in_(pids)).all():
+			brief = _person_brief(p)
+			if brief:
+				persons[int(p.id)] = str(brief["name"])
+	leads: Dict[int, str] = {}
+	if lids:
+		for lead in db.query(Lead).filter(Lead.id.in_(lids)).all():
+			brief = _lead_brief(lead)
+			if brief:
+				leads[int(lead.id)] = str(brief["name"])
+	return persons, leads
+
+
+def call_to_dict(
+	row: TelephonyCall,
+	*,
+	person_name: Optional[str] = None,
+	lead_name: Optional[str] = None,
+) -> Dict[str, Any]:
+	if not person_name:
+		person_name = _name_from_match_extra(row, "person")
+	if not lead_name:
+		lead_name = _name_from_match_extra(row, "lead")
+	peer = _peer_number(row)
+	party_name = person_name or lead_name or peer
 	return {
 		"id": row.id,
 		"business_id": row.business_id,
@@ -645,8 +1018,13 @@ def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
 		"talk_sec": row.talk_sec,
 		"hangup_cause": row.hangup_cause,
 		"recording_status": row.recording_status,
-		"recording_url": row.recording_url,
+		"recording_available": row.recording_status == "available",
+		"recording_url": None,
 		"person_id": row.person_id,
+		"person_name": person_name,
+		"lead_name": lead_name,
+		"party_name": party_name,
+		"peer_number": peer,
 		"lead_id": row.lead_id,
 		"deal_id": row.deal_id,
 		"document_id": row.document_id,
@@ -657,10 +1035,103 @@ def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
 		"note": row.note,
 		"match_method": row.match_method,
 		"is_anonymous": bool(row.is_anonymous),
-		"extra_info": row.extra_info or {},
+		"extra_info": _public_extra(row.extra_info),
 		"created_at": _iso(row.created_at),
 		"updated_at": _iso(row.updated_at),
 	}
+
+
+def _hidden_crm_ids(db: Session, business_id: int, ctx: Any, entity_type: str, ids: List[int]) -> set[int]:
+	"""شناسه‌هایی که بینندهٔ فعلی حق دیدنشان را ندارد. مجموعهٔ خالی یعنی چیزی پنهان نیست."""
+	wanted = {int(item) for item in ids if item}
+	if ctx is None or not wanted:
+		return set()
+	from adapters.db.models.crm import Deal, Lead
+	from app.services.crm_enterprise_service import record_acl_enforced, restrict_visibility_query
+
+	if not record_acl_enforced(db, business_id, ctx):
+		return set()
+	model = Lead if entity_type == "lead" else Deal
+	visible = restrict_visibility_query(
+		db.query(model.id).filter(model.business_id == business_id, model.id.in_(wanted)),
+		db, business_id, ctx, model, entity_type,
+	)
+	seen = {int(row[0]) for row in visible.all()}
+	return wanted - seen
+
+
+def _scrub_one_call(data: Dict[str, Any], hidden_leads: set[int], hidden_deals: set[int]) -> Dict[str, Any]:
+	if not hidden_leads and not hidden_deals:
+		return data
+	data = dict(data)
+	lead_id = data.get("lead_id")
+	if lead_id and int(lead_id) in hidden_leads:
+		if data.get("party_name") == data.get("lead_name"):
+			data["party_name"] = data.get("person_name") or data.get("peer_number")
+		data["lead_id"] = None
+		data["lead_name"] = None
+	if data.get("deal_id") and int(data["deal_id"]) in hidden_deals:
+		data["deal_id"] = None
+	extra = data.get("extra_info")
+	if isinstance(extra, dict) and isinstance(extra.get("match"), dict):
+		data["extra_info"] = {**extra, "match": _scrub_match_dict(extra["match"], hidden_leads)}
+	return data
+
+
+def _scrub_match_dict(match: Dict[str, Any], hidden_leads: set[int]) -> Dict[str, Any]:
+	if not hidden_leads:
+		return match
+	cleaned = dict(match)
+	lead = cleaned.get("lead")
+	if isinstance(lead, dict) and int(lead.get("id") or 0) in hidden_leads:
+		cleaned["lead"] = None
+	leads = []
+	for item in cleaned.get("leads") or []:
+		if isinstance(item, dict) and int(item.get("id") or 0) in hidden_leads:
+			continue
+		leads.append(item)
+	cleaned["leads"] = leads
+	return cleaned
+
+
+def scrub_calls_for_viewer(db: Session, business_id: int, ctx: Any, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	if ctx is None or not items:
+		return items
+	lead_ids: List[int] = []
+	deal_ids: List[int] = []
+	for data in items:
+		if data.get("lead_id"):
+			lead_ids.append(int(data["lead_id"]))
+		if data.get("deal_id"):
+			deal_ids.append(int(data["deal_id"]))
+		extra = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None
+		match = extra.get("match") if isinstance(extra, dict) else None
+		if isinstance(match, dict):
+			lead = match.get("lead")
+			if isinstance(lead, dict) and lead.get("id"):
+				lead_ids.append(int(lead["id"]))
+			for item in match.get("leads") or []:
+				if isinstance(item, dict) and item.get("id"):
+					lead_ids.append(int(item["id"]))
+	hidden_leads = _hidden_crm_ids(db, business_id, ctx, "lead", lead_ids)
+	hidden_deals = _hidden_crm_ids(db, business_id, ctx, "deal", deal_ids)
+	if not hidden_leads and not hidden_deals:
+		return items
+	return [_scrub_one_call(item, hidden_leads, hidden_deals) for item in items]
+
+
+def scrub_match_for_viewer(db: Session, business_id: int, ctx: Any, match: Dict[str, Any]) -> Dict[str, Any]:
+	if ctx is None or not match:
+		return match
+	lead_ids: List[int] = []
+	lead = match.get("lead")
+	if isinstance(lead, dict) and lead.get("id"):
+		lead_ids.append(int(lead["id"]))
+	for item in match.get("leads") or []:
+		if isinstance(item, dict) and item.get("id"):
+			lead_ids.append(int(item["id"]))
+	hidden = _hidden_crm_ids(db, business_id, ctx, "lead", lead_ids)
+	return _scrub_match_dict(match, hidden)
 
 
 def list_calls(
@@ -674,8 +1145,13 @@ def list_calls(
 	q: Optional[str] = None,
 	limit: int = 50,
 	offset: int = 0,
+	scope: Optional[TelephonyScope] = None,
+	auth_ctx=None,
 ) -> Dict[str, Any]:
 	query = db.query(TelephonyCall).filter(TelephonyCall.business_id == business_id)
+	resolved = scope or (resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None)
+	if resolved is not None:
+		query = resolved.apply_call_filter(query)
 	if direction:
 		query = query.filter(TelephonyCall.direction == direction)
 	if status:
@@ -698,18 +1174,52 @@ def list_calls(
 		)
 	total = query.count()
 	rows = query.order_by(TelephonyCall.started_at.desc()).offset(offset).limit(min(limit, 200)).all()
-	return {"items": [call_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
-
-
-def get_call(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
-	row = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
+	pnames, lnames = _load_party_names(db, rows)
+	items = scrub_calls_for_viewer(
+		db,
+		business_id,
+		auth_ctx,
+		[
+			call_to_dict(
+				r,
+				person_name=pnames.get(int(r.person_id)) if r.person_id else None,
+				lead_name=lnames.get(int(r.lead_id)) if r.lead_id else None,
+			)
+			for r in rows
+		],
 	)
-	if not row:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
-	data = call_to_dict(row)
+	return {
+		"items": items,
+		"total": total,
+		"limit": limit,
+		"offset": offset,
+	}
+
+
+def get_call(db: Session, business_id: int, call_id: int, *, auth_ctx=None, scope: Optional[TelephonyScope] = None) -> Dict[str, Any]:
+	if auth_ctx is not None:
+		row = require_call_in_scope(db, auth_ctx, business_id, call_id, scope=scope)
+	else:
+		row = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not row:
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
+	pnames, lnames = _load_party_names(db, [row])
+	data = scrub_calls_for_viewer(
+		db,
+		business_id,
+		auth_ctx,
+		[
+			call_to_dict(
+				row,
+				person_name=pnames.get(int(row.person_id)) if row.person_id else None,
+				lead_name=lnames.get(int(row.lead_id)) if row.lead_id else None,
+			)
+		],
+	)[0]
 	events = (
 		db.query(TelephonyCallEvent)
 		.filter(TelephonyCallEvent.call_id == call_id)
@@ -721,7 +1231,7 @@ def get_call(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
 			"id": e.id,
 			"event_id": e.event_id,
 			"event_type": e.event_type,
-			"payload": e.payload,
+			"payload": _public_extra(e.payload),
 			"occurred_at": _iso(e.occurred_at),
 		}
 		for e in events
@@ -729,15 +1239,28 @@ def get_call(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
 	return data
 
 
-def patch_call(db: Session, business_id: int, call_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
-	row = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not row:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
-	for key in (
+def patch_call(
+	db: Session,
+	business_id: int,
+	call_id: int,
+	payload: Dict[str, Any],
+	*,
+	auth_ctx=None,
+	scope: Optional[TelephonyScope] = None,
+) -> Dict[str, Any]:
+	if auth_ctx is not None:
+		row = require_call_in_scope(db, auth_ctx, business_id, call_id, scope=scope)
+		resolved = scope or resolve_scope(db, auth_ctx, business_id)
+	else:
+		row = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not row:
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
+		resolved = None
+	keys = [
 		"note",
 		"category",
 		"outcome",
@@ -746,7 +1269,27 @@ def patch_call(db: Session, business_id: int, call_id: int, payload: Dict[str, A
 		"deal_id",
 		"document_id",
 		"match_method",
-	):
+	]
+	if resolved is None or resolved.can_manage or resolved.can_supervise:
+		keys.append("assigned_user_id")
+	if payload.get("lead_id"):
+		linked_lead = db.query(Lead).filter(Lead.id == int(payload["lead_id"]), Lead.business_id == business_id).first()
+		if linked_lead is None:
+			raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+		if auth_ctx is not None:
+			from app.services.crm_enterprise_service import assert_can_view_record
+
+			assert_can_view_record(db, business_id, auth_ctx, "lead", linked_lead, write=True)
+	if payload.get("deal_id"):
+		from adapters.db.models.crm import Deal
+		from app.services.crm_enterprise_service import assert_can_view_record
+
+		linked_deal = db.query(Deal).filter(Deal.id == int(payload["deal_id"]), Deal.business_id == business_id).first()
+		if linked_deal is None:
+			raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+		if auth_ctx is not None:
+			assert_can_view_record(db, business_id, auth_ctx, "deal", linked_deal, write=True)
+	for key in keys:
 		if key in payload:
 			setattr(row, key, payload[key])
 	if payload.get("person_id"):
@@ -754,7 +1297,30 @@ def patch_call(db: Session, business_id: int, call_id: int, payload: Dict[str, A
 	row.updated_at = _now()
 	db.commit()
 	db.refresh(row)
-	return call_to_dict(row)
+	return scrub_calls_for_viewer(db, business_id, auth_ctx, [call_to_dict(row)])[0]
+
+
+def _ensure_extension_catalog(db: Session, pbx: TelephonyPbxConnection, extension: str) -> None:
+	ext = str(extension or "").strip()
+	if not ext:
+		return
+	exists = (
+		db.query(TelephonyExtension.id)
+		.filter(TelephonyExtension.pbx_id == pbx.id, TelephonyExtension.extension == ext)
+		.first()
+	)
+	if exists:
+		return
+	db.add(
+		TelephonyExtension(
+			business_id=pbx.business_id,
+			pbx_id=pbx.id,
+			extension=ext,
+			created_at=_now(),
+			updated_at=_now(),
+		)
+	)
+	db.flush()
 
 
 def _users_for_extension(db: Session, business_id: int, extension: Optional[str]) -> List[TelephonyUserExtension]:
@@ -795,6 +1361,35 @@ def _notify_users_sync(user_ids: List[int], message: Dict[str, Any]) -> None:
 			pass
 
 
+def _softphone_lead_audience(
+	db: Session,
+	business_id: int,
+	lead: Optional[Lead],
+	user_ids: List[int],
+) -> Optional[Set[int]]:
+	"""None یعنی فیلتر لازم نیست. مجموعه یعنی فقط همین کاربران نام سرنخ را می‌بینند."""
+	if lead is None:
+		return None
+	from adapters.db.models.business_crm_settings import BusinessCrmSettings
+	from app.services.crm_enterprise_service import acl_actor, assert_can_view_record, record_acl_enforced
+
+	settings = db.query(BusinessCrmSettings).filter(BusinessCrmSettings.business_id == business_id).first()
+	if settings is None or not settings.record_acl_enabled:
+		return None
+	allowed: Set[int] = set()
+	for user_id in {int(item) for item in user_ids}:
+		ctx = acl_actor(db, user_id)
+		if not record_acl_enforced(db, business_id, ctx):
+			allowed.add(user_id)
+			continue
+		try:
+			assert_can_view_record(db, business_id, ctx, "lead", lead, write=False)
+		except ApiError:
+			continue
+		allowed.add(user_id)
+	return allowed
+
+
 def _notify_softphone_incoming_sync(
 	*,
 	pbx_id: int,
@@ -802,6 +1397,10 @@ def _notify_softphone_incoming_sync(
 	call_id: int,
 	from_number: Optional[str] = None,
 	channel: Optional[str] = None,
+	person: Optional[Dict[str, Any]] = None,
+	lead: Optional[Dict[str, Any]] = None,
+	lead_visible_user_ids: Optional[Set[int]] = None,
+	ambiguous: bool = False,
 ) -> None:
 	import anyio
 
@@ -814,6 +1413,10 @@ def _notify_softphone_incoming_sync(
 			call_id=call_id,
 			from_number=from_number,
 			channel=channel,
+			person=person,
+			lead=lead,
+			lead_visible_user_ids=lead_visible_user_ids,
+			ambiguous=ambiguous,
 		)
 
 	try:
@@ -848,7 +1451,7 @@ def process_connector_event(
 	event_type = str(payload.get("type") or payload.get("event_type") or "").strip()
 	uniqueid = str(payload.get("uniqueid") or "").strip()
 	if not event_type or not uniqueid:
-		raise ApiError("VALIDATION_ERROR", "type و uniqueid الزامی است.", http_status=400)
+		raise ApiError("EVENT_TYPE_REQUIRED", "EVENT_TYPE_REQUIRED", http_status=400)
 
 	occurred_at = _now()
 	raw_at = payload.get("pbx_event_at")
@@ -863,16 +1466,66 @@ def process_connector_event(
 		.filter(TelephonyCall.pbx_id == pbx.id, TelephonyCall.asterisk_uniqueid == uniqueid)
 		.first()
 	)
+	if not call and payload.get("linkedid"):
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.pbx_id == pbx.id, TelephonyCall.asterisk_linkedid == str(payload.get("linkedid")))
+			.filter(TelephonyCall.ended_at.is_(None))
+			.order_by(TelephonyCall.id.desc())
+			.first()
+		)
+	if not call:
+		from app.services.telephony.ami_channels import match_call_by_ami_ids, match_softphone_relay_call
+
+		recent = (
+			db.query(TelephonyCall)
+			.filter(
+				TelephonyCall.pbx_id == pbx.id,
+				TelephonyCall.ended_at.is_(None),
+				TelephonyCall.status.in_(["ringing", "answered"]),
+				TelephonyCall.started_at >= _now() - timedelta(minutes=15),
+			)
+			.order_by(TelephonyCall.id.desc())
+			.limit(25)
+			.all()
+		)
+		call = match_softphone_relay_call(recent, payload) or match_call_by_ami_ids(
+			recent, uniqueid, payload.get("linkedid")
+		)
+
+	from app.services.telephony.ami_channels import (
+		append_ami_uniqueid,
+		is_softphone_outbound_call,
+		should_create_call_from_ami_event,
+		should_ignore_softphone_outbound_hangup,
+		should_skip_unmatched_ami_event,
+	)
 
 	settings = get_or_create_settings(db, pbx.business_id)
+	soft_out = is_softphone_outbound_call(call) if call else False
 	direction = str(payload.get("direction") or (call.direction if call else "inbound")).lower()
-	extension = str(payload.get("extension") or (call.extension if call else "") or "").strip() or None
-	from_raw = payload.get("from") or payload.get("from_number") or (call.from_number_raw if call else None)
-	to_raw = payload.get("to") or payload.get("to_number") or (call.to_number_raw if call else None)
+	if soft_out:
+		# رویداد AMI طرفین Originate را برعکس می‌کند؛ فیلدهای Softphone را نگه دار
+		extension = call.extension
+		from_raw = call.from_number_raw
+		to_raw = call.to_number_raw
+	else:
+		extension = str(payload.get("extension") or (call.extension if call else "") or "").strip() or None
+		from_raw = payload.get("from") or payload.get("from_number") or (call.from_number_raw if call else None)
+		to_raw = payload.get("to") or payload.get("to_number") or (call.to_number_raw if call else None)
+		if extension:
+			_ensure_extension_catalog(db, pbx, extension)
 	from_norm = normalize_iran_phone(from_raw)["canonical"]
 	to_norm = normalize_iran_phone(to_raw)["canonical"]
 
 	created = False
+	if not call and event_type in ("call.answered", "answered"):
+		# Answer بدون تماس قبلی (مثلاً Local AudioSocket) نباید رکورد جعلی بسازد
+		return {"ok": True, "ignored": True, "reason": "answered_without_call"}
+	if not call and (
+		should_skip_unmatched_ami_event(event_type) or not should_create_call_from_ami_event(event_type)
+	):
+		return {"ok": True, "ignored": True, "reason": "event_without_call"}
 	if not call:
 		match = match_caller(
 			db,
@@ -911,24 +1564,58 @@ def process_connector_event(
 		db.flush()
 		created = True
 	else:
-		if from_raw:
-			call.from_number_raw = str(from_raw)
-			call.from_number_normalized = from_norm
-		if to_raw:
-			call.to_number_raw = str(to_raw)
-			call.to_number_normalized = to_norm
-		if extension:
-			call.extension = extension
+		if not soft_out:
+			if from_raw:
+				call.from_number_raw = str(from_raw)
+				call.from_number_normalized = from_norm
+			if to_raw:
+				call.to_number_raw = str(to_raw)
+				call.to_number_normalized = to_norm
+			if extension:
+				call.extension = extension
 		if payload.get("queue"):
 			call.queue_code = payload.get("queue")
-		if payload.get("linkedid"):
-			call.asterisk_linkedid = payload.get("linkedid")
+		incoming_linkedid = str(payload.get("linkedid") or "").strip()
+		current_linkedid = str(call.asterisk_linkedid or "")
+		if incoming_linkedid and not current_linkedid.startswith("hsx-sf-"):
+			call.asterisk_linkedid = incoming_linkedid
+		# uniqueid ساختگی Softphone را به uniqueid واقعی Asterisk بچسبان تا Hangup بعدی پیدا شود
+		extra_bind = append_ami_uniqueid(call.extra_info, uniqueid)
+		already_bound = bool(extra_bind.get("asterisk_uniqueid_bound"))
+		if call.asterisk_uniqueid != uniqueid and not already_bound:
+			taken = (
+				db.query(TelephonyCall.id)
+				.filter(
+					TelephonyCall.pbx_id == pbx.id,
+					TelephonyCall.asterisk_uniqueid == uniqueid,
+					TelephonyCall.id != call.id,
+				)
+				.first()
+			)
+			if not taken:
+				try:
+					with db.begin_nested():
+						call.asterisk_uniqueid = uniqueid
+						extra_bind["asterisk_uniqueid_bound"] = True
+						call.extra_info = extra_bind
+						db.flush()
+				except IntegrityError:
+					call.extra_info = extra_bind
+			else:
+				call.extra_info = extra_bind
+		else:
+			call.extra_info = extra_bind
 
 	# state transitions
 	notify_type = None
-	if event_type in ("call.ringing", "ringing"):
-		call.status = "ringing"
-		notify_type = "telephony.incoming_call" if call.direction == "inbound" else "telephony.outbound_ringing"
+	skip_status = (not created) and should_ignore_softphone_outbound_hangup(call, payload, event_type)
+	if skip_status:
+		pass
+	elif event_type in ("call.ringing", "ringing"):
+		if call.status not in ("answered", "completed", "missed", "busy", "failed", "cancelled"):
+			call.status = "ringing"
+		if created or not is_softphone_outbound_call(call):
+			notify_type = "telephony.incoming_call" if call.direction == "inbound" else "telephony.outbound_ringing"
 	elif event_type in ("call.answered", "answered"):
 		call.status = "answered"
 		call.answered_at = call.answered_at or occurred_at
@@ -1014,10 +1701,13 @@ def process_connector_event(
 	except Exception:
 		pass
 
-	# store channel for later control
-	if payload.get("channel"):
+	# store channel for later control (DestChannel برای Hangup واقعی لازم است)
+	if payload.get("channel") or payload.get("dest_channel"):
 		extra = dict(call.extra_info or {})
-		extra["channel"] = payload.get("channel")
+		if payload.get("channel"):
+			extra["channel"] = payload.get("channel")
+		if payload.get("dest_channel"):
+			extra["dest_channel"] = payload.get("dest_channel")
 		call.extra_info = extra
 
 	db.commit()
@@ -1030,12 +1720,30 @@ def process_connector_event(
 		and call.extension
 		and call.status == "ringing"
 	):
+		person_brief = _person_brief(db.get(Person, call.person_id)) if call.person_id else None
+		lead_row = db.get(Lead, call.lead_id) if call.lead_id else None
+		if lead_row is not None and int(lead_row.business_id) != int(pbx.business_id):
+			lead_row = None
+		match_info = (call.extra_info or {}).get("match") if isinstance(call.extra_info, dict) else None
+		if lead_row is None and isinstance(match_info, dict) and isinstance(match_info.get("lead"), dict):
+			raw_lead_id = match_info["lead"].get("id")
+			if raw_lead_id:
+				candidate = db.get(Lead, int(raw_lead_id))
+				if candidate is not None and int(candidate.business_id) == int(pbx.business_id):
+					lead_row = candidate
+		from app.services.telephony.media_hub import media_hub
+
+		online_users = media_hub.extension_user_ids(pbx.id, str(call.extension))
 		_notify_softphone_incoming_sync(
 			pbx_id=pbx.id,
 			extension=str(call.extension),
 			call_id=int(call.id),
 			from_number=call.from_number_normalized or call.from_number_raw,
 			channel=str(payload.get("channel") or "") or None,
+			person=person_brief or ((match_info or {}).get("person") if isinstance(match_info, dict) else None),
+			lead=_lead_brief(lead_row),
+			lead_visible_user_ids=_softphone_lead_audience(db, pbx.business_id, lead_row, online_users),
+			ambiguous=bool(isinstance(match_info, dict) and match_info.get("ambiguous")),
 		)
 
 	# realtime
@@ -1080,7 +1788,15 @@ def _ensure_crm_activity(db: Session, call: TelephonyCall, user_id: Optional[int
 		call.crm_activity_id = existing.id
 		return
 	direction_fa = {"inbound": "ورودی", "outbound": "خروجی", "internal": "داخلی"}.get(call.direction, call.direction)
-	subject = f"تماس {direction_fa} {call.from_number_normalized or call.from_number_raw or ''}".strip()
+	party = None
+	if call.person_id:
+		brief = _person_brief(db.get(Person, call.person_id))
+		party = brief.get("name") if brief else None
+	elif call.lead_id:
+		brief = _lead_brief(db.get(Lead, call.lead_id))
+		party = brief.get("name") if brief else None
+	peer = _peer_number(call) or call.from_number_normalized or call.from_number_raw or ""
+	subject = f"تماس {direction_fa} {party or peer}".strip()
 	act = CrmActivity(
 		business_id=call.business_id,
 		person_id=call.person_id,
@@ -1120,14 +1836,21 @@ def _ensure_missed_call_task(db: Session, call: TelephonyCall, settings: Telepho
 		return
 	due_min = int(settings.missed_call_task_due_minutes or 60)
 	due_at = (call.ended_at or _now()) + timedelta(minutes=due_min)
-	number = call.from_number_normalized or call.from_number_raw or ""
+	number = _peer_number(call) or call.from_number_normalized or call.from_number_raw or ""
+	party = None
+	if call.person_id:
+		brief = _person_brief(db.get(Person, call.person_id))
+		party = brief.get("name") if brief else None
+	elif call.lead_id:
+		brief = _lead_brief(db.get(Lead, call.lead_id))
+		party = brief.get("name") if brief else None
 	act = CrmActivity(
 		business_id=call.business_id,
 		person_id=call.person_id,
 		lead_id=call.lead_id,
 		code=code,
 		activity_type="call",
-		subject=f"پیگیری تماس از دست‌رفته {number}"[:255],
+		subject=f"پیگیری تماس از دست‌رفته {party or number}"[:255],
 		description="ایجاد خودکار پس از تماس از دست‌رفته",
 		activity_date=_now(),
 		created_by_user_id=uid,
@@ -1147,27 +1870,40 @@ def _ensure_missed_call_task(db: Session, call: TelephonyCall, settings: Telepho
 # ─── Screen pop context ─────────────────────────────────────────────────────
 
 
-def screen_pop_context(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
+def screen_pop_context(db: Session, business_id: int, call_id: int, *, auth_ctx=None) -> Dict[str, Any]:
 	from app.services.person_service import calculate_person_balance
 	from adapters.db.models.check import Check, CheckStatus
 
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	match = (call.extra_info or {}).get("match") or match_caller(
 		db, business_id, call.from_number_raw if call.direction == "inbound" else call.to_number_raw
 	)
 	person_id = call.person_id or (match.get("person") or {}).get("id")
+	lead_id = call.lead_id or (match.get("lead") or {}).get("id")
 	balance = None
 	recent_docs: List[Dict[str, Any]] = []
 	overdue_checks: List[Dict[str, Any]] = []
 	open_deals: List[Dict[str, Any]] = []
 	person = None
+	lead_row = None
+	if lead_id:
+		lead_row = db.get(Lead, lead_id)
+		if lead_row and lead_row.business_id != business_id:
+			lead_row = None
+		elif lead_row and auth_ctx is not None:
+			hidden_leads = _hidden_crm_ids(db, business_id, auth_ctx, "lead", [int(lead_row.id)])
+			if int(lead_row.id) in hidden_leads:
+				lead_row = None
 	if person_id:
 		person = db.get(Person, person_id)
 		if person and person.business_id == business_id:
@@ -1228,24 +1964,26 @@ def screen_pop_context(db: Session, business_id: int, call_id: int) -> Dict[str,
 				for ch in checks
 			]
 			from adapters.db.models.crm import Deal
+			from app.services.crm_enterprise_service import restrict_visibility_query
 
-			deals = (
-				db.query(Deal)
-				.filter(Deal.business_id == business_id, Deal.person_id == person_id, Deal.closed_at.is_(None))
-				.order_by(Deal.created_at.desc())
-				.limit(5)
-				.all()
+			deal_query = db.query(Deal).filter(
+				Deal.business_id == business_id, Deal.person_id == person_id, Deal.closed_at.is_(None)
 			)
+			if auth_ctx is not None:
+				deal_query = restrict_visibility_query(deal_query, db, business_id, auth_ctx, Deal, "deal")
+			deals = deal_query.order_by(Deal.created_at.desc()).limit(5).all()
 			open_deals = [
 				{"id": d.id, "title": d.title, "code": d.code, "amount": float(d.amount or 0)}
 				for d in deals
 			]
 
+	safe_match = scrub_match_for_viewer(db, business_id, auth_ctx, match if isinstance(match, dict) else {})
+	safe_call = scrub_calls_for_viewer(db, business_id, auth_ctx, [call_to_dict(call)])[0]
 	return {
-		"call": call_to_dict(call),
-		"person": _person_brief(person) if person else match.get("person"),
-		"lead": match.get("lead"),
-		"match": match,
+		"call": safe_call,
+		"person": _person_brief(person) if person else safe_match.get("person"),
+		"lead": _lead_brief(lead_row) if lead_row else safe_match.get("lead"),
+		"match": safe_match,
 		"balance": balance,
 		"recent_documents": recent_docs,
 		"overdue_checks": overdue_checks,
@@ -1267,11 +2005,11 @@ def click_to_call(
 ) -> Dict[str, Any]:
 	destination = str(payload.get("destination") or payload.get("number") or "").strip()
 	if not destination:
-		raise ApiError("VALIDATION_ERROR", "شماره مقصد الزامی است.", http_status=400)
+		raise ApiError("DESTINATION_REQUIRED", "DESTINATION_REQUIRED", http_status=400)
 	norm = normalize_iran_phone(destination)
 	dest_canonical = norm["canonical"] or extract_digits(destination)
 	if not dest_canonical:
-		raise ApiError("VALIDATION_ERROR", "شماره مقصد نامعتبر است.", http_status=400)
+		raise ApiError("INVALID_DESTINATION", "INVALID_DESTINATION", http_status=400)
 
 	links = (
 		db.query(TelephonyUserExtension)
@@ -1284,7 +2022,7 @@ def click_to_call(
 		.all()
 	)
 	if not links:
-		raise ApiError("NO_EXTENSION", "برای شما داخلی Click-to-Call تعریف نشده است.", http_status=400)
+		raise ApiError("NO_EXTENSION", "NO_EXTENSION", http_status=400)
 
 	link = None
 	wanted_ext_id = payload.get("extension_id")
@@ -1296,7 +2034,7 @@ def click_to_call(
 	ext = link.extension_row
 	pbx = db.get(TelephonyPbxConnection, link.pbx_id)
 	if not pbx or not pbx.is_active:
-		raise ApiError("PBX_OFFLINE", "مرکز تلفن فعال نیست.", http_status=400)
+		raise ApiError("PBX_OFFLINE", "PBX_OFFLINE", http_status=400)
 
 	settings_pbx = pbx.settings or {}
 	command_id = str(uuid.uuid4())
@@ -1391,7 +2129,7 @@ def ack_command(db: Session, pbx: TelephonyPbxConnection, command_id: str, paylo
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "دستور یافت نشد.", http_status=404)
+		raise ApiError("COMMAND_NOT_FOUND", "COMMAND_NOT_FOUND", http_status=404)
 	ok = bool(payload.get("accepted", True))
 	row.status = "acked" if ok else "failed"
 	row.result_payload = payload
@@ -1404,15 +2142,18 @@ def ack_command(db: Session, pbx: TelephonyPbxConnection, command_id: str, paylo
 
 
 def create_person_from_call(
-	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int
+	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int, *, auth_ctx=None
 ) -> Dict[str, Any]:
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	number = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
 	number = number or call.from_number_raw or call.to_number_raw
@@ -1447,23 +2188,27 @@ def create_person_from_call(
 	call.is_anonymous = False
 	call.match_method = "created_person"
 	call.updated_at = _now()
+	_remember_call_match(call, person=person)
 	db.commit()
 	db.refresh(call)
 	return {"call": call_to_dict(call), "person": _person_brief(person)}
 
 
 def create_lead_from_call(
-	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int
+	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int, *, auth_ctx=None
 ) -> Dict[str, Any]:
 	from adapters.db.models.crm import CrmProcessDefinition, CrmProcessStage
 
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	process = (
 		db.query(CrmProcessDefinition)
@@ -1476,7 +2221,7 @@ def create_lead_from_call(
 		.first()
 	)
 	if not process:
-		raise ApiError("NO_LEAD_FUNNEL", "فانل سرنخ برای این کسب‌وکار تعریف نشده است.", http_status=400)
+		raise ApiError("NO_LEAD_FUNNEL", "NO_LEAD_FUNNEL", http_status=400)
 	stage = (
 		db.query(CrmProcessStage)
 		.filter(CrmProcessStage.process_definition_id == process.id)
@@ -1484,17 +2229,24 @@ def create_lead_from_call(
 		.first()
 	)
 	if not stage:
-		raise ApiError("NO_LEAD_STAGE", "مرحله سرنخ یافت نشد.", http_status=400)
+		raise ApiError("NO_LEAD_STAGE", "NO_LEAD_STAGE", http_status=400)
 
-	number = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
-	number = number or call.from_number_raw or call.to_number_raw
-	code = f"TEL-L-{call.id}-{secrets.token_hex(2)}"
+	if call.lead_id:
+		existing = db.get(Lead, call.lead_id)
+		if existing and existing.business_id == business_id:
+			return {"call": call_to_dict(call), "lead": _lead_brief(existing)}
+
+	from datetime import date
+	from app.services.document_numbering_service import generate_document_code
+
+	number = _peer_canonical_phone(call)
+	name = (payload.get("name") or number or "سرنخ تلفنی").strip()
 	lead = Lead(
 		business_id=business_id,
 		process_definition_id=process.id,
 		stage_id=stage.id,
-		code=code,
-		name=(payload.get("name") or number or "سرنخ تلفنی").strip(),
+		code=generate_document_code(db, business_id, "crm_lead", date.today()),
+		name=name,
 		company_name=payload.get("company_name"),
 		mobile=number,
 		source_code=payload.get("source_code") or "telephony",
@@ -1510,34 +2262,53 @@ def create_lead_from_call(
 	call.is_anonymous = False
 	call.match_method = "created_lead"
 	call.updated_at = _now()
+	_remember_call_match(call, lead=lead)
 	db.commit()
 	db.refresh(call)
+	try:
+		from app.services.workflow.workflow_trigger_service import trigger_lead_created
+
+		trigger_lead_created(
+			db,
+			business_id,
+			lead_id=lead.id,
+			process_definition_id=lead.process_definition_id,
+			stage_id=lead.stage_id,
+			name=lead.name,
+			user_id=user_id,
+		)
+	except Exception:
+		pass
 	return {"call": call_to_dict(call), "lead": _lead_brief(lead)}
 
 
-def dashboard_summary(db: Session, business_id: int, user_id: Optional[int] = None) -> Dict[str, Any]:
+def dashboard_summary(db: Session, business_id: int, user_id: Optional[int] = None, auth_ctx=None) -> Dict[str, Any]:
 	today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
 	base = db.query(TelephonyCall).filter(
 		TelephonyCall.business_id == business_id, TelephonyCall.started_at >= today_start
 	)
+	if scope is not None:
+		base = scope.apply_call_filter(base)
 	inbound = base.filter(TelephonyCall.direction == "inbound").count()
 	outbound = base.filter(TelephonyCall.direction == "outbound").count()
 	answered = base.filter(TelephonyCall.status.in_(["answered", "completed"])).count()
 	missed = base.filter(TelephonyCall.status == "missed").count()
-	active = (
-		db.query(TelephonyCall)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.status.in_(["ringing", "answered"]),
-			TelephonyCall.ended_at.is_(None),
-		)
-		.count()
+	active_q = db.query(TelephonyCall).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.status.in_(["ringing", "answered"]),
+		TelephonyCall.ended_at.is_(None),
 	)
-	pbx_rows = list_pbx(db, business_id)
+	if scope is not None:
+		active_q = scope.apply_call_filter(active_q)
+	active = active_q.count()
+	include_token = bool(scope.can_manage) if scope else False
+	pbx_rows = list_pbx(db, business_id, include_token_hint=include_token)
 	my_missed = 0
-	if user_id:
+	uid = user_id or (scope.user_id if scope else None)
+	if uid:
 		my_missed = (
-			base.filter(TelephonyCall.assigned_user_id == user_id, TelephonyCall.status == "missed").count()
+			base.filter(TelephonyCall.assigned_user_id == uid, TelephonyCall.status == "missed").count()
 		)
 	return {
 		"today": {
@@ -1549,4 +2320,5 @@ def dashboard_summary(db: Session, business_id: int, user_id: Optional[int] = No
 		},
 		"active_calls": active,
 		"pbx_connections": pbx_rows,
+		"access": scope.to_dict() if scope else None,
 	}

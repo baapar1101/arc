@@ -851,6 +851,13 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 		return confirm_public_invoice_share_payment(
 			db, tx, success=success, external_ref=external_ref, user_id=user_id
 		)
+	# واریز آزاد از لینک عمومی کسب‌وکار (سند دریافت؛ بدون تغییر کیف‌پول SaaS)
+	if (tx.type or "") == "public_pay_link":
+		from app.services.public_pay_page_payment_service import confirm_public_pay_page_payment
+
+		return confirm_public_pay_page_payment(
+			db, tx, success=success, external_ref=external_ref, user_id=user_id
+		)
 	if tx.type != "top_up":
 		logger.error("confirm_top_up_tx_not_found", tx_id=tx_id)
 		raise ApiError("TX_NOT_FOUND", "تراکنش افزایش اعتبار یافت نشد", http_status=404)
@@ -1677,7 +1684,9 @@ def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dic
 		"refund",                   # بازگشت وجه
 		"fee",                      # کارمزد
 		"chargeback",               # برگشت تراکنش
-		"reversal"                  # معکوس کردن تراکنش
+		"reversal",                 # معکوس کردن تراکنش
+		"public_invoice_share_pay", # دریافت لینک فاکتور
+		"public_pay_link",          # واریز لینک عمومی کسب‌وکار
 	]
 	
 	has_protected = any(tx.type in protected_types for tx in transactions)
@@ -1697,6 +1706,21 @@ def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dic
 		"transaction_types": transaction_types,
 		"message": message
 	}
+
+
+def raise_if_protected_wallet_document(db: Session, document_id: int) -> None:
+	"""حذف سندی که تراکنش سیستمی کیف‌پول به آن وصل است را متوقف می‌کند.
+
+	ستون document_id در wallet_transactions با ON DELETE SET NULL تعریف شده است.
+	اگر سند دریافتِ پرداخت آنلاین حذف شود، وضعیت تراکنش «موفق» می‌ماند و فقط پیوند سند پاک می‌شود.
+	"""
+	wallet_check = check_document_has_wallet_transactions(db, int(document_id))
+	if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions"):
+		raise ApiError(
+			"DOCUMENT_HAS_WALLET_TRANSACTIONS",
+			wallet_check["message"] or "این سند به تراکنش کیف پول سیستمی مرتبط است و قابل حذف نمی‌باشد",
+			http_status=409,
+		)
 
 
 def check_wallet_transaction_has_dependencies(db: Session, transaction_id: int) -> Dict[str, Any]:

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/admin/firewall", tags=["فایروال داخلی"])
 
 
 def _perm(ctx: AuthContext) -> None:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 
 

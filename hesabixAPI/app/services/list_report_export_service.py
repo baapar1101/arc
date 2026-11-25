@@ -10,10 +10,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from fastapi.responses import Response
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from weasyprint import CSS, HTML
-from weasyprint.text.fonts import FontConfiguration
 
 from adapters.db.models.business import Business
+from app.core.weasyprint_runtime import load_weasyprint
 
 
 @dataclass(frozen=True)
@@ -186,7 +185,8 @@ def build_list_pdf_bytes(
         except Exception:
             pass
 
-    css = CSS(string=font_face + f"""
+    weasyprint = load_weasyprint()
+    css = weasyprint.CSS(string=font_face + f"""
       @page {{ size: A4 landscape; margin: 10mm; }}
       body {{ font-family: {preferred}; font-size: 10px; color: #222; }}
       .header {{ display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:2px solid #444; padding-bottom:6px; }}
@@ -199,7 +199,9 @@ def build_list_pdf_bytes(
       td {{ border:1px solid #d7dde6; padding:4px; }}
       td.num {{ text-align:center; }}
     """)
-    return HTML(string=table_html).write_pdf(stylesheets=[css], font_config=FontConfiguration())
+    return weasyprint.HTML(string=table_html).write_pdf(
+        stylesheets=[css], font_config=weasyprint.FontConfiguration()
+    )
 
 
 def list_excel_response(

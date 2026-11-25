@@ -128,10 +128,17 @@ async def run_legacy_sql_import(
 	import_opening_balance: bool = Query(True),
 	import_checks: bool = Query(True),
 	rewrite_confirmation: Optional[str] = Query(None),
+	run_confirmation: Optional[str] = Query(None),
 	conflict_policy: str = Query("skip"),
 	ctx: AuthContext = Depends(get_current_user),
 ):
 	_require_superadmin(ctx)
+	if not dry_run and (run_confirmation or "").strip() not in ("ایمپورت", "IMPORT"):
+		raise ApiError(
+			"CONFIRMATION_REQUIRED",
+			"برای ایمپورت واقعی عبارت 'ایمپورت' یا 'IMPORT' را وارد کنید.",
+			http_status=400,
+		)
 	valid_modes = ("new_business", "merge_into_business", "rewrite_business")
 	if import_mode not in valid_modes:
 		raise ApiError("INVALID_IMPORT_MODE", "import_mode نامعتبر است.", http_status=400)
@@ -196,6 +203,19 @@ async def run_legacy_sql_import(
 			_unlink_paths(cleanup_paths)
 
 	background_tasks.add_task(task)
+	from adapters.db.session import get_db_session
+	from app.services.admin_audit_service import client_ip_from_request, record_admin_action
+	with get_db_session() as audit_db:
+		record_admin_action(
+			audit_db,
+			actor_user_id=ctx.get_user_id(),
+			action="legacy_import.run",
+			summary=f"شروع ایمپورت دیتابیس قدیمی ({import_mode})",
+			target_type="legacy_import",
+			target_id=str(job_id),
+			metadata={"import_mode": import_mode, "dry_run": dry_run, "target_business_id": target_business_id},
+			client_ip=client_ip_from_request(request),
+		)
 	return success_response(
 		{"job_id": job_id, "dry_run": dry_run},
 		request,

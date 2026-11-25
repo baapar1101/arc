@@ -86,7 +86,7 @@ async def _pcm_from_upload(upload: UploadFile, sample_rate_hz: int) -> tuple[byt
 	return raw, sample_rate_hz
 
 
-@router.get("/catalog", summary="کاتالوگ STT/TTS مجاز کاربر")
+@router.get("/catalog", summary="کاتالوگ STT/TTS مجاز کاربر", description="ابزار MCP: `list_ai_voice_catalog`. STT/TTS باینری در MCP نیست.")
 async def get_voice_catalog(
 	request: Request,
 	business_id: Optional[int] = Query(None),
@@ -99,7 +99,7 @@ async def get_voice_catalog(
 	return success_response(data, request)
 
 
-@router.get("/settings", summary="تنظیمات صوت کسب‌وکار")
+@router.get("/settings", summary="تنظیمات صوت کسب‌وکار", description="ابزار MCP: `get_business_voice_settings`.")
 async def get_business_voice_settings(
 	request: Request,
 	business_id: Optional[int] = Query(None),
@@ -116,7 +116,7 @@ async def get_business_voice_settings(
 	return success_response(payload, request)
 
 
-@router.put("/settings", summary="ذخیره تنظیمات صوت کسب‌وکار")
+@router.put("/settings", summary="ذخیره تنظیمات صوت کسب‌وکار", description="ابزار MCP: `update_business_voice_settings` (نیازمند تأیید).")
 async def update_business_voice_settings(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),
@@ -151,7 +151,7 @@ async def update_business_voice_settings(
 	return success_response(out, request, "تنظیمات صوت ذخیره شد")
 
 
-@router.post("/stt", summary="تبدیل صدا به متن (دیکته)")
+@router.post("/stt", summary="تبدیل صدا به متن (دیکته)", description="ورودی باینری صدا است و در MCP ثبت نشده. تنظیمات: `get_business_voice_settings`.")
 async def transcribe_audio(
 	request: Request,
 	business_id: Optional[int] = Query(None),
@@ -212,7 +212,7 @@ async def transcribe_audio(
 	)
 
 
-@router.post("/tts", summary="تبدیل متن به صدا (بلندخوانی)")
+@router.post("/tts", summary="تبدیل متن به صدا (بلندخوانی)", description="خروجی باینری صدا است و در MCP ثبت نشده. کاتالوگ: `list_ai_voice_catalog`.")
 async def synthesize_speech(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),

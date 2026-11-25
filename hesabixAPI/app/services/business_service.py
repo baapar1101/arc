@@ -1351,6 +1351,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_footer_preparer": bool(getattr(row, "show_footer_preparer", True)),
             "footer_note": getattr(row, "footer_note", None),
             "show_customer_balance": bool(getattr(row, "show_customer_balance", True)),
+            "show_currency_symbol": bool(getattr(row, "show_currency_symbol", False)),
             "show_seller_signature_area": bool(getattr(row, "show_seller_signature_area", True)),
             "show_buyer_signature_area": bool(getattr(row, "show_buyer_signature_area", True)),
             "stamp_scale_percent": clamp_scale_percent(
@@ -1376,6 +1377,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_footer_preparer": True,
         "footer_note": None,
         "show_customer_balance": True,
+        "show_currency_symbol": False,
         "show_seller_signature_area": True,
         "show_buyer_signature_area": True,
         "stamp_scale_percent": STAMP_SCALE_DEFAULT,
@@ -1451,6 +1453,7 @@ def update_business_print_settings(
         row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
         row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
         row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
+        row.show_currency_symbol = _get_bool(cfg, "show_currency_symbol", False)
         row.show_seller_signature_area = _get_bool(
             cfg, "show_seller_signature_area", True
         )
@@ -1679,6 +1682,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         # تنظیمات محاسبه سود فاکتور
         "invoice_profit_calculation_method": getattr(business, "invoice_profit_calculation_method", None),
         "invoice_profit_calculation_basis": getattr(business, "invoice_profit_calculation_basis", None),
+        "invoice_profit_missing_purchase_price_policy": getattr(
+            business, "invoice_profit_missing_purchase_price_policy", "zero_cost"
+        ),
         "invoice_profit_include_overhead": bool(getattr(business, "invoice_profit_include_overhead", False)),
         "invoice_profit_overhead_type": getattr(business, "invoice_profit_overhead_type", None),
         "invoice_profit_overhead_percent": float(business.invoice_profit_overhead_percent) if getattr(business, "invoice_profit_overhead_percent", None) is not None else None,
@@ -1693,6 +1699,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_sync_update_purchase_price_enabled": bool(getattr(business, "invoice_sync_update_purchase_price_enabled", False)),
         "invoice_sync_sales_price_basis": getattr(business, "invoice_sync_sales_price_basis", None),
         "invoice_sync_purchase_price_basis": getattr(business, "invoice_sync_purchase_price_basis", None),
+        "invoice_sync_purchase_price_multi_line_policy": getattr(
+            business, "invoice_sync_purchase_price_multi_line_policy", "weighted_average"
+        ),
         "invoice_warehouse_release_mode": _normalize_invoice_warehouse_release_mode(
             getattr(business, "invoice_warehouse_release_mode", None),
         ),
@@ -1707,6 +1716,8 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
             getattr(business, "invoice_default_warehouse_fill_document_header", True),
         ),
         "allow_negative_inventory_for_bulk": bool(getattr(business, "allow_negative_inventory_for_bulk", False)),
+        "product_dimension_unit": business.product_dimension_unit,
+        "product_weight_unit": business.product_weight_unit,
         "allow_negative_inventory_for_unique": bool(getattr(business, "allow_negative_inventory_for_unique", False)),
         "warehouse_transfer_require_positive_stock": bool(
             getattr(business, "warehouse_transfer_require_positive_stock", True),

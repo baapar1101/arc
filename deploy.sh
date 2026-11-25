@@ -294,48 +294,88 @@ hesabix_pip_append_trusted_host() {
   if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST} ${host}"
   else export PIP_TRUSTED_HOST="${host}"; fi
 }
+hesabix_pip_index_is_reachable() {
+  local url="${1%/}" code
+  [[ -n "$url" ]] || return 1
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 12 -L --max-redirs 4 "${url}/pip/" 2>/dev/null || true)"
+  case "${code:-000}" in 2*|301|302|303|307|308) return 0 ;; *) return 1 ;; esac
+}
 hesabix_apply_pip_china_fallback() {
-  [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]] && return 0
-  local china="${HESABIX_PIP_CHINA_INDEX_URL}" primary="${PIP_INDEX_URL:-}"
-  if [[ -z "${PIP_EXTRA_INDEX_URL:-}" ]]; then
-    if [[ "${primary}" == "${china}" ]]; then
-      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
-      hesabix_pip_append_trusted_host "mirrors.cloud.tencent.com"
-    else
-      export PIP_EXTRA_INDEX_URL="${china}"
-      hesabix_pip_append_trusted_host "${HESABIX_PIP_CHINA_TRUSTED_HOST}"
-    fi
-  else
-    local extra_host; extra_host="$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL%% *}")"
-    [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-15}"
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then unset PIP_EXTRA_INDEX_URL; return 0; fi
+  local extra="${PIP_EXTRA_INDEX_URL:-}"; extra="${extra%% *}"; extra="${extra%/}"
+  if [[ -z "${extra}" ]]; then unset PIP_EXTRA_INDEX_URL; return 0; fi
+  if ! hesabix_pip_index_is_reachable "${extra}"; then
+    hesabix_mirror_log_warning "Dropping unreachable PIP_EXTRA_INDEX_URL=${extra}"
+    unset PIP_EXTRA_INDEX_URL; return 0
   fi
-  hesabix_mirror_log_info "PyPI extra index (China fallback): ${PIP_EXTRA_INDEX_URL}"
+  export PIP_EXTRA_INDEX_URL="${extra}"
+  local extra_host; extra_host="$(hesabix_pip_trusted_host_from_url "${extra}")"
+  [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  hesabix_mirror_log_info "PyPI extra index: ${PIP_EXTRA_INDEX_URL}"
 }
 hesabix_pip_index_fallback_urls() {
   local -a urls=(); local u
   [[ -n "${PIP_INDEX_URL:-}" ]] && urls+=("${PIP_INDEX_URL}")
+  urls+=("https://pypi.org/simple" "https://pypi.tuna.tsinghua.edu.cn/simple" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}" "${HESABIX_PIP_CHINA_INDEX_URL}")
   [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && urls+=("${PIP_EXTRA_INDEX_URL%% *}")
-  urls+=("${HESABIX_PIP_CHINA_INDEX_URL}" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}")
   local -A seen=()
   for u in "${urls[@]}"; do
     u="${u%/}"; [[ -n "$u" && -z "${seen[$u]:-}" ]] || continue
     seen[$u]=1; printf '%s\n' "$u"
   done
 }
+hesabix_pip_preset_for_index_url() {
+  local url="${1%/}"
+  case "$url" in
+    "${HESABIX_PIP_INDEX_URL%/}"|"${HESABIX_PIP_INDEX_URL}") printf '%s' "hesabix" ;;
+    "https://pypi.org/simple") printf '%s' "official" ;;
+    "https://pypi.tuna.tsinghua.edu.cn/simple") printf '%s' "tuna" ;;
+    "https://mirrors.aliyun.com/pypi/simple") printf '%s' "aliyun" ;;
+    *) printf '%s' "custom" ;;
+  esac
+}
+hesabix_heal_pip_index_if_unreachable() {
+  local current="${PIP_INDEX_URL:-}"; current="${current%/}"
+  if [[ -n "${current}" ]] && hesabix_pip_index_is_reachable "${current}"; then return 0; fi
+  local url
+  while IFS= read -r url; do
+    [[ -n "$url" && "$url" != "${current}" ]] || continue
+    if hesabix_pip_index_is_reachable "$url"; then
+      hesabix_mirror_log_warning "PyPI index unreachable (${current:-<unset>}); switching to ${url}"
+      hesabix_set_pip_mirror_for_url "$url"
+      PIP_MIRROR="$(hesabix_pip_preset_for_index_url "$url")"; export PIP_MIRROR
+      unset PIP_EXTRA_INDEX_URL
+      HESABIX_PIP_INDEX_HEALED=1; export HESABIX_PIP_INDEX_HEALED
+      return 0
+    fi
+  done < <(hesabix_pip_index_fallback_urls)
+  hesabix_mirror_log_warning "No reachable PyPI index found."; return 1
+}
+hesabix_pip_invoke() {
+  local pip_bin="$1" index_url="$2"; shift 2
+  local timeout="${PIP_DEFAULT_TIMEOUT:-15}" sub="$1"; shift
+  local host
+  local -a cmd=("${pip_bin}" --isolated --disable-pip-version-check --timeout "${timeout}" --retries 2 "${sub}" --index-url "${index_url}")
+  host="$(hesabix_pip_trusted_host_from_url "${index_url}")"
+  [[ -n "${host}" ]] && cmd+=(--trusted-host "${host}")
+  "${cmd[@]}" "$@"
+}
 hesabix_pip_cmd_with_fallback() {
   local pip_bin="$1"; shift
-  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then "${pip_bin}" "$@"; return $?; fi
-  "${pip_bin}" "$@" && return 0
-  local url orig_index orig_extra orig_trust
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then
+    hesabix_pip_invoke "${pip_bin}" "${PIP_INDEX_URL:-https://pypi.org/simple}" "$@"; return $?
+  fi
+  local url orig_index orig_extra orig_trust first=1
   orig_index="${PIP_INDEX_URL:-}"; orig_extra="${PIP_EXTRA_INDEX_URL:-}"; orig_trust="${PIP_TRUSTED_HOST:-}"
   while IFS= read -r url; do
-    [[ -n "$url" && "$url" != "${orig_index}" ]] || continue
-    hesabix_mirror_log_warning "pip failed on ${orig_index:-<unset>}; retrying ${url}"
-    hesabix_set_pip_mirror_for_url "$url"
-    if [[ "$url" == "${HESABIX_PIP_CHINA_INDEX_URL}" ]]; then export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
-    else export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_INDEX_URL}"; fi
-    hesabix_pip_append_trusted_host "$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL}")"
-    if "${pip_bin}" "$@"; then hesabix_mirror_log_info "pip succeeded from ${url}"; return 0; fi
+    [[ -n "$url" ]] || continue
+    [[ "${first}" -eq 1 ]] && first=0 || hesabix_mirror_log_warning "pip failed on ${PIP_INDEX_URL:-<unset>}; retrying ${url}"
+    hesabix_set_pip_mirror_for_url "$url"; unset PIP_EXTRA_INDEX_URL
+    if hesabix_pip_invoke "${pip_bin}" "$url" "$@"; then
+      [[ "$url" != "${orig_index}" ]] && hesabix_mirror_log_info "pip succeeded from ${url}"
+      return 0
+    fi
   done < <(hesabix_pip_index_fallback_urls)
   export PIP_INDEX_URL="${orig_index}" PIP_EXTRA_INDEX_URL="${orig_extra}" PIP_TRUSTED_HOST="${orig_trust}"
   return 1
@@ -400,12 +440,13 @@ hesabix_apply_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     hesabix_mirror_log_info "Using PyPI index from environment: PIP_INDEX_URL=${PIP_INDEX_URL}"
     hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"
-    hesabix_apply_pip_china_fallback; return 0
+  else
+    PIP_MIRROR="${PIP_MIRROR:-hesabix}"; export PIP_MIRROR
+    hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
   fi
-  PIP_MIRROR="${PIP_MIRROR:-hesabix}"; export PIP_MIRROR
-  hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
   hesabix_apply_pip_china_fallback
-  hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR}): ${PIP_INDEX_URL}"
+  hesabix_heal_pip_index_if_unreachable || true
+  hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR:-}): ${PIP_INDEX_URL}"
 }
 hesabix_apply_flutter_mirror_env() {
   if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
@@ -423,7 +464,12 @@ hesabix_configure_pip_mirror() {
   python3 -m pip config --user set global.index-url "${PIP_INDEX_URL}" 2>/dev/null || true
   local primary_host; primary_host="$(hesabix_pip_trusted_host_from_url "${PIP_INDEX_URL}")"
   [[ -n "${primary_host}" ]] && python3 -m pip config --user set global.trusted-host "${primary_host}" 2>/dev/null || true
-  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
+  else
+    python3 -m pip config --user unset global.extra-index-url 2>/dev/null || true
+  fi
+  python3 -m pip config --user set global.timeout "${PIP_DEFAULT_TIMEOUT:-15}" 2>/dev/null || true
   hesabix_mirror_log_info "pip user config: ${PIP_INDEX_URL}"
 }
 hesabix_prompt_pip_mirror() {
@@ -1262,6 +1308,10 @@ FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}
 INSTALL_ID=${INSTALL_ID:-}
 ENV
   chmod 600 "${env_file}"
+  if getent group www-data >/dev/null 2>&1; then
+    chgrp www-data "${env_file}" 2>/dev/null || true
+  fi
+  chmod 640 "${env_file}" 2>/dev/null || true
   log_info "Saved deployment config to ${env_file}"
 
   local bin_hesabix="/usr/local/bin/hesabix"
@@ -1658,6 +1708,17 @@ install_prereqs() {
       log_warning "pgvector package install skipped or failed (non-fatal)."
     fi
   fi
+
+  local pg_client_script=""
+  if pg_client_script="$(hesabix_find_repo_script ensure_postgresql_client.sh)"; then
+    chmod +x "${pg_client_script}" 2>/dev/null || true
+    log_info "Ensuring PostgreSQL client tools (pg_dump/psql) for database backup..."
+    if bash "${pg_client_script}"; then
+      log_success "PostgreSQL client tools are installed."
+    else
+      log_warning "postgresql-client install skipped or failed. Database backup needs postgresql-client-<version>."
+    fi
+  fi
   
   log_success "Prerequisites installed (or already present)."
 }
@@ -2016,7 +2077,8 @@ hesabix_resolve_pg_restore_for_dump() {
     if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
       bin="/usr/lib/postgresql/${server_major}/bin/pg_restore"
       if [[ -x "${bin}" ]]; then
-        log_info "pg_restore: PostgreSQL ${server_major} client (matches server; dump format ${fmt})."
+        # Logs must go to stderr: callers capture this function's stdout as a path.
+        log_info "pg_restore: PostgreSQL ${server_major} client (matches server; dump format ${fmt})." >&2
         printf '%s' "${bin}"
         return 0
       fi
@@ -2024,7 +2086,7 @@ hesabix_resolve_pg_restore_for_dump() {
     if [[ -n "${server_major}" ]]; then
       for m in "${installed[@]}"; do
         if [[ "${m}" -ge "${min_major}" ]] && [[ "${m}" -le "${server_major}" ]]; then
-          log_info "pg_restore: PostgreSQL ${m} client (dump format ${fmt}; server ${server_major})."
+          log_info "pg_restore: PostgreSQL ${m} client (dump format ${fmt}; server ${server_major})." >&2
           printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
           return 0
         fi
@@ -2033,7 +2095,7 @@ hesabix_resolve_pg_restore_for_dump() {
     for m in "${installed[@]}"; do
       if [[ "${m}" -ge "${min_major}" ]]; then
         if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
-          log_warning "pg_restore ${m} for dump format ${fmt} on PostgreSQL ${server_major} server — may cause transaction_timeout errors; prefer matching client or upgrade PostgreSQL."
+          log_warning "pg_restore ${m} for dump format ${fmt} on PostgreSQL ${server_major} server — may cause transaction_timeout errors; prefer matching client or upgrade PostgreSQL." >&2
         fi
         printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
         return 0
@@ -2043,7 +2105,7 @@ hesabix_resolve_pg_restore_for_dump() {
     if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
       install_m="${server_major}"
     fi
-    hesabix_ensure_postgresql_client_major "${install_m}" || true
+    hesabix_ensure_postgresql_client_major "${install_m}" >&2 || true
     bin="/usr/lib/postgresql/${install_m}/bin/pg_restore"
     if [[ -x "${bin}" ]]; then
       printf '%s' "${bin}"
@@ -2051,11 +2113,11 @@ hesabix_resolve_pg_restore_for_dump() {
     fi
     for m in 18 17 16 15 14 13; do
       [[ "${m}" -ge "${min_major}" ]] || continue
-      hesabix_ensure_postgresql_client_major "${m}" || continue
+      hesabix_ensure_postgresql_client_major "${m}" >&2 || continue
       bin="/usr/lib/postgresql/${m}/bin/pg_restore"
       if [[ -x "${bin}" ]]; then
         if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
-          log_warning "Installed pg_restore ${m} for format ${fmt}; target server is PostgreSQL ${server_major}."
+          log_warning "Installed pg_restore ${m} for format ${fmt}; target server is PostgreSQL ${server_major}." >&2
         fi
         printf '%s' "${bin}"
         return 0
@@ -2072,6 +2134,24 @@ hesabix_resolve_pg_restore_for_dump() {
     [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
   done
   command -v pg_restore 2>/dev/null || true
+}
+
+# Callers must treat stdout as a filesystem path. If log lines leak, keep the last executable path.
+hesabix_pg_restore_bin_for_dump() {
+  local dump="$1" raw line picked=""
+  raw=$(hesabix_resolve_pg_restore_for_dump "${dump}")
+  if [[ -n "${raw}" && -x "${raw}" ]]; then
+    printf '%s' "${raw}"
+    return 0
+  fi
+  while IFS= read -r line; do
+    [[ -x "${line}" ]] && picked="${line}"
+  done <<< "${raw}"
+  if [[ -n "${picked}" ]]; then
+    printf '%s' "${picked}"
+    return 0
+  fi
+  return 1
 }
 
 # Revision bundled with seed dump (sidecar file, env, or embedded alembic_version data).
@@ -2091,7 +2171,7 @@ hesabix_read_seed_alembic_revision() {
     fi
   done
   if [[ -f "${dump}" ]]; then
-    pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${dump}")
+    pg_restore_bin=$(hesabix_pg_restore_bin_for_dump "${dump}" || true)
     if [[ -n "${pg_restore_bin}" && -x "${pg_restore_bin}" ]]; then
       rev=$(
         "${pg_restore_bin}" -a -t alembic_version "${dump}" 2>/dev/null | awk '
@@ -2139,7 +2219,7 @@ SQL
 hesabix_run_pg_restore_seed() {
   local seed_dump="$1" restore_log="$2"
   local pg_restore_bin
-  pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${seed_dump}")
+  pg_restore_bin=$(hesabix_pg_restore_bin_for_dump "${seed_dump}" || true)
   if [[ -z "${pg_restore_bin}" || ! -x "${pg_restore_bin}" ]]; then
     log_error "pg_restore not found."
     return 1
@@ -2398,6 +2478,12 @@ print('Connection successful')
     log_info "Ensuring PostgreSQL pgvector package before migrations..."
     bash "${pgvector_script}" || log_warning "pgvector install skipped (non-fatal)."
   fi
+  local pg_client_script=""
+  if pg_client_script="$(hesabix_find_repo_script ensure_postgresql_client.sh)"; then
+    chmod +x "${pg_client_script}" 2>/dev/null || true
+    log_info "Ensuring PostgreSQL client tools before API start..."
+    bash "${pg_client_script}" || log_warning "postgresql-client install skipped (non-fatal)."
+  fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
   if ! hesabix_db_is_fully_initialized && [[ "${table_count}" -gt 0 ]]; then
@@ -2409,7 +2495,7 @@ print('Connection successful')
   hesabix_fixup_seed_object_privileges
   hesabix_ensure_alembic_version_schema
   log_step "Running Alembic migrations..."
-  if ! alembic upgrade head; then
+  if ! python scripts/check_migration_branches.py --upgrade; then
     echo "$CROSS_MARK Error running migrations"
     exit 1
   fi
@@ -2443,9 +2529,9 @@ WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
 Environment=TZ=UTC
-# ! = run as root: daemon-reload + pip from deploy mirrors if needed (before alembic)
+# ! = run as root: postgresql-client + daemon-reload + pip from deploy mirrors if needed
 ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
-# Before start/restart: run migrations; service does not start if migrations fail
+# Before start/restart: run migrations; prestart auto-merges multiple Alembic heads first
 ExecStartPre=${api_dir}/.venv/bin/python -m alembic -c ${api_dir}/alembic.ini upgrade head
 ExecStart=${api_dir}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}
 Restart=always
@@ -3064,6 +3150,21 @@ server {
     proxy_send_timeout 30;
   }
 
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # When API and UI share one domain: serve /public/ paths from UI root (SPA)
   # Named location fallback so /index.html does not hit location / { return 404; }
   location /public/ {
@@ -3238,7 +3339,7 @@ server {
     add_header X-Accel-Buffering no always;
   }
 
-  location /api/ {
+  location ^~ /api/ {
     limit_req zone=api_limit burst=120 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
@@ -3347,6 +3448,21 @@ server {
     proxy_send_timeout 30;
   }
 
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # Proxy /api/ and /ws/ to backend (when API and UI share same domain)
   # AI chat SSE: stream chunks immediately (no proxy buffering)
   location ^~ /api/v1/ai/chat/ {
@@ -3367,7 +3483,7 @@ server {
     add_header X-Accel-Buffering no always;
   }
 
-  location /api/ {
+  location ^~ /api/ {
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;

@@ -239,6 +239,7 @@ def register_document_list_exports(router) -> None:
         @router.post(
             f"/businesses/{{business_id}}/reports/{slug}/export/excel",
             summary=f"خروجی Excel — {title_fa}",
+            description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report`.",
         )
         @require_business_access("business_id")
         async def _handler(
@@ -260,6 +261,7 @@ def register_document_list_exports(router) -> None:
         @router.post(
             f"/businesses/{{business_id}}/reports/{slug}/export/pdf",
             summary=f"خروجی PDF — {title_fa}",
+            description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report`.",
         )
         @require_business_access("business_id")
         async def _handler(

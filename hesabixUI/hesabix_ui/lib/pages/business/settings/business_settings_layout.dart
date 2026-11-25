@@ -1,28 +1,32 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/tokens/extensions.dart';
+
 /// Layout helpers for the business settings hub.
 abstract final class BusinessSettingsLayout {
-  /// Screen width at which setting cards use a two-column grid.
-  static const double twoColumnMinScreenWidth = 768;
-
-  static bool useTwoColumns(BuildContext context) {
-    return MediaQuery.sizeOf(context).width >= twoColumnMinScreenWidth;
+  static int columnCount(BuildContext context) {
+    return context.settingsHub.gridColumns(MediaQuery.sizeOf(context).width);
   }
 
-  static Widget buildTwoColumnGrid({
+  static Widget buildResponsiveGrid({
     required BuildContext context,
     required List<Widget> children,
-    double gap = 8,
-    double runSpacing = 6,
   }) {
     if (children.isEmpty) return const SizedBox.shrink();
 
-    if (!useTwoColumns(context)) {
+    final hub = context.settingsHub;
+    final gap = hub.gridGap;
+    final runSpacing = hub.gridRunSpacing;
+    final columns = columnCount(context);
+
+    if (columns <= 1) {
       return Column(
         children: [
           for (var i = 0; i < children.length; i++)
             Padding(
-              padding: EdgeInsets.only(bottom: i == children.length - 1 ? 0 : runSpacing),
+              padding: EdgeInsets.only(
+                bottom: i == children.length - 1 ? 0 : runSpacing,
+              ),
               child: children[i],
             ),
         ],
@@ -31,7 +35,7 @@ abstract final class BusinessSettingsLayout {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final itemWidth = (constraints.maxWidth - gap) / 2;
+        final itemWidth = (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
           spacing: gap,
           runSpacing: runSpacing,

@@ -71,6 +71,7 @@ class TriggerRegistry:
             ReceiptPaymentUpdatedTrigger,
             CheckDueDateTrigger,
             InventoryLowTrigger,
+            InventoryExpiresSoonTrigger,
             PersonCreatedTrigger,
             ScheduledTrigger,
             WebhookTrigger,
@@ -109,6 +110,7 @@ class TriggerRegistry:
         
         # Inventory triggers
         self.register("inventory.low", InventoryLowTrigger())
+        self.register("inventory.expires_soon", InventoryExpiresSoonTrigger())
         
         # Person triggers
         self.register("person.created", PersonCreatedTrigger())
@@ -164,4 +166,27 @@ class TriggerRegistry:
         self.register("basalam.order.updated", BasalamOrderUpdatedTrigger())
         self.register("basalam.order.paid", BasalamOrderPaidTrigger())
         self.register("basalam.chat.message.received", BasalamChatMessageReceivedTrigger())
+
+        from app.services.workflow.triggers.office_automation_triggers import (
+            OaLetterArchivedTrigger,
+            OaLetterDispatchedTrigger,
+            OaLetterReferredTrigger,
+            OaLetterRegisteredTrigger,
+            OaLetterSignedTrigger,
+        )
+
+        self.register("office_automation.letter_registered", OaLetterRegisteredTrigger())
+        self.register("office_automation.letter_referred", OaLetterReferredTrigger())
+        self.register("office_automation.letter_archived", OaLetterArchivedTrigger())
+        self.register("office_automation.letter_dispatched", OaLetterDispatchedTrigger())
+        self.register("office_automation.letter_signed", OaLetterSignedTrigger())
+
+        from app.services.workflow.triggers.procurement_triggers import ProcurementEventTrigger
+
+        self.register("procurement.requisition.created", ProcurementEventTrigger("ایجاد درخواست خرید", "پس از ثبت درخواست خرید"))
+        self.register("procurement.requisition.approved", ProcurementEventTrigger("تأیید درخواست خرید", "پس از تأیید نهایی درخواست خرید"))
+        self.register("procurement.order.approved", ProcurementEventTrigger("تأیید سفارش خرید", "پس از تأیید سفارش و ثبت تعهد بودجه"))
+        self.register("procurement.order.sent", ProcurementEventTrigger("ارسال سفارش خرید", "پس از ارسال سفارش برای تأمین‌کننده"))
+        self.register("procurement.receipt.posted", ProcurementEventTrigger("رسید سفارش خرید", "پس از ثبت رسید کالا یا خدمت"))
+        self.register("procurement.contract.expiring", ProcurementEventTrigger("نزدیک شدن انقضای قرارداد", "وقتی قرارداد فعال در افق ۳۰ روز به پایان برسد"))
 

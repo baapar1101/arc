@@ -27,7 +27,11 @@ from app.services.product_bundle_service import (
 router = APIRouter(prefix="/product-bundles", tags=["product-bundles"])
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="جستجوی بسته‌های کالا",
+    description="ابزار MCP: `search_product_bundles`.",
+)
 @require_business_access("business_id")
 def search_product_bundles(
     request: Request,
@@ -52,7 +56,11 @@ def search_product_bundles(
     return success_response(format_datetime_fields(result, request), request)
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد بسته کالا",
+    description="ابزار MCP: `create_product_bundle` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_product_bundle(
     request: Request,
@@ -68,7 +76,11 @@ def create_product_bundle(
     )
 
 
-@router.get("/business/{business_id}/{bundle_id}")
+@router.get(
+    "/business/{business_id}/{bundle_id}",
+    summary="جزئیات بسته کالا",
+    description="ابزار MCP: `get_product_bundle`.",
+)
 @require_business_access("business_id")
 def get_product_bundle(
     request: Request,
@@ -84,7 +96,11 @@ def get_product_bundle(
     return success_response(format_datetime_fields(result, request), request)
 
 
-@router.put("/business/{business_id}/{bundle_id}")
+@router.put(
+    "/business/{business_id}/{bundle_id}",
+    summary="ویرایش بسته کالا",
+    description="ابزار MCP: `update_product_bundle` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_product_bundle(
     request: Request,
@@ -103,7 +119,11 @@ def update_product_bundle(
     )
 
 
-@router.delete("/business/{business_id}/{bundle_id}")
+@router.delete(
+    "/business/{business_id}/{bundle_id}",
+    summary="حذف بسته کالا",
+    description="ابزار MCP: `delete_product_bundle` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_product_bundle(
     request: Request,
@@ -119,7 +139,11 @@ def delete_product_bundle(
     return success_response({"deleted": True, "id": bundle_id}, request, message="BUNDLE_DELETED")
 
 
-@router.post("/business/{business_id}/{bundle_id}/expand")
+@router.post(
+    "/business/{business_id}/{bundle_id}/expand",
+    summary="گسترش اقلام بسته کالا",
+    description="ابزار MCP: `expand_product_bundle`.",
+)
 @require_business_access("business_id")
 def expand_product_bundle(
     request: Request,

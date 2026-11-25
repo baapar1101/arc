@@ -1,4 +1,5 @@
 import 'catalog_specification_item.dart';
+import 'product_measurement.dart';
 import 'product_supplier_item.dart';
 
 const Object _kProductFormCodeUnset = Object();
@@ -20,6 +21,7 @@ class ProductFormData {
   /// بارکدهای عمومی؛ با ویرگول از هم جدا می‌شوند (هم‌عرض با APIی `general_barcodes`).
   String? generalBarcodes;
   int? categoryId;
+  final Map<ProductMeasurement, String?> physicalMeasurements;
   
   // Inventory
   bool trackInventory;
@@ -31,6 +33,14 @@ class ProductFormData {
   String? inventoryMode; // "bulk" or "unique"
   bool trackSerial;
   bool trackBarcode;
+  bool trackExpiry;
+  String lotPolicy;
+  int? shelfLifeDays;
+  int? bestBeforeOffsetDays;
+  int? removalOffsetDays;
+  int? alertOffsetDays;
+  String expiredSalePolicy;
+  int minRemainingShelfLifeDays;
   
   // Pricing
   num? baseSalesPrice;
@@ -60,6 +70,8 @@ class ProductFormData {
   
   // Attributes
   Set<int> selectedAttributeIds;
+  /// ویژگی‌های select که موجودی را تفکیک می‌کنند؛ به payload کالا ارسال نمی‌شود.
+  Set<int> inventoryDimensionAttributeIds;
   
   // Image
   String? imageFileId;
@@ -92,6 +104,7 @@ class ProductFormData {
     this.description,
     this.generalBarcodes,
     this.categoryId,
+    this.physicalMeasurements = const {},
     this.trackInventory = false,
     this.reorderPoint,
     this.minOrderQty,
@@ -99,6 +112,14 @@ class ProductFormData {
     this.inventoryMode,
     this.trackSerial = false,
     this.trackBarcode = false,
+    this.trackExpiry = false,
+    this.lotPolicy = 'optional',
+    this.shelfLifeDays,
+    this.bestBeforeOffsetDays,
+    this.removalOffsetDays,
+    this.alertOffsetDays,
+    this.expiredSalePolicy = 'block',
+    this.minRemainingShelfLifeDays = 0,
     this.baseSalesPrice,
     this.basePurchasePrice,
     this.baseSalesNote,
@@ -118,6 +139,7 @@ class ProductFormData {
     this.taxCode,
     this.taxUnitId,
     Set<int>? selectedAttributeIds,
+    Set<int>? inventoryDimensionAttributeIds,
     this.imageFileId,
     this.imageUrl,
     this.defaultWarehouseId,
@@ -132,6 +154,7 @@ class ProductFormData {
     List<String>? catalogGalleryFileIds,
     List<ProductSupplierItem>? suppliers,
   })  : selectedAttributeIds = selectedAttributeIds ?? <int>{},
+        inventoryDimensionAttributeIds = inventoryDimensionAttributeIds ?? <int>{},
         catalogSpecifications = catalogSpecifications ?? <CatalogSpecificationItem>[],
         catalogGalleryFileIds = catalogGalleryFileIds ?? <String>[],
         suppliers = suppliers ?? <ProductSupplierItem>[];
@@ -144,6 +167,7 @@ class ProductFormData {
     Object? description = _kProductFormFieldUnset,
     Object? generalBarcodes = _kProductFormFieldUnset,
     Object? categoryId = _kProductFormFieldUnset,
+    Map<ProductMeasurement, String?>? physicalMeasurements,
     bool? trackInventory,
     Object? reorderPoint = _kProductFormFieldUnset,
     Object? minOrderQty = _kProductFormFieldUnset,
@@ -151,6 +175,14 @@ class ProductFormData {
     Object? inventoryMode = _kProductFormFieldUnset,
     bool? trackSerial,
     bool? trackBarcode,
+    bool? trackExpiry,
+    String? lotPolicy,
+    Object? shelfLifeDays = _kProductFormFieldUnset,
+    Object? bestBeforeOffsetDays = _kProductFormFieldUnset,
+    Object? removalOffsetDays = _kProductFormFieldUnset,
+    Object? alertOffsetDays = _kProductFormFieldUnset,
+    String? expiredSalePolicy,
+    int? minRemainingShelfLifeDays,
     Object? baseSalesPrice = _kProductFormFieldUnset,
     Object? basePurchasePrice = _kProductFormFieldUnset,
     Object? baseSalesNote = _kProductFormFieldUnset,
@@ -170,6 +202,7 @@ class ProductFormData {
     Object? taxCode = _kProductFormFieldUnset,
     Object? taxUnitId = _kProductFormFieldUnset,
     Object? selectedAttributeIds = _kProductFormFieldUnset,
+    Object? inventoryDimensionAttributeIds = _kProductFormFieldUnset,
     Object? imageFileId = _kProductFormFieldUnset,
     Object? imageUrl = _kProductFormFieldUnset,
     Object? defaultWarehouseId = _kProductFormFieldUnset,
@@ -192,6 +225,7 @@ class ProductFormData {
       description: _nullableCopyField<String>(description, this.description),
       generalBarcodes: _nullableCopyField<String>(generalBarcodes, this.generalBarcodes),
       categoryId: _nullableCopyField<int>(categoryId, this.categoryId),
+      physicalMeasurements: physicalMeasurements ?? this.physicalMeasurements,
       trackInventory: trackInventory ?? this.trackInventory,
       reorderPoint: _nullableCopyField<int>(reorderPoint, this.reorderPoint),
       minOrderQty: _nullableCopyField<int>(minOrderQty, this.minOrderQty),
@@ -199,6 +233,14 @@ class ProductFormData {
       inventoryMode: _nullableCopyField<String>(inventoryMode, this.inventoryMode),
       trackSerial: trackSerial ?? this.trackSerial,
       trackBarcode: trackBarcode ?? this.trackBarcode,
+      trackExpiry: trackExpiry ?? this.trackExpiry,
+      lotPolicy: lotPolicy ?? this.lotPolicy,
+      shelfLifeDays: _nullableCopyField<int>(shelfLifeDays, this.shelfLifeDays),
+      bestBeforeOffsetDays: _nullableCopyField<int>(bestBeforeOffsetDays, this.bestBeforeOffsetDays),
+      removalOffsetDays: _nullableCopyField<int>(removalOffsetDays, this.removalOffsetDays),
+      alertOffsetDays: _nullableCopyField<int>(alertOffsetDays, this.alertOffsetDays),
+      expiredSalePolicy: expiredSalePolicy ?? this.expiredSalePolicy,
+      minRemainingShelfLifeDays: minRemainingShelfLifeDays ?? this.minRemainingShelfLifeDays,
       baseSalesPrice: _nullableCopyField<num>(baseSalesPrice, this.baseSalesPrice),
       basePurchasePrice: _nullableCopyField<num>(basePurchasePrice, this.basePurchasePrice),
       baseSalesNote: _nullableCopyField<String>(baseSalesNote, this.baseSalesNote),
@@ -220,6 +262,9 @@ class ProductFormData {
       selectedAttributeIds: identical(selectedAttributeIds, _kProductFormFieldUnset)
           ? this.selectedAttributeIds
           : Set<int>.from((selectedAttributeIds as Set<int>?) ?? const <int>{}),
+      inventoryDimensionAttributeIds: identical(inventoryDimensionAttributeIds, _kProductFormFieldUnset)
+          ? this.inventoryDimensionAttributeIds
+          : Set<int>.from((inventoryDimensionAttributeIds as Set<int>?) ?? const <int>{}),
       imageFileId: _nullableCopyField<String>(imageFileId, this.imageFileId),
       imageUrl: _nullableCopyField<String>(imageUrl, this.imageUrl),
       defaultWarehouseId: _nullableCopyField<int>(defaultWarehouseId, this.defaultWarehouseId),
@@ -268,6 +313,14 @@ class ProductFormData {
       'inventory_mode': inventoryMode ?? 'bulk',
       'track_serial': trackSerial,
       'track_barcode': trackBarcode,
+      'track_expiry': trackExpiry,
+      'lot_policy': lotPolicy,
+      'shelf_life_days': shelfLifeDays,
+      'best_before_offset_days': bestBeforeOffsetDays,
+      'removal_offset_days': removalOffsetDays,
+      'alert_offset_days': alertOffsetDays,
+      'expired_sale_policy': expiredSalePolicy,
+      'min_remaining_shelf_life_days': minRemainingShelfLifeDays,
       // Default numeric fields to zero when null
       'base_sales_price': baseSalesPrice ?? 0,
       'base_purchase_price': basePurchasePrice ?? 0,
@@ -338,6 +391,10 @@ class ProductFormData {
 
   factory ProductFormData.fromProduct(Map<String, dynamic> product) {
     return ProductFormData(
+      physicalMeasurements: {
+        for (final field in ProductMeasurement.values)
+          field: product[field.apiKey] as String?,
+      },
       itemType: (product['item_type'] as String?) ?? 'کالا',
       code: product['code']?.toString(),
       autoGenerateCode: false,
@@ -349,6 +406,14 @@ class ProductFormData {
       inventoryMode: product['inventory_mode']?.toString(),
       trackSerial: (product['track_serial'] == true),
       trackBarcode: (product['track_barcode'] == true),
+      trackExpiry: product['track_expiry'] == true,
+      lotPolicy: product['lot_policy']?.toString() ?? 'optional',
+      shelfLifeDays: _parseInt(product['shelf_life_days']),
+      bestBeforeOffsetDays: _parseInt(product['best_before_offset_days']),
+      removalOffsetDays: _parseInt(product['removal_offset_days']),
+      alertOffsetDays: _parseInt(product['alert_offset_days']),
+      expiredSalePolicy: product['expired_sale_policy']?.toString() ?? 'block',
+      minRemainingShelfLifeDays: _parseInt(product['min_remaining_shelf_life_days']) ?? 0,
       baseSalesPrice: _parseNumeric(product['base_sales_price']),
       basePurchasePrice: _parseNumeric(product['base_purchase_price']),
       salesPriceFx: _parseNumeric(product['sales_price_fx']),
@@ -371,6 +436,7 @@ class ProductFormData {
       taxCode: product['tax_code']?.toString(),
       taxUnitId: _parseInt(product['tax_unit_id']),
       selectedAttributeIds: _parseAttributeIds(product['attribute_ids']),
+      inventoryDimensionAttributeIds: _parseDimensionAttributeIds(product['variant_dimensions']),
       imageFileId: product['image_file_id']?.toString(),
       imageUrl: product['image_url']?.toString(),
       defaultWarehouseId: _parseInt(product['default_warehouse_id']),
@@ -402,9 +468,24 @@ class ProductFormData {
 
   static Set<int> _parseAttributeIds(dynamic value) {
     if (value is List) {
-      return value.whereType<int>().toSet();
+      return value
+          .map((e) => e is int ? e : (e is num ? e.toInt() : int.tryParse(e.toString())))
+          .whereType<int>()
+          .toSet();
     }
     return <int>{};
+  }
+
+  static Set<int> _parseDimensionAttributeIds(dynamic value) {
+    if (value is! List) return <int>{};
+    final ids = <int>{};
+    for (final item in value) {
+      if (item is Map) {
+        final id = _parseInt(item['attribute_id']);
+        if (id != null) ids.add(id);
+      }
+    }
+    return ids;
   }
 
   static List<CatalogSpecificationItem> _parseCatalogSpecifications(dynamic value) {
@@ -436,6 +517,9 @@ class ProductOpeningBalanceInput {
   final int? warehouseId;
   final int? fiscalYearId;
   final bool clear;
+  final String? lotCode;
+  final DateTime? manufacturingDate;
+  final DateTime? expiryDate;
 
   const ProductOpeningBalanceInput({
     this.quantity = 0,
@@ -443,6 +527,9 @@ class ProductOpeningBalanceInput {
     this.warehouseId,
     this.fiscalYearId,
     this.clear = false,
+    this.lotCode,
+    this.manufacturingDate,
+    this.expiryDate,
   });
 
   Map<String, dynamic> toJson() => {
@@ -451,5 +538,10 @@ class ProductOpeningBalanceInput {
         if (!clear && costPrice > 0) 'cost_price': costPrice,
         if (warehouseId != null) 'warehouse_id': warehouseId,
         if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+        if (!clear && lotCode != null && lotCode!.isNotEmpty) 'lot_code': lotCode,
+        if (!clear && manufacturingDate != null)
+          'manufacturing_date': manufacturingDate!.toIso8601String().split('T').first,
+        if (!clear && expiryDate != null)
+          'expiry_date': expiryDate!.toIso8601String().split('T').first,
       };
 }

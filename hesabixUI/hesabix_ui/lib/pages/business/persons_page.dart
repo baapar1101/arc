@@ -197,6 +197,18 @@ class _PersonsPageState extends State<PersonsPage> {
     }
   }
 
+  bool _isTelephonyPluginActive() {
+    try {
+      final plugin = _businessPlugins.firstWhere(
+        (p) => p['plugin_code'] == 'asterisk_issabel_connector',
+        orElse: () => <String, dynamic>{},
+      );
+      return plugin['is_active'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -886,6 +898,7 @@ class _PersonsPageState extends State<PersonsPage> {
           person: person,
           authStore: widget.authStore,
           isWarrantyPluginActive: _isWarrantyPluginActive(),
+          isTelephonyPluginActive: _isTelephonyPluginActive(),
         ),
       );
     }();

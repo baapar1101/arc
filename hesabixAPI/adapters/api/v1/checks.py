@@ -50,7 +50,7 @@ router = APIRouter(prefix="/checks", tags=["مدیریت مالی", "دریاف�
 @router.post(
     "/businesses/{business_id}/checks",
     summary="لیست چک‌های کسب‌وکار",
-    description="دریافت لیست چک‌ها با جستجو/فیلتر",
+    description="لیست چک‌ها. ابزار MCP: `search_checks`. Excel/PDF در MCP نیست.",
 )
 @require_business_access("business_id")
 async def list_checks_endpoint(
@@ -74,7 +74,7 @@ async def list_checks_endpoint(
 @router.post(
     "/businesses/{business_id}/checks/create",
     summary="ایجاد چک",
-    description="ایجاد چک جدید برای کسب‌وکار",
+    description="ایجاد چک. ابزار MCP: `create_check` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_check_endpoint(
@@ -94,7 +94,7 @@ async def create_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/endorse",
     summary="واگذاری چک دریافتی به شخص",
-    description="واگذاری چک دریافتی به شخص دیگر",
+    description="واگذاری چک. ابزار MCP: `endorse_check` (نیازمند تأیید).",
 )
 async def endorse_check_endpoint(
     request: Request,
@@ -124,7 +124,7 @@ async def endorse_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/clear",
     summary="وصول/پاس چک",
-    description="انتقال حساب چک به بانک در زمان پاس/وصول",
+    description="وصول چک. ابزار MCP: `clear_check` (نیازمند تأیید).",
 )
 async def clear_check_endpoint(
     request: Request,
@@ -153,7 +153,7 @@ async def clear_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/return",
     summary="عودت چک",
-    description="عودت چک: from_endorsee (برگشت از واگذارشونده) یا to_drawer (عودت به صادرکننده)",
+    description="عودت چک. ابزار MCP: `return_check` (نیازمند تأیید).",
 )
 async def return_check_endpoint(
     request: Request,
@@ -182,7 +182,7 @@ async def return_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/bounce",
     summary="برگشت چک",
-    description="برگشت چک و ثبت هزینه احتمالی",
+    description="برگشت چک. ابزار MCP: `bounce_check` (نیازمند تأیید).",
 )
 async def bounce_check_endpoint(
     request: Request,
@@ -211,7 +211,7 @@ async def bounce_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/pay",
     summary="پرداخت چک پرداختنی",
-    description="پاس چک پرداختنی از بانک",
+    description="پرداخت چک پرداختنی. ابزار MCP: `pay_check` (نیازمند تأیید).",
 )
 async def pay_check_endpoint(
     request: Request,
@@ -240,7 +240,7 @@ async def pay_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/deposit",
     summary="سپرده چک به بانک (اختیاری)",
-    description="انتقال به اسناد در جریان وصول",
+    description="سپرده چک. ابزار MCP: `deposit_check` (نیازمند تأیید).",
 )
 async def deposit_check_endpoint(
     request: Request,
@@ -270,7 +270,7 @@ async def deposit_check_endpoint(
 @router.get(
     "/checks/{check_id}",
     summary="جزئیات چک",
-    description="دریافت جزئیات چک",
+    description="جزئیات چک. ابزار MCP: `get_check_details`.",
 )
 async def get_check_endpoint(
     request: Request,
@@ -293,7 +293,7 @@ async def get_check_endpoint(
 @router.get(
     "/checks/{check_id}/history",
     summary="سوابق چک و اسناد حسابداری",
-    description="دریافت سوابق چک و اسناد حسابداری مرتبط",
+    description="سوابق چک. ابزار MCP: `get_check_history`.",
 )
 async def get_check_history_endpoint(
     request: Request,
@@ -326,7 +326,7 @@ async def get_check_history_endpoint(
 @router.put(
     "/checks/{check_id}",
     summary="ویرایش چک",
-    description="ویرایش اطلاعات چک",
+    description="ویرایش چک. ابزار MCP: `update_check` (نیازمند تأیید).",
 )
 async def update_check_endpoint(
     request: Request,
@@ -357,7 +357,7 @@ async def update_check_endpoint(
 @router.delete(
     "/checks/{check_id}",
     summary="حذف چک",
-    description="حذف یک چک",
+    description="حذف چک. ابزار MCP: `delete_check` (نیازمند تأیید).",
 )
 async def delete_check_endpoint(
     request: Request,
@@ -388,7 +388,7 @@ async def delete_check_endpoint(
 @router.post(
     "/businesses/{business_id}/checks/reconciliations/calculate",
     summary="محاسبه راس چک‌ها",
-    description="محاسبه راس چک‌ها بدون ذخیره",
+    description="محاسبه راس بدون ذخیره. ابزار MCP: `calculate_checks_reconciliation`.",
 )
 @require_business_access("business_id")
 async def calculate_reconciliation_endpoint(
@@ -412,7 +412,7 @@ async def calculate_reconciliation_endpoint(
 @router.post(
     "/businesses/{business_id}/checks/reconciliations",
     summary="ایجاد جلسه راس‌گیری",
-    description="ایجاد و ذخیره جلسه راس‌گیری چک‌ها",
+    description="ایجاد جلسه راس‌گیری. ابزار MCP: `create_checks_reconciliation` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_reconciliation_endpoint(
@@ -430,7 +430,7 @@ async def create_reconciliation_endpoint(
 @router.post(
     "/businesses/{business_id}/checks/reconciliations/list",
     summary="لیست جلسات راس‌گیری",
-    description="دریافت لیست جلسات راس‌گیری با جستجو/فیلتر",
+    description="فهرست جلسات راس‌گیری. ابزار MCP: `list_checks_reconciliations`.",
 )
 @require_business_access("business_id")
 async def list_reconciliations_endpoint(
@@ -458,7 +458,7 @@ async def list_reconciliations_endpoint(
 @router.get(
     "/reconciliations/{reconciliation_id}",
     summary="جزئیات جلسه راس‌گیری",
-    description="دریافت جزئیات یک جلسه راس‌گیری",
+    description="جزئیات جلسه راس‌گیری. ابزار MCP: `get_checks_reconciliation`.",
 )
 async def get_reconciliation_endpoint(
     request: Request,
@@ -481,7 +481,7 @@ async def get_reconciliation_endpoint(
 @router.delete(
     "/reconciliations/{reconciliation_id}",
     summary="حذف جلسه راس‌گیری",
-    description="حذف یک جلسه راس‌گیری",
+    description="حذف جلسه راس‌گیری. ابزار MCP: `delete_checks_reconciliation` (نیازمند تأیید).",
 )
 async def delete_reconciliation_endpoint(
     request: Request,
@@ -508,7 +508,7 @@ async def delete_reconciliation_endpoint(
 @router.post(
     "/businesses/{business_id}/checks/export/excel",
     summary="خروجی Excel لیست چک‌ها",
-    description="خروجی Excel لیست چک‌ها با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="باینری است؛ در MCP نیست. JSON: `search_checks`.",
 )
 @require_business_access("business_id")
 async def export_checks_excel(
@@ -837,7 +837,7 @@ async def export_checks_excel(
 @router.post(
     "/businesses/{business_id}/checks/export/pdf",
     summary="خروجی PDF لیست چک‌ها",
-    description="خروجی PDF لیست چک‌ها با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="باینری است؛ در MCP نیست.",
 )
 @require_business_access("business_id")
 async def export_checks_pdf(

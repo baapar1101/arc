@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../models/account_model.dart';
 import '../../models/account_tree_node.dart';
 import '../../services/account_service.dart';
+import '../../utils/account_detail_type.dart';
 
 /// ویجت انتخاب حساب با ساختار درختی
-/// فقط حساب‌هایی که فرزند ندارند (leaf nodes) قابل انتخاب هستند
+/// به‌طور پیش‌فرض فقط حساب‌های برگ قابل انتخاب هستند.
 class AccountTreeComboboxWidget extends StatefulWidget {
   final int businessId;
   final Account? selectedAccount;
@@ -20,6 +21,9 @@ class AccountTreeComboboxWidget extends StatefulWidget {
   /// در صورت تنظیم، ارتفاع فیلد را به‌صورت دقیق قفل می‌کند.
   /// پیش‌فرض null است تا رفتار استفاده‌های قبلی بدون تغییر بماند.
   final double? fixedHeight;
+  /// اگر true باشد، حساب‌های کنترلی شخص‌محور (مثل جاری شرکا) حتی با فرزند هم قابل انتخاب‌اند
+  /// تا بعد از آن تفصیل شخص جداگانه انتخاب شود.
+  final bool allowPersonControlParents;
 
   const AccountTreeComboboxWidget({
     super.key,
@@ -32,6 +36,7 @@ class AccountTreeComboboxWidget extends StatefulWidget {
     this.documentTypeFilter,
     this.dense = false,
     this.fixedHeight,
+    this.allowPersonControlParents = false,
   });
 
   @override
@@ -143,6 +148,7 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
         accountTree: _accountTree,
         selectedAccount: widget.selectedAccount,
         documentTypeFilter: widget.documentTypeFilter,
+        allowPersonControlParents: widget.allowPersonControlParents,
         onAccountSelected: (account) {
           widget.onChanged(account);
           _searchController.text = account?.displayName ?? '';
@@ -159,12 +165,14 @@ class _AccountTreeDialog extends StatefulWidget {
   final Account? selectedAccount;
   final ValueChanged<Account?> onAccountSelected;
   final String? documentTypeFilter;
+  final bool allowPersonControlParents;
 
   const _AccountTreeDialog({
     required this.accountTree,
     this.selectedAccount,
     required this.onAccountSelected,
     this.documentTypeFilter,
+    this.allowPersonControlParents = false,
   });
 
   @override
@@ -431,7 +439,9 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'فقط حساب‌های انتهایی قابل انتخاب هستند',
+                    widget.allowPersonControlParents
+                        ? 'حساب‌های انتهایی و حساب جاری اشخاص/شرکا قابل انتخاب هستند'
+                        : 'فقط حساب‌های انتهایی قابل انتخاب هستند',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontStyle: FontStyle.italic,
@@ -468,7 +478,13 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
       final isExpanded = _expandedNodes.contains(node.id);
       final hasChildren = node.children.isNotEmpty;
       final isSelected = widget.selectedAccount?.id == node.id;
-      final isSelectable = node.isSelectable;
+      final isSelectable = node.isSelectable ||
+          (widget.allowPersonControlParents &&
+              isPersonControlAccount(
+                name: node.name,
+                accountType: node.accountType,
+                code: node.code,
+              ));
       
       widgets.add(
         _TreeNodeWidget(

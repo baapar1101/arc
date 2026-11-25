@@ -1,141 +1,126 @@
 #!/usr/bin/env python3
-"""
-اسکریپت بررسی و حل مشکل چند شاخه بودن میگریشن‌ها
+"""Ensure Alembic has a single head, then optionally run upgrade.
 
-این اسکریپت قبل از اجرای میگریشن‌ها بررسی می‌کند که آیا branchهای merge نشده وجود دارند یا نه.
-اگر branch وجود داشته باشد، یک merge head ایجاد می‌کند.
+When two developers add migrations from the same parent, Alembic grows
+multiple heads and `alembic upgrade head` refuses to start the API.
+This script merges every current head into one empty revision so the
+next upgrade can run. Safe to call on every deploy/start: one head is a no-op.
 """
 
+from __future__ import annotations
+
+import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-# مسیر پروژه
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
+MAX_MERGE_ROUNDS = 5
 
 
-def run_command(cmd: list[str], cwd: Path = None) -> tuple[str, str, int]:
-    """اجرای یک دستور و برگرداندن خروجی"""
-    result = subprocess.run(
-        cmd,
-        cwd=cwd or PROJECT_ROOT,
-        capture_output=True,
-        text=True,
-        check=False
-    )
-    return result.stdout, result.stderr, result.returncode
-
-
-def check_branches() -> bool:
-    """بررسی وجود branchهای merge نشده"""
-    stdout, stderr, returncode = run_command(
-        ['alembic', 'branches'],
-        cwd=PROJECT_ROOT
-    )
-    
-    if returncode != 0:
-        print(f"خطا در بررسی branchها: {stderr}")
-        return False
-    
-    # اگر خروجی خالی باشد، branch وجود ندارد
-    lines = [line.strip() for line in stdout.split('\n') if line.strip()]
-    
-    # اگر فقط یک head وجود دارد، branch وجود ندارد
-    if len(lines) == 0:
-        return False
-    
-    # بررسی وجود branchpoint
-    has_branchpoint = any('branchpoint' in line for line in lines)
-    return has_branchpoint
-
-
-def check_heads() -> list[str]:
-    """بررسی headهای موجود"""
-    stdout, stderr, returncode = run_command(
-        ['alembic', 'heads'],
-        cwd=PROJECT_ROOT
-    )
-    
-    if returncode != 0:
-        print(f"خطا در بررسی headها: {stderr}")
-        return []
-    
-    # استخراج revision IDs از خروجی
-    heads = []
-    for line in stdout.split('\n'):
-        line = line.strip()
-        if line and not line.startswith('INFO'):
-            # فرمت: revision_id (head)
-            parts = line.split()
-            if parts:
-                heads.append(parts[0])
-    
+def parse_heads(stdout: str) -> list[str]:
+    """Extract revision ids from `alembic heads` output."""
+    heads: list[str] = []
+    for raw in stdout.splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("INFO", "DEBUG", "WARNING", "ERROR")):
+            continue
+        token = line.split()[0]
+        if token:
+            heads.append(token)
     return heads
 
 
-def merge_heads(heads: list[str]) -> bool:
-    """ایجاد merge head برای headهای موجود"""
-    if len(heads) < 2:
-        return True  # نیازی به merge نیست
-    
-    print(f"در حال merge کردن {len(heads)} head...")
-    
-    # ایجاد merge head
-    merge_message = f"merge_{len(heads)}_heads"
-    cmd = ['alembic', 'merge', '-m', merge_message] + heads
-    
-    stdout, stderr, returncode = run_command(cmd, cwd=PROJECT_ROOT)
-    
-    if returncode != 0:
-        print(f"خطا در ایجاد merge head: {stderr}")
-        return False
-    
-    print(f"Merge head با موفقیت ایجاد شد: {stdout.strip()}")
-    return True
+def _alembic_env() -> dict[str, str]:
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        str(PROJECT_ROOT) if not existing else f"{PROJECT_ROOT}{os.pathsep}{existing}"
+    )
+    return env
 
 
-def main():
-    """تابع اصلی"""
-    print("بررسی وضعیت میگریشن‌ها...")
-    
-    # بررسی headها
-    heads = check_heads()
-    print(f"تعداد headهای موجود: {len(heads)}")
-    
-    if len(heads) == 0:
-        print("هیچ headی یافت نشد!")
-        return 1
-    
-    if len(heads) == 1:
-        print("✓ فقط یک head وجود دارد. همه چیز درست است.")
-        return 0
-    
-    # اگر چند head وجود دارد
-    print(f"⚠️  {len(heads)} head یافت شد:")
-    for head in heads:
-        print(f"  - {head}")
-    
-    # بررسی branchها
-    has_branches = check_branches()
-    
-    if has_branches:
-        print("\n⚠️  Branchهای merge نشده یافت شد!")
-        print("در حال ایجاد merge head...")
-        
-        if merge_heads(heads):
-            print("✓ Merge head با موفقیت ایجاد شد.")
-            print("\nلطفاً میگریشن‌ها را بررسی کنید و سپس اجرا کنید:")
-            print("  alembic upgrade head")
-            return 0
-        else:
-            print("✗ خطا در ایجاد merge head!")
+def run_alembic(args: list[str]) -> subprocess.CompletedProcess[str]:
+    cmd = [sys.executable, "-m", "alembic", "-c", str(ALEMBIC_INI), *args]
+    return subprocess.run(
+        cmd,
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_alembic_env(),
+    )
+
+
+def list_heads() -> list[str]:
+    result = run_alembic(["heads"])
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "alembic heads failed").strip()
+        raise RuntimeError(detail)
+    return parse_heads(result.stdout)
+
+
+def ensure_single_head() -> list[str]:
+    """Merge until Alembic reports one head. Returns the remaining heads."""
+    heads = list_heads()
+    if len(heads) <= 1:
+        return heads
+
+    for round_i in range(1, MAX_MERGE_ROUNDS + 1):
+        print(
+            f"alembic: {len(heads)} heads; auto-merging (round {round_i}): {', '.join(heads)}",
+            flush=True,
+        )
+        result = run_alembic(["merge", "-m", "auto_merge_alembic_heads", *heads])
+        if result.stdout.strip():
+            print(result.stdout.strip(), flush=True)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "alembic merge failed").strip()
+            raise RuntimeError(detail)
+        heads = list_heads()
+        if len(heads) <= 1:
+            return heads
+
+    raise RuntimeError(
+        f"still {len(heads)} heads after {MAX_MERGE_ROUNDS} merges: {', '.join(heads)}"
+    )
+
+
+def upgrade_head() -> None:
+    result = run_alembic(["upgrade", "head"])
+    if result.stderr:
+        sys.stderr.write(result.stderr)
+    if result.stdout:
+        sys.stdout.write(result.stdout)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "alembic upgrade head failed").strip())
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Merge multiple Alembic heads, then optionally upgrade."
+    )
+    parser.add_argument(
+        "--upgrade",
+        action="store_true",
+        help="Run `alembic upgrade head` after heads are merged.",
+    )
+    args = parser.parse_args(argv)
+    try:
+        heads = ensure_single_head()
+        if not heads:
+            print("alembic: no heads found", file=sys.stderr)
             return 1
-    else:
-        print("\n⚠️  چند head وجود دارد اما branch point یافت نشد.")
-        print("این ممکن است نشان‌دهنده مشکل در ساختار میگریشن‌ها باشد.")
+        print(f"alembic: single head {heads[0]}", flush=True)
+        if args.upgrade:
+            upgrade_head()
+        return 0
+    except RuntimeError as exc:
+        print(f"alembic: {exc}", file=sys.stderr)
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
-

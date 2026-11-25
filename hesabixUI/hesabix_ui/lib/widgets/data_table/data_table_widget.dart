@@ -145,6 +145,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   bool _sortDesc = false;
   // Multi-sort: first item is primary sort
   final List<_SortSpec> _multiSort = <_SortSpec>[];
+  /// True after the user changes sort in this session (click or clear-filters).
+  bool _sortPreferenceLocked = false;
 
   // Row selection state
   final Set<int> _selectedRows = <int>{};
@@ -190,16 +192,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     super.initState();
     _horizontalScrollController = ScrollController();
     _limit = widget.config.defaultPageSize;
-    // Initialize default sort if provided
-    if (widget.config.enableSorting) {
-      _sortBy = widget.config.defaultSortBy;
-      _sortDesc = widget.config.defaultSortDesc;
-      if (_sortBy != null && _sortBy!.isNotEmpty) {
-        _multiSort
-          ..clear()
-          ..add(_SortSpec(by: _sortBy!, desc: _sortDesc));
-      }
-    }
+    _applyDefaultSort();
     _searchCtrl.addListener(_onSearchTextChanged);
     _loadDensityPreference();
     _loadExportCalendarPreference();
@@ -537,12 +530,92 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     } catch (_) {}
   }
 
-  Future<void> _loadColumnSettings() async {
-    if (!widget.config.enableColumnSettings) {
-      _visibleColumns = List.from(widget.config.columns);
+  void _applyDefaultSort() {
+    _sortPreferenceLocked = false;
+    _multiSort.clear();
+    if (!widget.config.enableSorting) {
+      _sortBy = null;
+      _sortDesc = false;
       return;
     }
+    _sortBy = widget.config.defaultSortBy;
+    _sortDesc = widget.config.defaultSortDesc;
+    if (_sortBy != null && _sortBy!.isNotEmpty) {
+      _multiSort.add(_SortSpec(by: _sortBy!, desc: _sortDesc));
+    }
+  }
 
+  void _applySortFromSettings(ColumnSettings settings) {
+    if (!widget.config.enableSorting) return;
+    if (!settings.hasSortPreference) return;
+    _multiSort.clear();
+    final allowed = widget.config.columnKeys.toSet();
+    if (settings.sorts.isNotEmpty) {
+      for (final spec in settings.sorts) {
+        if (allowed.contains(spec.by)) {
+          _multiSort.add(_SortSpec(by: spec.by, desc: spec.desc));
+        }
+      }
+    } else if (settings.sortBy != null &&
+        settings.sortBy!.isNotEmpty &&
+        allowed.contains(settings.sortBy)) {
+      _multiSort.add(
+        _SortSpec(by: settings.sortBy!, desc: settings.sortDesc),
+      );
+    }
+    if (_multiSort.isNotEmpty) {
+      _sortBy = _multiSort.first.by;
+      _sortDesc = _multiSort.first.desc;
+    } else {
+      _sortBy = null;
+      _sortDesc = false;
+    }
+  }
+
+  ColumnSettings _stampSort(ColumnSettings settings) {
+    final persistSort =
+        settings.hasSortPreference || _sortPreferenceLocked;
+    if (!persistSort) {
+      return settings.copyWith(
+        hasSortPreference: false,
+        sorts: const <ColumnSortSpec>[],
+        sortDesc: false,
+        clearSortBy: true,
+      );
+    }
+    return settings.copyWith(
+      hasSortPreference: true,
+      sortBy: _sortBy,
+      sortDesc: _sortDesc,
+      sorts: _multiSort
+          .map((s) => ColumnSortSpec(by: s.by, desc: s.desc))
+          .toList(),
+      clearSortBy: _sortBy == null,
+    );
+  }
+
+  Future<void> _persistViewSettings(ColumnSettings settings) async {
+    final stamped = _stampSort(settings);
+    await ColumnSettingsService.saveColumnSettings(
+      widget.config.effectiveTableId,
+      stamped,
+      businessId: widget.config.businessId,
+    );
+    _columnSettings = stamped;
+  }
+
+  Future<void> _persistSortPreference() async {
+    final base =
+        _columnSettings ??
+        ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
+    try {
+      await _persistViewSettings(base);
+    } catch (e) {
+      debugPrint('Error persisting table sort: $e');
+    }
+  }
+
+  Future<void> _loadColumnSettings() async {
     setState(() {
       _isLoadingColumnSettings = true;
     });
@@ -571,19 +644,29 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         );
       }
 
+      if (!mounted) return;
       setState(() {
         _columnSettings = effectiveSettings;
-        _visibleColumns = _getVisibleColumnsFromSettings(effectiveSettings);
+        if (widget.config.enableColumnSettings) {
+          _visibleColumns = _getVisibleColumnsFromSettings(effectiveSettings);
+        } else {
+          _visibleColumns = List.from(widget.config.columns);
+        }
+        _applySortFromSettings(effectiveSettings);
       });
     } catch (e) {
       debugPrint('Error loading column settings: $e');
-      setState(() {
-        _visibleColumns = List.from(widget.config.columns);
-      });
+      if (mounted) {
+        setState(() {
+          _visibleColumns = List.from(widget.config.columns);
+        });
+      }
     } finally {
-      setState(() {
-        _isLoadingColumnSettings = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingColumnSettings = false;
+        });
+      }
     }
   }
 
@@ -593,10 +676,21 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final visibleColumns = <DataTableColumn>[];
 
     // Add columns in the order specified by settings
+    final seen = <String>{};
     for (final key in settings.columnOrder) {
       final column = widget.config.getColumnByKey(key);
-      if (column != null && settings.visibleColumns.contains(key)) {
+      if (column != null &&
+          settings.visibleColumns.contains(key) &&
+          seen.add(key)) {
         visibleColumns.add(column);
+      }
+    }
+    for (final key in settings.visibleColumns) {
+      if (seen.contains(key)) continue;
+      final column = widget.config.getColumnByKey(key);
+      if (column != null) {
+        visibleColumns.add(column);
+        seen.add(key);
       }
     }
 
@@ -978,6 +1072,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         oldWidget.config.effectiveTableId != widget.config.effectiveTableId;
     if (identityChanged) {
       _autoFitApplied = false;
+      _applyDefaultSort();
       if (widget.config.persistPageSize) {
         setState(() {
           _loadingList = true;
@@ -1073,15 +1168,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         columnWidths: {...settings.columnWidths, ...computed},
       );
       try {
-        await ColumnSettingsService.saveColumnSettings(
-          widget.config.effectiveTableId,
-          updated,
-          businessId: widget.config.businessId,
-        );
+        await _persistViewSettings(updated);
         if (mounted) {
           setState(() {
-            _columnSettings = updated;
-            _visibleColumns = _getVisibleColumnsFromSettings(updated);
+            _visibleColumns = widget.config.enableColumnSettings
+                ? _getVisibleColumnsFromSettings(_columnSettings ?? updated)
+                : List.from(widget.config.columns);
             _autoFitApplied = true;
           });
         } else {
@@ -1264,6 +1356,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   void _clearAllFilters() {
+    _sortPreferenceLocked = true;
     _persistTableFiltersDebounce?.cancel();
     if (_tableFiltersPersistenceEnabled) {
       unawaited(
@@ -1290,6 +1383,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     });
     _page = 1;
     _fetchData();
+    unawaited(_persistSortPreference());
     widget.config.onAllFiltersCleared?.call();
     // Call the callback if provided
     if (widget.config.onRowSelectionChanged != null) {
@@ -1298,6 +1392,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   void _sortByColumnInternal(String column, {required bool additive}) {
+    _sortPreferenceLocked = true;
     setState(() {
       if (!additive) {
         if (_sortBy == column) {
@@ -1325,6 +1420,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     });
     _page = 1;
     _fetchData();
+    unawaited(_persistSortPreference());
   }
 
   void _toggleRowSelection(int rowIndex) {
@@ -1419,22 +1515,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     try {
       // Ensure at least one column is visible
       final validatedSettings = _validateColumnSettings(settings);
-
-      final tableId = widget.config.effectiveTableId;
-      await ColumnSettingsService.saveColumnSettings(
-        tableId,
-        validatedSettings,
-        businessId: widget.config.businessId,
-      );
+      await _persistViewSettings(validatedSettings);
 
       setState(() {
-        _columnSettings = validatedSettings;
-        _visibleColumns = _getVisibleColumnsFromSettings(validatedSettings);
+        _visibleColumns = _getVisibleColumnsFromSettings(
+          _columnSettings ?? validatedSettings,
+        );
       });
 
       // Call the callback if provided
       if (widget.config.onColumnSettingsChanged != null) {
-        widget.config.onColumnSettingsChanged!(validatedSettings);
+        widget.config.onColumnSettingsChanged!(
+          _columnSettings ?? validatedSettings,
+        );
       }
     } catch (e) {
       debugPrint('Error saving column settings: $e');
@@ -1452,11 +1545,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   ColumnSettings _validateColumnSettings(ColumnSettings settings) {
-    // Ensure at least one column is visible
     if (settings.visibleColumns.isEmpty && widget.config.columns.isNotEmpty) {
       return settings.copyWith(
         visibleColumns: [widget.config.columns.first.key],
-        columnOrder: [widget.config.columns.first.key],
       );
     }
     return settings;
@@ -3660,13 +3751,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             onResizeDragEnd: widget.config.enableColumnSettings
                 ? () {
                     if (_columnSettings == null) return;
-                    unawaited(
-                      ColumnSettingsService.saveColumnSettings(
-                        widget.config.effectiveTableId,
-                        _columnSettings!,
-                        businessId: widget.config.businessId,
-                      ),
-                    );
+                    unawaited(_persistViewSettings(_columnSettings!));
                   }
                 : null,
             onAutoFit: widget.config.enableColumnSettings
@@ -3690,13 +3775,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     setState(() {
                       _columnSettings = updated;
                     });
-                    unawaited(
-                      ColumnSettingsService.saveColumnSettings(
-                        widget.config.effectiveTableId,
-                        updated,
-                        businessId: widget.config.businessId,
-                      ),
-                    );
+                    unawaited(_persistViewSettings(updated));
                   }
                 : null,
             onPinLeft: widget.config.enableColumnSettings
@@ -3715,13 +3794,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       _columnSettings = updated;
                       _visibleColumns = _getVisibleColumnsFromSettings(updated);
                     });
-                    unawaited(
-                      ColumnSettingsService.saveColumnSettings(
-                        widget.config.effectiveTableId,
-                        updated,
-                        businessId: widget.config.businessId,
-                      ),
-                    );
+                    unawaited(_persistViewSettings(updated));
                   }
                 : null,
             onPinRight: widget.config.enableColumnSettings
@@ -3740,13 +3813,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       _columnSettings = updated;
                       _visibleColumns = _getVisibleColumnsFromSettings(updated);
                     });
-                    unawaited(
-                      ColumnSettingsService.saveColumnSettings(
-                        widget.config.effectiveTableId,
-                        updated,
-                        businessId: widget.config.businessId,
-                      ),
-                    );
+                    unawaited(_persistViewSettings(updated));
                   }
                 : null,
             onUnpin: widget.config.enableColumnSettings
@@ -3764,18 +3831,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       _columnSettings = updated;
                       _visibleColumns = _getVisibleColumnsFromSettings(updated);
                     });
-                    unawaited(
-                      ColumnSettingsService.saveColumnSettings(
-                        widget.config.effectiveTableId,
-                        updated,
-                        businessId: widget.config.businessId,
-                      ),
-                    );
+                    unawaited(_persistViewSettings(updated));
                   }
                 : null,
             onHide: widget.config.enableColumnSettings
                 ? () {
                     if (_columnSettings == null) return;
+                    if (_columnSettings!.visibleColumns.length <= 1) return;
                     final updated = _columnSettings!.copyWith(
                       visibleColumns: _columnSettings!.visibleColumns
                           .where((k) => k != column.key)
@@ -3785,13 +3847,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       _columnSettings = updated;
                       _visibleColumns = _getVisibleColumnsFromSettings(updated);
                     });
-                    unawaited(
-                      ColumnSettingsService.saveColumnSettings(
-                        widget.config.effectiveTableId,
-                        updated,
-                        businessId: widget.config.businessId,
-                      ),
-                    );
+                    unawaited(_persistViewSettings(updated));
                   }
                 : null,
             onResetColumns: widget.config.enableColumnSettings
@@ -3805,11 +3861,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         defaults,
                       );
                     });
-                    await ColumnSettingsService.saveColumnSettings(
-                      widget.config.effectiveTableId,
-                      defaults,
-                      businessId: widget.config.businessId,
-                    );
+                    await _persistViewSettings(defaults);
                   }
                 : null,
           ),
