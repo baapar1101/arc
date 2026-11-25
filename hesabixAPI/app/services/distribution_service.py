@@ -820,11 +820,21 @@ def _serialize_distribution_plan_mutation(db: Session, business_id: int) -> None
 			text("""
 				SET NOCOUNT ON;
 				DECLARE @distribution_lock_result int;
-				EXEC @distribution_lock_result = sys.sp_getapplock
-					@Resource = :resource,
-					@LockMode = 'Exclusive',
-					@LockOwner = 'Transaction',
-					@LockTimeout = 10000;
+				BEGIN TRY
+					EXEC @distribution_lock_result = sys.sp_getapplock
+						@Resource = :resource,
+						@LockMode = 'Exclusive',
+						@LockOwner = 'Transaction',
+						@LockTimeout = 10000;
+				END TRY
+				BEGIN CATCH
+					SET NOCOUNT OFF;
+					THROW;
+				END CATCH;
+				-- NOCOUNT is connection-scoped. Leaving it ON makes pymssql
+				-- report rowcount=-1 for subsequent ORM UPDATE statements,
+				-- causing SQLAlchemy to raise StaleDataError on valid writes.
+				SET NOCOUNT OFF;
 				SELECT @distribution_lock_result;
 			"""),
 			{
