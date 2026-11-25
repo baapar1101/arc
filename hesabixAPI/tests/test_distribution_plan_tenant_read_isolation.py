@@ -27,6 +27,7 @@ from adapters.db.models.distribution import (
     DistributionTerritory,
     DistributionVan,
     DistributionUserLiveLocation,
+    DistributionReturnRequest,
 )
 from app.services import distribution_service as distribution
 from app.services import distribution_field_ops_service as field_ops
@@ -51,6 +52,7 @@ def db(monkeypatch):
             DistributionBusinessSettings.__table__,
             DistributionVan.__table__,
             DistributionUserLiveLocation.__table__,
+            DistributionReturnRequest.__table__,
         ):
             connection.execute(CreateTable(table, include_foreign_key_constraints=[]))
     monkeypatch.setattr(distribution, "_ensure_plugin", lambda *_args, **_kwargs: None)
@@ -625,3 +627,122 @@ def test_route_update_does_not_expose_foreign_territory_or_prevent_repair(db, mo
     assert repaired["territory_id"] is None
     assert db.get(DistributionRoute, 99).territory_id is None
     assert db.get(DistributionTerritory, 18).name == "FOREIGN-TERRITORY-SECRET"
+
+
+def _seed_legacy_visit_links(db):
+    db.add_all([
+        DistributionFieldVisit(
+            id=31, business_id=10, person_id=808, user_id=20,
+            route_id=99, status="in_progress",
+            started_at=datetime(2026, 11, 23, 9),
+        ),
+        DistributionFieldVisit(
+            id=32, business_id=10, person_id=707, user_id=21,
+            route_id=99, status="in_progress",
+            started_at=datetime(2026, 11, 23, 10),
+        ),
+        DistributionFieldVisit(
+            id=33, business_id=11, person_id=707, user_id=30,
+            route_id=100, status="in_progress",
+            started_at=datetime(2026, 11, 23, 11),
+        ),
+    ])
+    db.commit()
+
+
+def test_visit_list_masks_foreign_customer_identity_on_corrupt_legacy_link(db, monkeypatch):
+    _seed_legacy_visit_links(db)
+    monkeypatch.setattr(
+        distribution, "_scope_visit_user_id", lambda *_args: None,
+    )
+    rows, total = distribution.list_visits(
+        db, 10, object(), None, None, 100, 0,
+    )
+    by_id = {row["id"]: row for row in rows}
+    assert total == 2
+    assert by_id[31]["person_id"] is None
+    assert by_id[31]["person_name"] is None
+    assert by_id[32]["person_id"] == 707
+    assert by_id[32]["person_name"] == "Tenant ten"
+    assert "Tenant eleven SECRET" not in repr(rows)
+    assert "808" not in repr(rows)
+
+
+def test_cancel_visit_masks_foreign_customer_identity_on_corrupt_legacy_link(db):
+    _seed_legacy_visit_links(db)
+    result = distribution.cancel_visit(db, 10, 20, 31, "no access")
+    assert result["status"] == "cancelled"
+    assert result["person_id"] is None
+    assert result["person_name"] is None
+    assert "Tenant eleven SECRET" not in repr(result)
+    assert db.get(DistributionFieldVisit, 33).status == "in_progress"
+
+
+def test_return_request_list_masks_corrupt_foreign_customer_name_and_id(db, monkeypatch):
+    from app.services import distribution_documents
+
+    monkeypatch.setattr(
+        distribution, "_scope_visit_user_id", lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        distribution_documents, "user_label", lambda _db, uid: f"Visitor {uid}",
+    )
+    db.add_all([
+        DistributionReturnRequest(
+            id=41, business_id=10, person_id=808, created_by_user_id=20,
+            lines=[{"product_id": 7, "quantity": 1}], status="pending",
+        ),
+        DistributionReturnRequest(
+            id=42, business_id=10, person_id=707, created_by_user_id=20,
+            lines=[{"product_id": 7, "quantity": 1}], status="pending",
+        ),
+    ])
+    db.commit()
+    rows = distribution.list_return_requests(db, 10, object(), None)
+    by_id = {row["id"]: row for row in rows}
+    assert by_id[41]["person_id"] is None
+    assert by_id[41]["person_name"] is None
+    assert by_id[42]["person_id"] == 707
+    assert by_id[42]["person_name"] == "Tenant ten"
+    assert "Tenant eleven SECRET" not in repr(rows)
+    assert "808" not in repr(rows)
+
+
+@pytest.mark.parametrize("bad_visit_id,expected_code,expected_http", [
+    (31, "NOT_FOUND", 404),  # local visit, but references foreign customer
+    (33, "NOT_FOUND", 404),  # different business's visit, same person_id
+    ("not-an-integer", "VALIDATION_ERROR", 400),
+    (-1, "VALIDATION_ERROR", 400),
+])
+def test_return_request_does_not_link_mismatched_or_foreign_visit(
+    db, monkeypatch, bad_visit_id, expected_code, expected_http,
+):
+    from app.core.responses import ApiError
+
+    _seed_legacy_visit_links(db)
+    monkeypatch.setattr(
+        distribution, "_validate_return_lines", lambda _db, _bid, lines: lines,
+    )
+    with pytest.raises(ApiError) as error:
+        distribution.create_return_request(
+            db, 10, 20,
+            {"person_id": 707, "visit_id": bad_visit_id,
+             "lines": [{"product_id": 7, "quantity": 1}]},
+        )
+    assert (error.value.code, error.value.status_code) == (expected_code, expected_http)
+    assert db.query(DistributionReturnRequest).count() == 0
+
+
+def test_return_request_accepts_valid_same_tenant_visit(db, monkeypatch):
+    _seed_legacy_visit_links(db)
+    monkeypatch.setattr(
+        distribution, "_validate_return_lines", lambda _db, _bid, lines: lines,
+    )
+    created = distribution.create_return_request(
+        db, 10, 20,
+        {"person_id": 707, "visit_id": 32,
+         "lines": [{"product_id": 7, "quantity": 1}]},
+    )
+    assert created["visit_id"] == 32
+    assert created["person_id"] == 707
+    assert db.query(DistributionReturnRequest).count() == 1
