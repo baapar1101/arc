@@ -901,7 +901,7 @@ class Hesabix_V2_Mapper
 			$payload['tag_ids'] = $tag_ids;
 		}
 
-		$payload['payments'] = self::build_wc_order_invoice_payments($order, $is_proforma, $f, $payment_date_ymd, $target_net_rounded);
+		$payload['payments'] = self::build_wc_order_invoice_payments($order, $is_proforma, $f, $payment_date_ymd, $target_net_rounded, $money_policy);
 
 		return $payload;
 	}
@@ -1089,7 +1089,7 @@ class Hesabix_V2_Mapper
 	 * @param string|null $payment_date_ymd اگر ست باشد، بخش تاریخ transaction_date هم‌راستا با این مقدار (بخش ساعت از تاریخ پرداخت یا زمان کنونی).
 	 * @return array<int, array<string, mixed>>
 	 */
-	private static function build_wc_order_invoice_payments($order, $is_proforma, $amount_factor, $payment_date_ymd, $invoice_amount)
+	private static function build_wc_order_invoice_payments($order, $is_proforma, $amount_factor, $payment_date_ymd, $invoice_amount, array $money_policy)
 	{
 		$payments = array();
 
@@ -1107,11 +1107,10 @@ class Hesabix_V2_Mapper
 			return apply_filters('hesabix_v2_invoice_payments', $payments, $order, $amount_factor);
 		}
 
-		$settlement_commission = 0.0;
+		$settlement_commission = '0';
 		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
-			$settlement_commission = Hesabix_V2_Gateway_Fee_Service::resolve_settlement_commission($order, (float) $amount, $f);
+			$settlement_commission = Hesabix_V2_Gateway_Fee_Service::resolve_invoice_commission($order, $amount, $f, $money_policy);
 		}
-		$settlement_commission = (int) round((float) $settlement_commission, 0);
 
 		$date_paid = $order->get_date_paid();
 		if (is_string($payment_date_ymd) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $payment_date_ymd)) {
