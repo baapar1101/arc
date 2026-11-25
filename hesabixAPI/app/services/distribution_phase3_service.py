@@ -647,7 +647,7 @@ def get_team_map(
 	user_ids.update(int(r[0]) for r in assigns if r[0])
 	van_users = (
 		db.query(DistributionVan.user_id)
-		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active.is_(True))
+		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active == True)
 		.all()
 	)
 	user_ids.update(int(r[0]) for r in van_users if r[0])
