@@ -7,6 +7,7 @@ on:
     paths:
       - 'hesabixAPI/app/services/distribution_service.py'
       - 'hesabixAPI/app/services/distribution_field_ops_service.py'
+      - 'hesabixAPI/app/services/person_service.py'
       - 'hesabixAPI/app/services/distribution_phase3_service.py'
       - 'hesabixAPI/app/services/goods_expense_income_service.py'
       - 'hesabixAPI/tests/test_distribution_sqlserver_live_lock.py'
