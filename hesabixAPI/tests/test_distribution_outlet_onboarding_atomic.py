@@ -199,3 +199,65 @@ def test_onboarding_without_route_still_persists_customer_profile(db):
     assert session.query(DistributionRouteStop).count() == 0
     assert session.query(Person).count() == 1
     assert len(notices) == 1
+
+
+def test_standalone_person_create_preserves_default_commit_and_notification(
+    db, monkeypatch,
+):
+    """Public non-distribution APIs still commit the person and notify once."""
+    from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
+
+    session, notices = db
+    original_commit = session.commit
+    commits = []
+
+    def tracked_commit():
+        commits.append(True)
+        return original_commit()
+
+    monkeypatch.setattr(session, "commit", tracked_commit)
+    result = person_service.create_person(
+        session, 10,
+        PersonCreateRequest(alias_name="Standalone person", person_types=[PersonType.CUSTOMER]),
+    )
+    assert result["success"] is True
+    person_id = result["data"]["id"]
+    assert person_id > 0
+    assert commits == [True]
+    assert session.query(Person).filter_by(business_id=10).count() == 1
+    assert notices == [(10, person_id, tuple(result["data"]["person_types"]))]
+
+
+def test_onboarding_commit_failure_rolls_back_without_notification(db, monkeypatch):
+    session, notices = db
+
+    def failed_commit():
+        raise RuntimeError("Simulated database commit failure")
+
+    monkeypatch.setattr(session, "commit", failed_commit)
+    with pytest.raises(RuntimeError, match="Simulated database commit failure"):
+        fieldops.onboard_new_outlet(
+            session, 10, 1,
+            {"name": "Person must be rolled back", "route_id": 99},
+        )
+    assert session.query(Person).count() == 0
+    assert session.query(DistributionCustomerProfile).count() == 0
+    assert session.query(DistributionRouteStop).count() == 0
+    assert notices == []
+
+
+def test_postcommit_notification_failure_does_not_lie_about_saved_customer(db, monkeypatch):
+    session, notices = db
+
+    def broken_notification(*_args, **_kwargs):
+        raise RuntimeError("Workflow backend unavailable")
+
+    monkeypatch.setattr(person_service, "notify_person_created", broken_notification)
+    result = fieldops.onboard_new_outlet(
+        session, 10, 1, {"name": "Customer safely committed", "route_id": 99},
+    )
+    assert result["person_id"] > 0
+    assert session.query(Person).filter_by(id=result["person_id"]).count() == 1
+    assert session.query(DistributionCustomerProfile).count() == 1
+    assert session.query(DistributionRouteStop).count() == 1
+    assert notices == []
