@@ -166,6 +166,7 @@ def get_profile(db: Session, business_id: int, person_id: int) -> Optional[Distr
 
 def upsert_customer_profile(
 	db: Session, business_id: int, person_id: int, payload: Dict[str, Any],
+	*, commit: bool = True,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
@@ -209,7 +210,10 @@ def upsert_customer_profile(
 	if "notes" in payload:
 		row.notes = (str(payload.get("notes") or "").strip() or None)
 	row.updated_at = datetime.utcnow()
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	d = profile_to_dict(row)
 	d["person_name"] = person_label(db, person_id)
