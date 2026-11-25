@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, true
 from sqlalchemy.orm import Session
 
 from adapters.db.models.distribution import (
@@ -318,7 +318,7 @@ def must_sell_product_ids_for_person(db: Session, business_id: int, person_id: i
 		.filter(
 			DistributionAssortment.id == profile.assortment_id,
 			DistributionAssortment.business_id == business_id,
-			DistributionAssortment.is_active.is_(True),
+			DistributionAssortment.is_active == true(),
 		)
 		.first()
 	)
