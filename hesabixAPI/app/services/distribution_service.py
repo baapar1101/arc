@@ -465,6 +465,19 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
+	# On deletion, SQLAlchemy relationship synchronization may null out
+	# route.territory_id regardless of our business-scoped bulk UPDATE.
+	# Reject malformed cross-business FK links instead of modifying them.
+	foreign_route = db.query(DistributionRoute.id).filter(
+		DistributionRoute.territory_id == territory_id,
+		DistributionRoute.business_id != business_id,
+	).first()
+	if foreign_route is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Territory is referenced by a route in another business; repair the invalid link first",
+			http_status=409,
+		)
 	_assert_territory_has_no_locked_plans(db, business_id, territory_id)
 	# The FK is a global ID and legacy data may incorrectly link routes
 	# from other businesses to this territory. Never rewrite those routes.
