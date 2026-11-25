@@ -4,6 +4,8 @@ define('WPINC', true);
 require_once __DIR__ . '/../includes/class-hesabix-v2-decimal.php';
 require_once __DIR__ . '/../includes/class-hesabix-v2-currency-service.php';
 require_once __DIR__ . '/../includes/class-hesabix-v2-mapper.php';
+require_once __DIR__ . '/../includes/class-hesabix-v2-gateway-fee.php';
+require_once __DIR__ . '/../includes/class-hesabix-v2-validation.php';
 
 function check($actual, $expected, $name)
 {
@@ -13,11 +15,14 @@ function check($actual, $expected, $name)
 }
 function absint($v) { return abs((int) $v); }
 function __($v, $domain = '') { return $v; }
-function apply_filters($hook, $value, ...$args) { return $value; }
+function sanitize_key($key) { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($key)); }
+function has_filter($hook) { return $hook === 'hesabix_v2_order_gateway_commission' && isset($GLOBALS['commission_filter']) ? 10 : false; }
+function apply_filters($hook, $value, ...$args) { return has_filter($hook) !== false ? ($GLOBALS['commission_filter'])($value, ...$args) : $value; }
 function get_transient($key) { return false; }
 function set_transient(...$args) {}
 function get_option($key, $default = false)
 {
+	if ($key === 'hesabix_v2_sync_settings') { return $GLOBALS['commission_settings'] ?? array(); }
 	return array('hesabix_v2_enabled' => true, 'hesabix_v2_business_id' => 1, 'hesabix_v2_currency_id' => 1,
 		'hesabix_v2_invoice_payment_destination' => 'cash_register', 'hesabix_v2_default_cash_register_id' => '1')[$key] ?? $default;
 }
@@ -63,6 +68,8 @@ class MoneyOrder
 	public function get_date_created() { return null; }
 	public function get_date_paid() { return null; }
 	public function is_paid() { return true; }
+	public function get_payment_method() { return 'test_gateway'; }
+	public function get_meta($key, $single) { return $GLOBALS['commission_meta'][$key] ?? ''; }
 }
 $money_case = array(3, '30.01', '3.01', '33.02');
 $money_currency = 'IRT';
@@ -143,4 +150,41 @@ check($payload['lines'][0]['extra_info']['unit'], 'عدد', 'fork unit preserved
 check(isset($payload['lines'][0]['allocations']), false, 'no upstream native allocation injected');
 check($payload['payments'][0]['amount'], '33.02', 'variation exact payment');
 unset($money_variation_id);
+// Real gateway-fee service, including policy rounding and legacy filter safety.
+$money_case = array(1, '33.02', '0', '33.02');
+$currency_response = array('success' => true, 'data' => array(array('id' => 1, 'code' => 'USD', 'decimal_places' => 2, 'round_monetary_amounts' => true)));
+$commission_meta = array('_gateway_settlement_fee' => '0.125');
+foreach (array(
+	array(array('gateway_settlement_mode' => 'percent', 'gateway_settlement_percent' => '2.5'), '0.83'),
+	array(array('gateway_settlement_mode' => 'fixed', 'gateway_settlement_fixed' => '0.25'), '0.25'),
+	array(array('gateway_settlement_mode' => 'rules', 'gateway_settlement_rules' => 'test_gateway|2.5|0.10'), '0.93'),
+	array(array('gateway_settlement_mode' => 'order_meta'), '0.13'),
+	array(array('gateway_settlement_mode' => 'fixed', 'gateway_settlement_fixed' => '100'), '33.02'),
+) as $case) {
+	$commission_settings = $case[0];
+	$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
+	check($payload['payments'][0]['commission'], $case[1], 'exact settlement commission');
+	check($payload['payments'][0]['amount'], '33.02', 'commission does not change payment gross');
+}
+$commission_settings = array('gateway_settlement_mode' => 'off');
+$commission_filter = function ($value, $order, $base) {
+	check(is_float($value), true, 'legacy commission filter value type');
+	check(is_float($base), true, 'legacy commission filter base type');
+	return 1000;
+};
+$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
+check($payload['payments'][0]['commission'], '33.02', 'filter cannot exceed payment');
+$commission_filter = function () { return -1; };
+$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
+check(isset($payload['payments'][0]['commission']), false, 'negative commission is omitted');
+unset($commission_filter);
+$commission_settings = array('gateway_settlement_mode' => 'fixed', 'gateway_settlement_fixed' => '0.25');
+$currency_response['data'][0]['decimal_places'] = 0;
+$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
+check(isset($payload['payments'][0]['commission']), false, 'zero-decimal policy rounds commission');
+$currency_response['data'][0]['decimal_places'] = 2;
+$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 10, 1);
+check($payload['payments'][0]['commission'], '2.5', 'fixed commission converted by factor');
+unset($commission_settings, $commission_meta);
+echo "PASS: exact settlement commissions and filter compatibility\n";
 echo "PASS: decimal arithmetic, currency policy and eleven Mapper/payment/JSON cases\n";
