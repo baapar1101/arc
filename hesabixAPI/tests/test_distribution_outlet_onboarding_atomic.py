@@ -58,7 +58,7 @@ def db(monkeypatch):
     notices = []
     monkeypatch.setattr(
         person_service, "notify_person_created",
-        lambda _db, business_id, person_id, person_types: notices.append(
+        lambda _db, business_id, person_id, person_types, **_kwargs: notices.append(
             (business_id, person_id, tuple(person_types))
         ),
     )
