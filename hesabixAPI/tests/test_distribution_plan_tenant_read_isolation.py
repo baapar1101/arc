@@ -24,6 +24,7 @@ from adapters.db.models.distribution import (
     DistributionRoute,
     DistributionRouteAssignment,
     DistributionRouteStop,
+    DistributionTerritory,
 )
 from app.services import distribution_service as distribution
 from app.services import distribution_field_ops_service as field_ops
@@ -38,6 +39,7 @@ def db(monkeypatch):
     with engine.begin() as connection:
         for table in (
             Person.__table__,
+            DistributionTerritory.__table__,
             DistributionRoute.__table__,
             DistributionRouteAssignment.__table__,
             DistributionRouteStop.__table__,
@@ -464,3 +466,51 @@ def test_optimizer_rejects_foreign_business_route_without_customer_info(db):
         phase3.optimize_route_plan(db, 10, 100, DAY)
     assert (error.value.code, error.value.status_code) == ("NOT_FOUND", 404)
     assert "Tenant eleven SECRET" not in str(error.value)
+
+
+def test_territory_delete_rejects_invalid_foreign_route_reference_before_write(db, monkeypatch):
+    """ORM territory relationship deletes must never detach another tenant's route."""
+    from app.services import sepidar_plugin_service
+    from app.core.responses import ApiError
+
+    monkeypatch.setattr(
+        sepidar_plugin_service, "assert_plugin_entity_editable",
+        lambda *_args: None,
+    )
+    territory = DistributionTerritory(
+        id=17, business_id=10, code="T-17", name="Local territory",
+    )
+    db.add(territory)
+    db.commit()
+    db.get(DistributionRoute, 99).territory_id = 17
+    # Corrupt legacy route FK: a foreign route points to our territory.
+    db.get(DistributionRoute, 100).territory_id = 17
+    db.commit()
+
+    with pytest.raises(ApiError) as error:
+        distribution.delete_territory(db, 10, 17)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+    assert db.get(DistributionTerritory, 17) is not None
+    assert db.get(DistributionRoute, 99).territory_id == 17
+    assert db.get(DistributionRoute, 100).territory_id == 17
+
+
+def test_territory_delete_detaches_only_local_routes_without_foreign_links(db, monkeypatch):
+    from app.services import sepidar_plugin_service
+
+    monkeypatch.setattr(
+        sepidar_plugin_service, "assert_plugin_entity_editable",
+        lambda *_args: None,
+    )
+    db.add(DistributionTerritory(
+        id=17, business_id=10, code="T-17", name="Local territory",
+    ))
+    db.commit()
+    db.get(DistributionRoute, 99).territory_id = 17
+    db.commit()
+
+    distribution.delete_territory(db, 10, 17)
+    assert db.get(DistributionTerritory, 17) is None
+    assert db.get(DistributionRoute, 99).territory_id is None
+    assert db.get(DistributionRoute, 100).business_id == 11
+    assert db.get(DistributionRoute, 100).territory_id is None
