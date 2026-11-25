@@ -111,9 +111,9 @@ def test_outlet_onboarding_commits_once_and_returns_nested_person_id(db, monkeyp
 
     assert calls == ["commit"]
     person_id = result["person_id"]
-    assert result["person"]["id"] == person_id
-    assert result["person"]["business_id"] == 10
-    assert result["person"]["alias_name"] == "New grocery"
+    assert result["person"]["data"]["id"] == person_id
+    assert result["person"]["data"]["business_id"] == 10
+    assert result["person"]["data"]["alias_name"] == "New grocery"
     assert result["stop"]["person_id"] == person_id
     assert result["profile"]["onboarded_at"]
     person = session.get(Person, person_id)
@@ -123,7 +123,7 @@ def test_outlet_onboarding_commits_once_and_returns_nested_person_id(db, monkeyp
     assert person.business_id == 10
     assert session.query(DistributionRouteStop).filter_by(route_id=99).count() == 1
     assert session.query(DistributionCustomerProfile).filter_by(person_id=person_id).count() == 1
-    assert notices == [(10, person_id, tuple(result["person"]["person_types"]))]
+    assert notices == [(10, person_id, tuple(result["person"]["data"]["person_types"]))]
 
 
 @pytest.mark.parametrize("bad_payload,expected_code", [
