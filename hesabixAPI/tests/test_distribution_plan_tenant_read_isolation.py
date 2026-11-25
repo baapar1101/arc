@@ -25,6 +25,8 @@ from adapters.db.models.distribution import (
     DistributionRouteAssignment,
     DistributionRouteStop,
     DistributionTerritory,
+    DistributionVan,
+    DistributionUserLiveLocation,
 )
 from app.services import distribution_service as distribution
 from app.services import distribution_field_ops_service as field_ops
@@ -47,6 +49,8 @@ def db(monkeypatch):
             DistributionDailyPlanLock.__table__,
             DistributionFieldVisit.__table__,
             DistributionBusinessSettings.__table__,
+            DistributionVan.__table__,
+            DistributionUserLiveLocation.__table__,
         ):
             connection.execute(CreateTable(table, include_foreign_key_constraints=[]))
     monkeypatch.setattr(distribution, "_ensure_plugin", lambda *_args, **_kwargs: None)
@@ -514,3 +518,83 @@ def test_territory_delete_detaches_only_local_routes_without_foreign_links(db, m
     assert db.get(DistributionRoute, 99).territory_id is None
     assert db.get(DistributionRoute, 100).business_id == 11
     assert db.get(DistributionRoute, 100).territory_id is None
+
+
+def test_route_list_masks_foreign_territory_name_and_identifier(db, monkeypatch):
+    # A route in business 10 may have a stale invalid territory FK to
+    # business 11. Do not materialize the ORM relationship and leak its name.
+    monkeypatch.setattr(
+        distribution, "_use_strict_catalog_for_field_user",
+        lambda *_args: False,
+    )
+    db.add_all([
+        DistributionTerritory(id=17, business_id=10, code="T-10", name="Own territory"),
+        DistributionTerritory(id=18, business_id=11, code="T-11", name="FOREIGN-TERRITORY-SECRET"),
+        DistributionRoute(id=102, business_id=10, code="R-102",
+                          name="Corrupted local route", territory_id=18),
+    ])
+    db.flush()
+    db.get(DistributionRoute, 99).territory_id = 17
+    db.commit()
+
+    routes = distribution.list_routes(db, 10, object())
+    result = {route["id"]: route for route in routes}
+    assert set(result) == {99, 102}
+    assert result[99]["territory_id"] == 17
+    assert result[99]["territory_name"] == "Own territory"
+    assert result[102]["territory_id"] is None
+    assert result[102]["territory_name"] is None
+    assert "FOREIGN-TERRITORY-SECRET" not in repr(routes)
+    assert "18" not in repr(result[102]["territory_id"])
+
+
+def test_team_map_masks_cross_tenant_legacy_visit_person_without_writes(db, monkeypatch):
+    from app.services import distribution_documents as docs
+
+    monkeypatch.setattr(
+        distribution, "_can_see_full_distribution_catalog", lambda *_args: True,
+    )
+    monkeypatch.setattr(docs, "user_label", lambda _db, uid: f"Visitor {uid}")
+    monkeypatch.setattr(
+        phase3, "business_day_utc_bounds",
+        lambda *_args: (datetime(2026, 11, 23), datetime(2026, 11, 24)),
+    )
+    db.add_all([
+        DistributionFieldVisit(
+            id=21, business_id=10, person_id=808, user_id=20,
+            route_id=99, status="in_progress",
+            started_at=datetime(2026, 11, 23, 9),
+            start_latitude=35.1, start_longitude=51.1,
+        ),
+        DistributionFieldVisit(
+            id=22, business_id=10, person_id=707, user_id=21,
+            route_id=99, status="completed",
+            started_at=datetime(2026, 11, 23, 10),
+            ended_at=datetime(2026, 11, 23, 11),
+            start_latitude=35.2, start_longitude=51.2,
+        ),
+    ])
+    db.commit()
+    # Read-only map must neither create settings nor commit the transaction.
+    monkeypatch.setattr(
+        distribution, "get_or_create_distribution_settings",
+        lambda *_args: pytest.fail("Team map must never initialize settings"),
+    )
+    monkeypatch.setattr(
+        db, "commit", lambda: pytest.fail("Team map must not commit"),
+    )
+    result = phase3.get_team_map(db, 10, object(), DAY)
+    by_user = {item["user_id"]: item for item in result["visitors"]}
+    assert by_user[20]["visit_id"] == 21
+    assert by_user[20]["person_id"] is None
+    assert by_user[20]["person_name"] is None
+    assert by_user[20]["customer_latitude"] is None
+    assert by_user[20]["customer_longitude"] is None
+    assert by_user[21]["person_id"] == 707
+    assert by_user[21]["person_name"] == "Tenant ten"
+    assert {x["person_id"] for x in result["customers"]} == {707}
+    assert {x["person_id"] for x in result["markers"]} == {707, None}
+    assert "Tenant eleven SECRET" not in repr(result)
+    assert "36.5" not in repr(result)
+    assert "52.5" not in repr(result)
+    assert "808" not in repr(result)
