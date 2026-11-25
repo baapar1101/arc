@@ -230,10 +230,11 @@ foreach (array(array('0.005','0.005','0.01'), array('-0.125','-0.025','-0.15')) 
 	check($lines[0]['extra_info']['tax_amount'], $fee_case[1], 'exact signed service line tax');
 }
 $money_case = array(1, '1', '0.005', '1.01');
+$money_items = array(array(1, '1', '0'));
 $money_fees = array(new MoneyFee('0.005','0.005'));
 $payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
 check($payload['payments'][0]['amount'], '1.01', 'service fee payment stays exact');
 check($payload['lines'][1]['extra_info']['line_total'], '0.01', 'service fee retains fractional source amount');
-unset($money_fees);
+unset($money_fees, $money_items);
 echo "PASS: fee service line and signed account adjustment precision\n";
 echo "PASS: decimal arithmetic, currency policy and eleven Mapper/payment/JSON cases\n";
