@@ -30,6 +30,7 @@ on:
       - 'hesabixAPI/tests/test_distribution_plan_tenant_read_isolation.py'
       - 'hesabixAPI/tests/test_distribution_settings_read_only.py'
       - 'hesabixAPI/tests/test_distribution_setup_wizard_atomic.py'
+      - 'hesabixAPI/tests/test_distribution_outlet_onboarding_atomic.py'
       - 'hesabixAPI/tests/test_goods_post_row_lock.py'
       - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
@@ -139,10 +140,10 @@ jobs:
 
       - name: Check backend Python syntax
         run: |
-          python -m compileall -q adapters/api/v1/distribution.py adapters/api/v1/schema_models/distribution.py adapters/db/models/distribution.py app/services/distribution_service.py app/services/distribution_phase3_service.py app/services/distribution_field_ops_service.py migrations/versions/20261121_000001_distribution_daily_plan_locks.py migrations/versions/20261121_000002_distribution_daily_plan_snapshot.py tests/test_distribution_sqlserver_transaction_lock.py app/services/person_service.py tests/test_distribution_person_snapshot_guard.py tests/test_distribution_settings_snapshot_guard.py tests/test_distribution_plan_tenant_read_isolation.py tests/test_distribution_settings_read_only.py tests/test_distribution_setup_wizard_atomic.py
+          python -m compileall -q adapters/api/v1/distribution.py adapters/api/v1/schema_models/distribution.py adapters/db/models/distribution.py app/services/distribution_service.py app/services/distribution_phase3_service.py app/services/distribution_field_ops_service.py migrations/versions/20261121_000001_distribution_daily_plan_locks.py migrations/versions/20261121_000002_distribution_daily_plan_snapshot.py tests/test_distribution_sqlserver_transaction_lock.py app/services/person_service.py tests/test_distribution_person_snapshot_guard.py tests/test_distribution_settings_snapshot_guard.py tests/test_distribution_plan_tenant_read_isolation.py tests/test_distribution_settings_read_only.py tests/test_distribution_setup_wizard_atomic.py tests/test_distribution_outlet_onboarding_atomic.py
 
       - name: Run distribution publication regression
-        run: pytest -q tests/test_distribution_daily_plan_publication.py tests/test_distribution_plan_lock_guards.py tests/test_distribution_live_plan_progress.py tests/test_distribution_sqlserver_transaction_lock.py tests/test_distribution_person_snapshot_guard.py tests/test_distribution_settings_snapshot_guard.py tests/test_distribution_plan_tenant_read_isolation.py tests/test_distribution_settings_read_only.py tests/test_distribution_setup_wizard_atomic.py
+        run: pytest -q tests/test_distribution_daily_plan_publication.py tests/test_distribution_plan_lock_guards.py tests/test_distribution_live_plan_progress.py tests/test_distribution_sqlserver_transaction_lock.py tests/test_distribution_person_snapshot_guard.py tests/test_distribution_settings_snapshot_guard.py tests/test_distribution_plan_tenant_read_isolation.py tests/test_distribution_settings_read_only.py tests/test_distribution_setup_wizard_atomic.py tests/test_distribution_outlet_onboarding_atomic.py
 
   distribution-publication-postgres:
     name: Distribution migration on PostgreSQL
