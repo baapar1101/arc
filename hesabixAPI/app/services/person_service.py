@@ -90,8 +90,13 @@ def create_person(
     person_data: PersonCreateRequest,
     *,
     defer_cache_invalidation: bool = False,
+    commit: bool = True,
 ) -> Dict[str, Any]:
-    """ایجاد شخص جدید"""
+    """Create a person; commit=False stages the row for a caller-owned transaction.
+
+    Cache invalidation and workflow triggers are emitted only after commit.
+    An atomic caller must invoke notify_person_created after its final commit.
+    """
     person_data = merge_person_create_with_group_defaults(db, business_id, person_data)
     # محاسبه/اعتبارسنجی کد یکتا
     code: Optional[int] = getattr(person_data, 'code', None)
@@ -223,38 +228,56 @@ def create_person(
             )
         )
     
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
+    if commit:
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
+    else:
+        # Flush still allocates the person ID for dependent profile/route-stop
+        # rows; the caller retains responsibility for rollback and commit.
+        db.flush()
     db.refresh(person)
+    created_data = _person_to_dict(person)
+    if commit:
+        notify_person_created(
+            db, business_id, person.id, types_list,
+            invalidate_cache=not defer_cache_invalidation,
+        )
+    return success_response(
+        message="شخص با موفقیت ایجاد شد",
+        data=created_data,
+    )
 
-    # Invalidate کش لیست اشخاص (در bulk با defer از بیرون یک‌بار invalidate می‌شود)
-    if not defer_cache_invalidation:
+
+def notify_person_created(
+    db: Session,
+    business_id: int,
+    person_id: int,
+    person_types: List[str],
+    *,
+    invalidate_cache: bool = True,
+) -> None:
+    """Publish external/cache side effects only for a committed person."""
+    if invalidate_cache:
         invalidate_persons_cache(business_id, fiscal_year_id=None)
-
-    # فراخوانی workflow triggers
     try:
         from app.services.workflow.workflow_trigger_service import trigger_person_created
-        person_types_list = json.loads(person.person_types) if person.person_types else []
+
         trigger_person_created(
             db=db,
             business_id=business_id,
-            person_id=person.id,
-            person_types=person_types_list,
-            user_id=None  # می‌توان user_id را از context دریافت کرد
+            person_id=person_id,
+            person_types=person_types,
+            user_id=None,
         )
-    except Exception as e:
-        # عدم موفقیت در trigger نباید مانع بازگشت شخص شود
+    except Exception as exc:
         import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to trigger workflows for person {person.id}: {e}")
-    
-    return success_response(
-        message="شخص با موفقیت ایجاد شد",
-        data=_person_to_dict(person)
-    )
+
+        logging.getLogger(__name__).warning(
+            "Failed to trigger workflows for person %s: %s", person_id, exc,
+        )
 
 
 def get_person_by_id(
