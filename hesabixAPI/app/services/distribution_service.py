@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, func, or_, text
+from sqlalchemy import and_, func, or_, text, true
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
@@ -881,7 +881,7 @@ def assert_route_has_no_locked_plans(
 		.filter(
 			DistributionDailyPlanLock.business_id == business_id,
 			DistributionRouteAssignment.route_id == route_id,
-			DistributionDailyPlanLock.is_locked.is_(True),
+			DistributionDailyPlanLock.is_locked == true(),
 		)
 	)
 	if plan_date is not None:
@@ -908,7 +908,7 @@ def assert_assignment_has_no_locked_plans(
 	q = db.query(DistributionDailyPlanLock.id).filter(
 		DistributionDailyPlanLock.business_id == business_id,
 		DistributionDailyPlanLock.user_id == user_id,
-		DistributionDailyPlanLock.is_locked.is_(True),
+		DistributionDailyPlanLock.is_locked == true(),
 		DistributionDailyPlanLock.plan_date >= valid_from,
 	)
 	if valid_to is not None:
@@ -945,7 +945,7 @@ def assert_customer_schedule_unlocked(db: Session, business_id: int, person_id: 
 		.join(DistributionRouteStop, DistributionRouteStop.route_id == DistributionRouteAssignment.route_id)
 		.filter(
 			DistributionDailyPlanLock.business_id == business_id,
-			DistributionDailyPlanLock.is_locked.is_(True),
+			DistributionDailyPlanLock.is_locked == true(),
 			DistributionRouteStop.person_id == person_id,
 		)
 	)
@@ -2168,7 +2168,7 @@ def assert_daily_plan_inputs_unlocked(db: Session, business_id: int) -> None:
 		db.query(DistributionDailyPlanLock.id)
 		.filter(
 			DistributionDailyPlanLock.business_id == business_id,
-			DistributionDailyPlanLock.is_locked.is_(True),
+			DistributionDailyPlanLock.is_locked == true(),
 		)
 		.first()
 		is not None
