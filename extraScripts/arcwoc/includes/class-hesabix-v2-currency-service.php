@@ -24,7 +24,7 @@ class Hesabix_V2_Currency_Service
 	 */
 	private static function list_transient_key()
 	{
-		return 'hesabix_v2_bc_money_' . (int) get_option('hesabix_v2_business_id');
+		return 'hesabix_v2_bc_money_policy_v2_' . (int) get_option('hesabix_v2_business_id');
 	}
 
 	/**
