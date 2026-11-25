@@ -1510,7 +1510,7 @@ def assert_customer_owner_allows_visit(
 	person_id: int,
 	ctx: Optional[AuthContext] = None,
 ) -> None:
-	settings = get_or_create_distribution_settings(db, business_id)
+	settings = get_distribution_settings_row(db, business_id)
 	if not bool(getattr(settings, "exclusive_customer_ownership", True)):
 		return
 	prof = (
