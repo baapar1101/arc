@@ -13514,6 +13514,11 @@ def _receipt_amount_for_invoice_balance(
     receipt: Document, invoice: Document, *, via_person_line: bool,
 ) -> Decimal:
     """Prefer explicit receivable allocations in the invoice's currency."""
+    from app.services.receipt_invoice_allocation_service import exact_receipt_allocation
+
+    exact = exact_receipt_allocation(receipt, invoice)
+    if exact is not None:
+        return exact
     extra = receipt.extra_info or {}
     if (
         invoice.document_type == INVOICE_SALES
