@@ -4665,6 +4665,49 @@ class AppLocalizationsFa extends AppLocalizations {
   String get chooseFile => 'انتخاب فایل';
 
   @override
+  String get productPhoto => 'عکس کالا';
+
+  @override
+  String get productPhotoTake => 'گرفتن عکس';
+
+  @override
+  String get productPhotoRetake => 'گرفتن دوبارهٔ عکس';
+
+  @override
+  String get productPhotoUse => 'تأیید عکس';
+
+  @override
+  String get productPhotoRemove => 'حذف عکس';
+
+  @override
+  String get productPhotoCameraSecureContext =>
+      'برای استفاده از دوربین، حسابیکس را با HTTPS باز کنید یا یک فایل انتخاب کنید.';
+
+  @override
+  String get productPhotoCameraPermission =>
+      'دسترسی به دوربین داده نشد. مجوز دوربین را در تنظیمات مرورگر یا دستگاه بررسی کنید.';
+
+  @override
+  String get productPhotoNoCamera =>
+      'دوربینی پیدا نشد. یک دوربین وصل کنید یا فایل انتخاب کنید.';
+
+  @override
+  String get productPhotoCameraUnavailable =>
+      'دوربین در دسترس نیست. اتصال دوربین را بررسی کنید، برنامه‌های دیگری را که از آن استفاده می‌کنند ببندید یا فایل انتخاب کنید.';
+
+  @override
+  String get productPhotoCaptureFailed =>
+      'گرفتن عکس انجام نشد. دوباره تلاش کنید یا فایل انتخاب کنید.';
+
+  @override
+  String get productPhotoEmpty =>
+      'تصویر خالی است. فایل دیگری انتخاب کنید یا عکس بگیرید.';
+
+  @override
+  String get productPhotoInvalidFormat =>
+      'یک تصویر با فرمت JPG، PNG، GIF، WebP یا BMP انتخاب کنید.';
+
+  @override
   String get matchBy => 'معیار تطبیق';
 
   @override
@@ -14539,6 +14582,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get oaAcknowledge => 'رؤیت ابلاغ';
+
+  @override
+  String get oaVersion => 'نسخه';
 
   @override
   String get oaVersions => 'نسخه‌های متن';

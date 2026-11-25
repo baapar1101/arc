@@ -8802,6 +8802,78 @@ abstract class AppLocalizations {
   /// **'Choose file'**
   String get chooseFile;
 
+  /// No description provided for @productPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Product photo'**
+  String get productPhoto;
+
+  /// No description provided for @productPhotoTake.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get productPhotoTake;
+
+  /// No description provided for @productPhotoRetake.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake photo'**
+  String get productPhotoRetake;
+
+  /// No description provided for @productPhotoUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use photo'**
+  String get productPhotoUse;
+
+  /// No description provided for @productPhotoRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo'**
+  String get productPhotoRemove;
+
+  /// No description provided for @productPhotoCameraSecureContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Hesabix over HTTPS to use the camera, or choose a file.'**
+  String get productPhotoCameraSecureContext;
+
+  /// No description provided for @productPhotoCameraPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access was denied. Check camera permissions in your browser or device settings.'**
+  String get productPhotoCameraPermission;
+
+  /// No description provided for @productPhotoNoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'No camera was found. Connect a camera or choose a file.'**
+  String get productPhotoNoCamera;
+
+  /// No description provided for @productPhotoCameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera is unavailable. Check that it is connected and close any other app using it, or choose a file.'**
+  String get productPhotoCameraUnavailable;
+
+  /// No description provided for @productPhotoCaptureFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not take a photo. Try again or choose a file.'**
+  String get productPhotoCaptureFailed;
+
+  /// No description provided for @productPhotoEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The image is empty. Choose another file or take a photo.'**
+  String get productPhotoEmpty;
+
+  /// No description provided for @productPhotoInvalidFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a JPG, PNG, GIF, WebP or BMP image.'**
+  String get productPhotoInvalidFormat;
+
   /// No description provided for @matchBy.
   ///
   /// In en, this message translates to:
@@ -26594,6 +26666,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Acknowledge'**
   String get oaAcknowledge;
+
+  /// No description provided for @oaVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get oaVersion;
 
   /// No description provided for @oaVersions.
   ///
