@@ -27,6 +27,7 @@ from adapters.db.models.distribution import (
 )
 from app.services import distribution_service as distribution
 from app.services import distribution_field_ops_service as field_ops
+from app.services import distribution_phase3_service as phase3
 
 DAY = date(2026, 11, 23)  # Monday
 
@@ -379,3 +380,87 @@ def test_read_only_default_settings_do_not_create_row(db, monkeypatch):
     assert result["require_visit_in_daily_plan"] is False
     assert result["carry_over_days"] == 7
     assert db.get(DistributionBusinessSettings, 10) is None
+
+
+def _add_second_local_optimization_stop(db):
+    db.execute(sa.insert(Person.__table__), [
+        dict(id=709, business_id=10, alias_name="Another local customer",
+             person_types="[]", mobile="09133333333",
+             latitude=35.8, longitude=51.8),
+    ])
+    db.add(DistributionRouteStop(
+        id=4, route_id=99, person_id=709, weekday=0, sort_order=3,
+    ))
+    db.commit()
+
+
+def test_route_optimizer_excludes_foreign_tenant_name_coordinates_and_stop(db):
+    _add_second_local_optimization_stop(db)
+
+    result = phase3.optimize_route_plan(db, 10, 99, DAY)
+    assert result["optimized"] is True
+    assert {row["person_id"] for row in result["items"]} == {707, 709}
+    assert {row["stop_id"] for row in result["items"]} == {1, 4}
+    assert "Tenant ten" in repr(result)
+    assert "Another local customer" in repr(result)
+    assert "Tenant eleven SECRET" not in repr(result)
+    assert "36.5" not in repr(result)
+    assert "52.5" not in repr(result)
+    assert "808" not in repr(result)
+
+
+def test_saved_route_optimization_only_persists_business_owned_stop_ids(db):
+    _add_second_local_optimization_stop(db)
+
+    result = phase3.apply_route_optimize(db, 10, 99, DAY)
+    assert result["persisted"] is True
+    assert {row["stop_id"] for row in result["items"]} == {1, 4}
+    override = db.get(DistributionRoute, 99).plan_sort_overrides[DAY.isoformat()]
+    assert set(override) == {"1", "4"}
+    assert "2" not in override  # Corrupt foreign-customer stop is never saved.
+
+
+def test_route_optimization_locks_before_reading_stops(db, monkeypatch):
+    order = []
+    monkeypatch.setattr(
+        distribution, "assert_route_has_no_locked_plans",
+        lambda *_args, **_kwargs: order.append("lock"),
+    )
+
+    def staged_optimizer(*_args, **_kwargs):
+        order.append("read")
+        return {"items": [], "optimized": False}
+
+    monkeypatch.setattr(phase3, "optimize_route_plan", staged_optimizer)
+    result = phase3.apply_route_optimize(db, 10, 99, DAY)
+    assert result["persisted"] is False
+    assert order == ["lock", "read"]
+
+
+def test_locked_route_optimizer_rejects_before_calculating_any_stops(db, monkeypatch):
+    from app.core.responses import ApiError
+
+    db.add(DistributionDailyPlanLock(
+        business_id=10, user_id=20, plan_date=DAY,
+        is_locked=True, published_at=datetime.utcnow(),
+    ))
+    db.commit()
+    monkeypatch.setattr(
+        phase3, "optimize_route_plan",
+        lambda *_args, **_kwargs: pytest.fail(
+            "Locked route must be rejected before calculating stops"
+        ),
+    )
+    with pytest.raises(ApiError) as error:
+        phase3.apply_route_optimize(db, 10, 99, DAY)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+    assert db.get(DistributionRoute, 99).plan_sort_overrides is None
+
+
+def test_optimizer_rejects_foreign_business_route_without_customer_info(db):
+    from app.core.responses import ApiError
+
+    with pytest.raises(ApiError) as error:
+        phase3.optimize_route_plan(db, 10, 100, DAY)
+    assert (error.value.code, error.value.status_code) == ("NOT_FOUND", 404)
+    assert "Tenant eleven SECRET" not in str(error.value)
