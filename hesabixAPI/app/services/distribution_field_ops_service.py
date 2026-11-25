@@ -967,11 +967,29 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 	}
 
 
+
+
 def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
-	dist_svc._ensure_plugin(db, business_id)
-	# Setup calls several services which commit independently. Reject known
-	# locked-route/assignment conflicts BEFORE changing settings or creating
-	# a territory, otherwise a failed wizard can leave partial setup writes.
+	"""Apply the complete distribution setup using one atomic transaction.
+
+	An existing request-scoped session is reused (no nested independent
+	transaction). All child mutations flush without committing, preserving
+	the business-level publication lock until the single final commit.
+	"""
+	try:
+		dist_svc._ensure_plugin(db, business_id)
+		dist_svc._serialize_distribution_plan_mutation(db, business_id)
+		result = _stage_setup_wizard(db, business_id, actor_user_id, payload)
+		db.commit()
+		return result
+	except Exception:
+		db.rollback()
+		raise
+
+def _stage_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	# All called write services must use commit=False. The caller holds one
+	# business-wide publication lock and commits once after every stage
+	# validates and flushes successfully. Failures roll back the whole wizard.
 	existing_route_id = int(payload.get("route_id") or 0) if not payload.get("route_name") else 0
 	if payload.get("route_name"):
 		route_code = str(payload.get("route_code") or "R-01")[:50]
@@ -1014,44 +1032,40 @@ def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload:
 		settings_patch["default_source_warehouse_id"] = int(payload["default_source_warehouse_id"])
 	if payload.get("nav_provider") in NAV_PROVIDERS:
 		settings_patch["nav_provider"] = payload["nav_provider"]
-	dist_svc.update_distribution_settings(db, business_id, settings_patch)
+	dist_svc.update_distribution_settings(db, business_id, settings_patch, commit=False)
 
 	territory = None
 	if payload.get("territory_name"):
 		tcode = str(payload.get("territory_code") or "T-01")[:50]
-		try:
+		row = (
+			db.query(DistributionTerritory)
+			.filter(DistributionTerritory.business_id == business_id, DistributionTerritory.code == tcode)
+			.first()
+		)
+		if row:
+			territory = dist_svc.territory_to_dict(row)
+		else:
 			territory = dist_svc.create_territory(db, business_id, {
 				"code": tcode,
 				"name": str(payload["territory_name"]).strip()[:255],
-			})
-		except ApiError as e:
-			if int(getattr(e, "status_code", 400) or 400) not in (400, 409):
-				raise
-			row = (
-				db.query(DistributionTerritory)
-				.filter(DistributionTerritory.business_id == business_id, DistributionTerritory.code == tcode)
-				.first()
-			)
-			territory = dist_svc.territory_to_dict(row) if row else None
+			}, commit=False)
 
 	route = None
 	if payload.get("route_name"):
 		rcode = str(payload.get("route_code") or "R-01")[:50]
-		try:
+		row = (
+			db.query(DistributionRoute)
+			.filter(DistributionRoute.business_id == business_id, DistributionRoute.code == rcode)
+			.first()
+		)
+		if row:
+			route = dist_svc.route_to_dict(row)
+		else:
 			route = dist_svc.create_route(db, business_id, {
 				"code": rcode,
 				"name": str(payload["route_name"]).strip()[:255],
 				"territory_id": (territory or {}).get("id") if isinstance(territory, dict) else payload.get("territory_id"),
-			})
-		except ApiError as e:
-			if int(getattr(e, "status_code", 400) or 400) not in (400, 409):
-				raise
-			row = (
-				db.query(DistributionRoute)
-				.filter(DistributionRoute.business_id == business_id, DistributionRoute.code == rcode)
-				.first()
-			)
-			route = dist_svc.route_to_dict(row) if row else None
+			}, commit=False)
 
 	stops_created = 0
 	route_id = (route or {}).get("id") if isinstance(route, dict) else payload.get("route_id")
@@ -1060,30 +1074,70 @@ def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload:
 	freq = normalize_frequency(payload.get("frequency"), payload.get("customer_class"))
 	if route_id and person_ids:
 		for i, pid in enumerate(person_ids):
-			dist_svc.upsert_route_stop(db, business_id, int(route_id), {
+			# Retrying the wizard reuses an existing stop for the same
+			# route/customer/weekday rather than inserting a duplicate.
+			existing_stop = (
+				db.query(DistributionRouteStop.id)
+				.filter(
+					DistributionRouteStop.route_id == int(route_id),
+					DistributionRouteStop.person_id == pid,
+					DistributionRouteStop.weekday == weekday,
+				)
+				.first()
+			)
+			stop_payload = {
 				"person_id": pid,
 				"sort_order": i + 1,
 				"weekday": weekday,
 				"frequency": freq,
 				"cycle_offset": int(payload.get("cycle_offset") or 0),
 				"customer_class": payload.get("customer_class"),
-			})
+			}
+			if existing_stop:
+				stop_payload["id"] = int(existing_stop[0])
+			dist_svc.upsert_route_stop(
+				db, business_id, int(route_id), stop_payload, commit=False,
+			)
 			cls = str(payload.get("customer_class") or "").upper() or None
 			if cls:
 				upsert_customer_profile(db, business_id, pid, {
 					"customer_class": cls,
 					"visit_frequency": freq,
-				})
-			stops_created += 1
+				}, commit=False)
+			if not existing_stop:
+				stops_created += 1
 
 	assignment = None
 	visitor_id = int(payload.get("visitor_user_id") or 0)
 	if route_id and visitor_id:
-		assignment = dist_svc.create_assignment(db, business_id, {
-			"route_id": int(route_id),
-			"user_id": visitor_id,
-			"valid_from": (payload.get("valid_from") or business_today(business_id).isoformat()),
-		})
+		valid_from = date.fromisoformat(
+			str(payload.get("valid_from") or business_today(business_id).isoformat())[:10]
+		)
+		existing_assignment = (
+			db.query(DistributionRouteAssignment)
+			.filter(
+				DistributionRouteAssignment.business_id == business_id,
+				DistributionRouteAssignment.route_id == int(route_id),
+				DistributionRouteAssignment.user_id == visitor_id,
+				DistributionRouteAssignment.valid_from == valid_from,
+				DistributionRouteAssignment.valid_to.is_(None),
+			)
+			.first()
+		)
+		if existing_assignment:
+			assignment = {
+				"id": existing_assignment.id,
+				"route_id": existing_assignment.route_id,
+				"user_id": existing_assignment.user_id,
+				"valid_from": existing_assignment.valid_from.isoformat(),
+				"valid_to": None,
+			}
+		else:
+			assignment = dist_svc.create_assignment(db, business_id, {
+				"route_id": int(route_id),
+				"user_id": visitor_id,
+				"valid_from": valid_from.isoformat(),
+			}, commit=False)
 
 	return {
 		"ok": True,
