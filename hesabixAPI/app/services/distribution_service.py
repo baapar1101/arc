@@ -384,7 +384,7 @@ def list_territories(db: Session, business_id: int, ctx: AuthContext) -> List[Di
 	return [territory_to_dict(t) for t in q.order_by(DistributionTerritory.code.asc()).all()]
 
 
-def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_territory(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	code = str(payload.get("code") or "").strip()
 	name = str(payload.get("name") or "").strip()
@@ -405,7 +405,10 @@ def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 		is_active=bool(payload.get("is_active", True)),
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return territory_to_dict(row)
 
@@ -491,7 +494,7 @@ def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[st
 	return out
 
 
-def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_route(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	code = str(payload.get("code") or "").strip()
 	name = str(payload.get("name") or "").strip()
@@ -518,7 +521,10 @@ def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict
 		is_active=bool(payload.get("is_active", True)),
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	tname = None
 	if row.territory_id:
@@ -618,7 +624,7 @@ def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthCont
 	return out
 
 
-def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
@@ -670,7 +676,10 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 			customer_class=customer_class,
 		)
 		db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	pname = (person.alias_name or "").strip() or str(person.id)
 	return {
@@ -728,7 +737,7 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 	return out
 
 
-def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_assignment(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	route_id = int(payload.get("route_id") or 0)
 	user_id = int(payload.get("user_id") or 0)
@@ -753,7 +762,10 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 		valid_to=valid_to,
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return {
 		"id": row.id,
@@ -2168,7 +2180,7 @@ def assert_daily_plan_inputs_unlocked(db: Session, business_id: int) -> None:
 		)
 
 
-def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	if _DAILY_PLAN_INPUT_SETTINGS.intersection(payload):
 		assert_daily_plan_inputs_unlocked(db, business_id)
@@ -2239,7 +2251,10 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 	if "near_expiry_days" in payload:
 		row.near_expiry_days = max(1, min(90, int(payload.get("near_expiry_days") or 14)))
 	row.updated_at = datetime.utcnow()
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return settings_to_dict(row)
 
