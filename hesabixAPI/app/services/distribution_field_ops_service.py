@@ -1152,13 +1152,46 @@ def _stage_setup_wizard(db: Session, business_id: int, actor_user_id: int, paylo
 def onboard_new_outlet(
 	db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any],
 ) -> Dict[str, Any]:
-	dist_svc._ensure_plugin(db, business_id)
+	"""Register a new outlet and route stop in one business-scoped transaction.
+
+	Workflow notifications and person cache invalidation run only *after* the
+	transaction commits successfully. Any failure leaves neither a customer
+	nor an incomplete profile/route stop behind.
+	"""
+	try:
+		dist_svc._ensure_plugin(db, business_id)
+		dist_svc._serialize_distribution_plan_mutation(db, business_id)
+		result = _stage_new_outlet(db, business_id, actor_user_id, payload)
+		db.commit()
+	except Exception:
+		db.rollback()
+		raise
+	# Never send a person.created workflow event for a rolled-back person.
+	from app.services.person_service import notify_person_created
+	try:
+		notify_person_created(
+			db, business_id, result["person_id"],
+			result["person"].get("person_types") or [],
+		)
+	except Exception:
+		# Post-commit side effects cannot roll back the successfully created
+		# customer. Treat notification failures as nonfatal, as before.
+		import logging
+		logging.getLogger(__name__).exception(
+			"Post-commit person notification failed for %s", result["person_id"],
+		)
+	return result
+
+
+def _stage_new_outlet(
+	db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any],
+) -> Dict[str, Any]:
 	name = str(payload.get("name") or payload.get("alias_name") or "").strip()
 	if not name:
 		raise ApiError("VALIDATION_ERROR", "name required", http_status=400)
-	# Preflight the requested route before create_person commits a new
-	# customer. The stop service checks again when inserting the stop, so
-	# concurrent publication cannot bypass its authoritative lock check.
+	# The caller holds the business mutation lock across the full transaction.
+	# Validate the route before staging a person; downstream guards recheck
+	# locked-plan and customer ownership without releasing that lock.
 	route_id = int(payload.get("route_id") or 0)
 	if route_id:
 		route = (
@@ -1180,8 +1213,14 @@ def onboard_new_outlet(
 		address=payload.get("address"),
 		city=payload.get("city"),
 	)
-	created = create_person(db, business_id, req)
-	person_id = int(created.get("id") or created.get("person_id") or 0)
+	created = create_person(
+		db, business_id, req,
+		defer_cache_invalidation=True, commit=False,
+	)
+	# Person service wraps its data as {"success": True, "data": {...}}.
+	# Reading the top-level "id" incorrectly failed *after* an early commit.
+	person_data = created.get("data") if isinstance(created, dict) else None
+	person_id = int((person_data or {}).get("id") or 0)
 	if person_id <= 0:
 		raise ApiError("VALIDATION_ERROR", "person create failed", http_status=400)
 	lat = payload.get("latitude")
@@ -1189,7 +1228,9 @@ def onboard_new_outlet(
 	if lat is not None and lng is not None:
 		from app.services.distribution_phase3_service import update_person_location
 
-		update_person_location(db, business_id, person_id, float(lat), float(lng))
+		update_person_location(
+			db, business_id, person_id, float(lat), float(lng), commit=False,
+		)
 	profile = upsert_customer_profile(db, business_id, person_id, {
 		"customer_class": payload.get("customer_class"),
 		"visit_frequency": payload.get("frequency") or payload.get("visit_frequency"),
@@ -1198,17 +1239,16 @@ def onboard_new_outlet(
 		"assortment_id": payload.get("assortment_id"),
 		"storefront_photo_file_id": payload.get("storefront_photo_file_id"),
 		"notes": payload.get("notes"),
-	})
-	person = db.query(Person).filter(Person.id == person_id).first()
+	}, commit=False)
+	person = db.query(Person).filter(
+		Person.id == person_id, Person.business_id == business_id,
+	).first()
 	if person:
 		person.updated_at = datetime.utcnow()
-		if not getattr(person, "onboarded_at", None):
-			pass
-	get_profile(db, business_id, person_id)
 	prof_row = get_profile(db, business_id, person_id)
 	if prof_row:
 		prof_row.onboarded_at = datetime.utcnow()
-		db.commit()
+	db.flush()
 	stop = None
 	if route_id:
 		stop = dist_svc.upsert_route_stop(db, business_id, route_id, {
@@ -1217,11 +1257,11 @@ def onboard_new_outlet(
 			"weekday": payload.get("weekday"),
 			"frequency": payload.get("frequency") or profile.get("visit_frequency"),
 			"customer_class": payload.get("customer_class"),
-		})
+		}, commit=False)
 	return {
-		"person": created,
+		"person": person_data,
 		"person_id": person_id,
-		"profile": profile_to_dict(get_profile(db, business_id, person_id)) if get_profile(db, business_id, person_id) else profile,
+		"profile": profile_to_dict(prof_row) if prof_row else profile,
 		"stop": stop,
 	}
 
