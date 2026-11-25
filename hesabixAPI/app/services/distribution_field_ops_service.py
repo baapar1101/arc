@@ -1171,7 +1171,7 @@ def onboard_new_outlet(
 	try:
 		notify_person_created(
 			db, business_id, result["person_id"],
-			result["person"].get("person_types") or [],
+			(result["person"].get("data") or {}).get("person_types") or [],
 		)
 	except Exception:
 		# Post-commit side effects cannot roll back the successfully created
@@ -1259,7 +1259,7 @@ def _stage_new_outlet(
 			"customer_class": payload.get("customer_class"),
 		}, commit=False)
 	return {
-		"person": person_data,
+		"person": created,
 		"person_id": person_id,
 		"profile": profile_to_dict(prof_row) if prof_row else profile,
 		"stop": stop,
