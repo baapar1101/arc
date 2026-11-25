@@ -12,6 +12,7 @@ import uuid as uuid_module
 
 from app.core.responses import ApiError
 from app.core.cache import get_cache
+from app.core.product_measurements import MEASUREMENT_FIELDS
 from adapters.db.models.product import Product, ProductItemType
 from adapters.db.models.product_attribute import ProductAttribute
 from adapters.db.models.product_attribute_link import ProductAttributeLink
@@ -550,6 +551,7 @@ def create_product(
                 code=code,
                 name=payload.name.strip(),
                 description=payload.description,
+                **payload.model_dump(include=set(MEASUREMENT_FIELDS), exclude_unset=True),
                 category_id=payload.category_id,
                 main_unit=main_unit,
                 secondary_unit=secondary_unit,
@@ -1040,6 +1042,7 @@ def update_product(
         ),
         **catalog_uuid_kw,
         **catalog_profile_kw,
+        **payload.model_dump(include=set(MEASUREMENT_FIELDS), exclude_unset=True),
         **gb_kw,
         **price_update_kwargs,
         **_expiry_update_kwargs(payload, fields_set, obj),
@@ -1530,6 +1533,7 @@ def _get_thumbnail_url(obj: Product) -> str | None:
 
 
 def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
+    measurements = {key: getattr(obj, key) for key in MEASUREMENT_FIELDS}
     # دریافت attribute_ids از ProductAttributeLink
     attribute_ids = []
     if db is not None:
@@ -1543,6 +1547,10 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "code": obj.code,
         "name": obj.name,
         "description": obj.description,
+        **{
+            key: format(value, "f") if value is not None else None
+            for key, value in measurements.items()
+        },
         "category_id": obj.category_id,
         "main_unit": obj.main_unit,
         "secondary_unit": obj.secondary_unit,

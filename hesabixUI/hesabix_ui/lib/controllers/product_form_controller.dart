@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/product_form_data.dart';
+import '../models/product_measurement.dart';
 import '../services/product_service.dart';
 import '../services/opening_balance_service.dart';
 import '../services/category_service.dart';
@@ -33,6 +34,10 @@ class ProductFormController extends ChangeNotifier {
   late final OpeningBalanceService _openingBalanceService;
 
   ProductFormData _formData = ProductFormData();
+  ProductMeasurementUnit? _dimensionUnit;
+  ProductMeasurementUnit? _weightUnit;
+  Map<ProductMeasurement, String?> _originalMeasurements = const {};
+  final _measurementInputs = <ProductMeasurement, String>{};
   bool _isLoading = false;
   String? _errorMessage;
   int? _editingProductId;
@@ -409,6 +414,7 @@ class ProductFormController extends ChangeNotifier {
         _loadReferenceData(),
         _loadPriceListsAndCurrencies(),
         _loadWarehouses(),
+        _loadMeasurementUnits(),
       ]);
 
       if (cloneSourceProductId != null) {
@@ -469,6 +475,9 @@ class ProductFormController extends ChangeNotifier {
         _originalInventoryMode = 'bulk';
       }
 
+      _originalMeasurements = _formData.physicalMeasurements;
+      _measurementInputs.clear();
+
       // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
       // کاربر می‌تواند عنوان واحد را در فرم وارد کند و در صورت تطبیق با لیست، آیدی ست می‌شود
       
@@ -480,6 +489,77 @@ class ProductFormController extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  Future<void> _loadMeasurementUnits() async {
+    try {
+      final business = await BusinessApiService.getBusiness(
+        businessId,
+        apiClient: _apiClient,
+      );
+      _dimensionUnit = ProductMeasurementUnit.dimensionFromCode(
+        business.productDimensionUnit,
+      );
+      _weightUnit = ProductMeasurementUnit.weightFromCode(
+        business.productWeightUnit,
+      );
+    } catch (_) {
+      _dimensionUnit = null;
+      _weightUnit = null;
+    }
+  }
+
+  ProductMeasurementUnit? measurementUnit(ProductMeasurement field) =>
+      field == ProductMeasurement.weight ? _weightUnit : _dimensionUnit;
+
+  String measurementInput(ProductMeasurement field) =>
+      _measurementInputs[field] ??
+      measurementUnit(field)?.display(_formData.physicalMeasurements[field]) ??
+      '';
+
+  bool isMeasurementApproximate(ProductMeasurement field) {
+    final display = measurementUnit(field)!.format(_originalMeasurements[field]);
+    return display.approximate && (_measurementInputs[field] ?? display.value) == display.value;
+  }
+
+  String? _measurementBaseValue(ProductMeasurement field, String input) =>
+      measurementUnit(field)!.toBaseValue(input, original: _originalMeasurements[field]);
+
+  String? measurementError(ProductMeasurement field, String input) {
+    try {
+      _measurementBaseValue(field, input);
+      return null;
+    } on FormatException catch (error) {
+      return error.message;
+    }
+  }
+
+  void updateMeasurement(ProductMeasurement field, String input) {
+    _measurementInputs[field] = input;
+    try {
+      final value = _measurementBaseValue(field, input);
+      updateFormData(_formData.copyWith(physicalMeasurements: {
+        ..._formData.physicalMeasurements,
+        field: value,
+      }));
+    } on FormatException {
+      // Keep the raw input for validation, including when the user switches tabs.
+    }
+  }
+
+  Map<String, String?> _measurementPayload({required bool editing}) {
+    if (_formData.itemType != 'کالا' || _dimensionUnit == null) return {};
+    final values = <String, String?>{};
+    for (final field in ProductMeasurement.values) {
+      final input = _measurementInputs[field];
+      if (editing && input == null) continue;
+      final value = input == null
+          ? _formData.physicalMeasurements[field]
+          : _measurementBaseValue(field, input);
+      if (editing ? value == _originalMeasurements[field] : value == null) continue;
+      values[field.apiKey] = value;
+    }
+    return values;
   }
 
   // Load all reference data (موازی برای بهبود عملکرد)
@@ -616,8 +696,16 @@ class ProductFormController extends ChangeNotifier {
       _setError(firstError);
       return false;
     }
-    
-    return isValid;
+    if (!isValid) return false;
+
+    try {
+      _measurementPayload(editing: isEditingProduct);
+    } on FormatException catch (error) {
+      _setError(error.message);
+      return false;
+    }
+
+    return true;
   }
 
   Future<bool> _ensureCatalogBusinessContactReady() async {
@@ -659,7 +747,8 @@ class ProductFormController extends ChangeNotifier {
         return false;
       }
 
-      final payload = _formData.toPayload();
+      final payload = _formData.toPayload()
+        ..addAll(_measurementPayload(editing: false));
       if (openingBalanceInput != null) {
         payload['opening_balance'] = openingBalanceInput.toJson();
       }
@@ -763,7 +852,8 @@ class ProductFormController extends ChangeNotifier {
         return false;
       }
 
-      final payload = _formData.toPayload();
+      final payload = _formData.toPayload()
+        ..addAll(_measurementPayload(editing: true));
       if (openingBalanceInput != null) {
         payload['opening_balance'] = openingBalanceInput.toJson();
       }
@@ -943,6 +1033,8 @@ class ProductFormController extends ChangeNotifier {
   // Reset form
   void resetForm() {
     _formData = ProductFormData();
+    _originalMeasurements = const {};
+    _measurementInputs.clear();
     _clearError();
     // حذف draft ذخیره شده
     _autoSave.clearFormData(businessId, _editingProductId);

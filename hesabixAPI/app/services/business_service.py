@@ -1716,6 +1716,8 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
             getattr(business, "invoice_default_warehouse_fill_document_header", True),
         ),
         "allow_negative_inventory_for_bulk": bool(getattr(business, "allow_negative_inventory_for_bulk", False)),
+        "product_dimension_unit": business.product_dimension_unit,
+        "product_weight_unit": business.product_weight_unit,
         "allow_negative_inventory_for_unique": bool(getattr(business, "allow_negative_inventory_for_unique", False)),
         "warehouse_transfer_require_positive_stock": bool(
             getattr(business, "warehouse_transfer_require_positive_stock", True),

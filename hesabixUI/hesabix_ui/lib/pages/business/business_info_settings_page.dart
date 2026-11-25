@@ -7,6 +7,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/business_models.dart';
+import 'package:hesabix_ui/models/product_measurement.dart';
 import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
@@ -94,6 +95,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _allowNegativeInventoryForBulk = false;
   bool _allowNegativeInventoryForUnique = false;
   bool _warehouseTransferRequirePositiveStock = true;
+  ProductMeasurementUnit _productDimensionUnit = ProductMeasurementUnit.mm;
+  ProductMeasurementUnit _productWeightUnit = ProductMeasurementUnit.g;
 
   // کالای هزینه‌شده / کالای درآمدشده
   String _geiWorkflowMode = 'simple';
@@ -231,6 +234,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               ? resp.invoiceGlobalDiscountMaxAmount!.toStringAsFixed(0)
               : '';
       _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
+      _productDimensionUnit = ProductMeasurementUnit.dimensionFromCode(
+        resp.productDimensionUnit,
+      );
+      _productWeightUnit = ProductMeasurementUnit.weightFromCode(
+        resp.productWeightUnit,
+      );
       _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
       _geiWorkflowMode = resp.goodsExpenseIncomeWorkflowMode;
@@ -432,6 +441,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_allowNegativeInventoryForBulk != orig.allowNegativeInventoryForBulk) {
       payload['allow_negative_inventory_for_bulk'] = _allowNegativeInventoryForBulk;
+    }
+    if (_productDimensionUnit.code != orig.productDimensionUnit) {
+      payload['product_dimension_unit'] = _productDimensionUnit.code;
+    }
+    if (_productWeightUnit.code != orig.productWeightUnit) {
+      payload['product_weight_unit'] = _productWeightUnit.code;
     }
     if (_allowNegativeInventoryForUnique != orig.allowNegativeInventoryForUnique) {
       payload['allow_negative_inventory_for_unique'] = _allowNegativeInventoryForUnique;
@@ -1297,6 +1312,23 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildInventoryNegativePolicySettings(cs),
 
               const SizedBox(height: 24),
+              _buildSectionTitle('واحدهای مشخصات فیزیکی کالا', cs),
+              const SizedBox(height: 8),
+              _measurementUnitDropdown(
+                'واحد ابعاد کالا',
+                _productDimensionUnit,
+                ProductMeasurementUnit.dimensionUnits,
+                (unit) => setState(() => _productDimensionUnit = unit),
+              ),
+              const SizedBox(height: 12),
+              _measurementUnitDropdown(
+                'واحد وزن کالا',
+                _productWeightUnit,
+                ProductMeasurementUnit.weightUnits,
+                (unit) => setState(() => _productWeightUnit = unit),
+              ),
+
+              const SizedBox(height: 24),
               _buildSectionTitle('کالای هزینه‌شده / کالای درآمدشده', cs),
               const SizedBox(height: 8),
               _buildGoodsExpenseIncomeSettings(cs),
@@ -1696,6 +1728,25 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       child: Text('قیمت تمام‌شده ردیف (خرید) / در فروش همان قیمت واحد'),
     ),
   ];
+
+  Widget _measurementUnitDropdown(
+    String label,
+    ProductMeasurementUnit selected,
+    List<ProductMeasurementUnit> units,
+    ValueChanged<ProductMeasurementUnit> onChanged,
+  ) {
+    return DropdownButtonFormField<ProductMeasurementUnit>(
+      initialValue: selected,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        for (final unit in units)
+          DropdownMenuItem(value: unit, child: Text(unit.label)),
+      ],
+      onChanged: _saving ? null : (unit) {
+        if (unit != null) onChanged(unit);
+      },
+    );
+  }
 
   Widget _buildInventoryNegativePolicySettings(ColorScheme cs) {
     final t = AppLocalizations.of(context);

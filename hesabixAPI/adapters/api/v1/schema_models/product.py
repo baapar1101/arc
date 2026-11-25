@@ -3,11 +3,46 @@ Schema models کامل برای محصولات (Products)
 
 این ماژول شامل تمام schema های مورد نیاز برای مدیریت محصولات است.
 """
-from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo, ConfigDict
+from typing import Annotated, Optional, List, Literal, Dict, Any
+from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator, ValidationInfo, ConfigDict
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+import re
+
+from app.core.product_measurements import MEASUREMENT_FIELDS, MEASUREMENT_PRECISION, MEASUREMENT_SCALE
+
+
+def _measurement_decimal(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+        if re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", value):
+            return Decimal(value)
+    elif type(value) is int:
+        return Decimal(value)
+    elif isinstance(value, Decimal) and value.is_finite() and not value.is_signed():
+        return value
+    raise ValueError("مقدار باید عدد صحیح یا اعشاری غیرمنفی باشد")
+
+
+PhysicalMeasurement = Annotated[
+    Annotated[
+        Decimal,
+        Field(ge=0, max_digits=MEASUREMENT_PRECISION, decimal_places=MEASUREMENT_SCALE),
+    ] | None,
+    BeforeValidator(_measurement_decimal),
+]
+
+
+class ProductMeasurementsMixin(BaseModel):
+    length_mm: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["length_mm"])
+    width_mm: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["width_mm"])
+    height_mm: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["height_mm"])
+    weight_g: PhysicalMeasurement = Field(None, description=MEASUREMENT_FIELDS["weight_g"])
 
 
 class ProductItemType(str, Enum):
@@ -167,7 +202,7 @@ class ProductCatalogProfileMixin(BaseModel):
     )
 
 
-class ProductCreateRequest(ProductCatalogProfileMixin):
+class ProductCreateRequest(ProductCatalogProfileMixin, ProductMeasurementsMixin):
     """درخواست ایجاد محصول جدید"""
     code: Optional[str] = Field(
         None, 
@@ -427,7 +462,7 @@ class ProductCreateRequest(ProductCatalogProfileMixin):
         }
 
 
-class ProductUpdateRequest(ProductCatalogProfileMixin):
+class ProductUpdateRequest(ProductCatalogProfileMixin, ProductMeasurementsMixin):
     """درخواست ویرایش محصول"""
     code: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=200)
@@ -552,6 +587,11 @@ class ProductInventoryInfo(BaseModel):
 
 class ProductResponse(BaseModel):
     """پاسخ اطلاعات محصول"""
+    length_mm: str | None = Field(None, description=MEASUREMENT_FIELDS["length_mm"])
+    width_mm: str | None = Field(None, description=MEASUREMENT_FIELDS["width_mm"])
+    height_mm: str | None = Field(None, description=MEASUREMENT_FIELDS["height_mm"])
+    weight_g: str | None = Field(None, description=MEASUREMENT_FIELDS["weight_g"])
+
     id: int = Field(..., description="شناسه محصول")
     code: str = Field(..., description="کد محصول")
     name: str = Field(..., description="نام محصول")

@@ -3,11 +3,13 @@ Helper functions for processing product requests (multipart/form-data and JSON)
 """
 import json
 import os
+from decimal import Decimal
 from typing import Dict, Any, Optional
 from fastapi import Request, UploadFile, HTTPException
 from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
 from adapters.api.v1.helpers.storage_upload_errors import raise_if_storage_upload_error
 from app.core.responses import ApiError
+from app.core.product_measurements import MEASUREMENT_FIELDS
 
 _ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
 
@@ -71,6 +73,13 @@ async def process_product_request(
 			body_data = await request.json()
 			if not isinstance(body_data, dict):
 				raise ApiError("INVALID_PAYLOAD", "داده‌های ارسالی باید یک object JSON باشد", http_status=400)
+
+			decimal_fields = [key for key in MEASUREMENT_FIELDS if isinstance(body_data.get(key), float)]
+			if decimal_fields:
+				# Keep the JSON number's original precision without changing other product fields.
+				original = getattr(request.state, "original_product_json", None)
+				exact_data = json.loads(original or await request.body(), parse_float=Decimal)
+				body_data.update((key, exact_data[key]) for key in decimal_fields)
 
 			if is_update and 'default_warehouse_id' in body_data:
 				default_warehouse_id_value = body_data.get('default_warehouse_id')
@@ -149,6 +158,9 @@ def _parse_form_data(form_data) -> Dict[str, Any]:
 	product_data = {}
 	for key, value in form_data.items():
 		if key == "file":
+			continue
+		if key in MEASUREMENT_FIELDS:
+			product_data[key] = value
 			continue
 		if isinstance(value, str):
 			try:

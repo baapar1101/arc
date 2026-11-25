@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Union, Generic, TypeVar, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, validator
 from enum import Enum
 from datetime import datetime, date
+from app.core.product_measurements import ProductDimensionUnit, ProductWeightUnit
 
 T = TypeVar('T')
 
@@ -782,6 +783,9 @@ class BusinessCreateRequest(BaseModel):
 
 
 class BusinessUpdateRequest(BaseModel):
+	product_dimension_unit: ProductDimensionUnit = "mm"
+	product_weight_unit: ProductWeightUnit = "g"
+
 	name: Optional[str] = Field(default=None, min_length=1, max_length=255, description="نام کسب و کار")
 	business_type: Optional[BusinessType] = Field(default=None, description="نوع کسب و کار")
 	business_field: Optional[BusinessField] = Field(default=None, description="زمینه فعالیت")
@@ -1175,6 +1179,9 @@ class BusinessUpdateRequest(BaseModel):
 
 
 class BusinessResponse(BaseModel):
+	product_dimension_unit: ProductDimensionUnit = "mm"
+	product_weight_unit: ProductWeightUnit = "g"
+
 	id: int = Field(..., description="شناسه کسب و کار")
 	name: str = Field(..., description="نام کسب و کار")
 	business_type: str = Field(..., description="نوع کسب و کار")
