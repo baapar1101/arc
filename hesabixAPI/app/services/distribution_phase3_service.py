@@ -119,7 +119,7 @@ def validate_geofence_on_start(
 	raise ApiError("GEOFENCE_VIOLATION", msg, http_status=400, details={"distance_meters": dist})
 
 
-def update_person_location(db: Session, business_id: int, person_id: int, lat: float, lng: float) -> Dict[str, Any]:
+def update_person_location(db: Session, business_id: int, person_id: int, lat: float, lng: float, *, commit: bool = True) -> Dict[str, Any]:
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
@@ -130,7 +130,10 @@ def update_person_location(db: Session, business_id: int, person_id: int, lat: f
 	person.latitude = lat
 	person.longitude = lng
 	person.updated_at = datetime.utcnow()
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	return {"person_id": person_id, "latitude": lat, "longitude": lng}
 
 
