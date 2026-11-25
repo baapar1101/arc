@@ -491,11 +491,7 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 
 def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
-	q = (
-		db.query(DistributionRoute)
-		.options(joinedload(DistributionRoute.territory))
-		.filter(DistributionRoute.business_id == business_id)
-	)
+	q = db.query(DistributionRoute).filter(DistributionRoute.business_id == business_id)
 	if _use_strict_catalog_for_field_user(db, business_id, ctx):
 		uid = ctx.get_user_id()
 		if uid is None:
@@ -505,10 +501,24 @@ def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[st
 			return []
 		q = q.filter(DistributionRoute.id.in_(route_ids))
 	rows = q.order_by(DistributionRoute.code.asc()).all()
+	# Territory references are single-column foreign keys, and historical
+	# rows may point to a territory in another business. Never serialize a
+	# foreign territory's name or ID into a local route list.
+	territory_ids = {r.territory_id for r in rows if r.territory_id is not None}
+	territory_names = dict(
+		db.query(DistributionTerritory.id, DistributionTerritory.name)
+		.filter(
+			DistributionTerritory.business_id == business_id,
+			DistributionTerritory.id.in_(territory_ids),
+		).all()
+	) if territory_ids else {}
 	out = []
 	for r in rows:
-		tname = r.territory.name if r.territory else None
-		out.append(route_to_dict(r, tname))
+		territory_name = territory_names.get(r.territory_id)
+		result = route_to_dict(r, territory_name)
+		if r.territory_id is not None and r.territory_id not in territory_names:
+			result["territory_id"] = None
+		out.append(result)
 	return out
 
 
