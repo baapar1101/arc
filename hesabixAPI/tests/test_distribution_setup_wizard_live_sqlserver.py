@@ -121,3 +121,95 @@ def test_mssql_setup_wizard_transaction_rolls_back_all_stages(monkeypatch):
             for table in reversed(created):
                 conn.execute(DropTable(table, if_exists=True))
         engine.dispose()
+
+
+def test_mssql_new_outlet_is_atomic_and_postcommit_notified(monkeypatch):
+    """Create and roll back a real SQL Server person and distribution stop.
+
+    Local ephemeral tempdb only. Keep all FK parent/reference tables inside
+    this test and remove them even if onboarding raises unexpectedly.
+    """
+    from adapters.db.models.business import Business, BusinessType, BusinessField
+    from adapters.db.models.person import PersonBankAccount, PersonSocialContact
+    from app.services import person_service
+
+    url = make_url(_DSN)
+    assert url.get_backend_name() == "mssql"
+    assert url.host in ("localhost", "127.0.0.1")
+    assert url.port == 1433 and url.database == "tempdb"
+    tables = (
+        Business.__table__,
+        Person.__table__,
+        PersonBankAccount.__table__,
+        PersonSocialContact.__table__,
+        DistributionTerritory.__table__,
+        DistributionRoute.__table__,
+        DistributionRouteStop.__table__,
+        DistributionRouteAssignment.__table__,
+        DistributionCustomerProfile.__table__,
+        DistributionDailyPlanLock.__table__,
+    )
+    notices = []
+    monkeypatch.setattr(dist_svc, "_ensure_plugin", lambda *_args: None)
+    monkeypatch.setattr(fieldops, "business_today", lambda *_args: date(2026, 11, 25))
+    monkeypatch.setattr(
+        person_service, "notify_person_created",
+        lambda _session, business_id, person_id, types: notices.append(
+            (business_id, person_id, tuple(types))
+        ),
+    )
+    engine = sa.create_engine(url, pool_pre_ping=True)
+    created = []
+    try:
+        with engine.begin() as conn:
+            assert conn.execute(sa.text("SELECT DB_NAME()")).scalar_one() == "tempdb"
+            for table in tables:
+                assert not sa.inspect(conn).has_table(table.name)
+                conn.execute(CreateTable(table, include_foreign_key_constraints=[]))
+                created.append(table)
+
+        with Session(engine) as session:
+            session.add(Business(
+                id=10, name="Test Own Business",
+                business_type=BusinessType.SHOP,
+                business_field=BusinessField.TRADING,
+                owner_id=1,
+            ))
+            session.add(DistributionRoute(
+                id=99, business_id=10, code="R-OUTLET",
+                name="Test local route", is_active=True,
+            ))
+            session.commit()
+
+            with pytest.raises(ApiError):
+                fieldops.onboard_new_outlet(
+                    session, 10, 1,
+                    {"name": "Must roll back", "route_id": 99,
+                     "outlet_type": "not-valid", "latitude": 35.1,
+                     "longitude": 51.3},
+                )
+            assert session.query(Person).count() == 0
+            assert session.query(DistributionCustomerProfile).count() == 0
+            assert session.query(DistributionRouteStop).count() == 0
+            assert notices == []
+
+            result = fieldops.onboard_new_outlet(
+                session, 10, 1,
+                {"name": "Committed customer", "route_id": 99,
+                 "customer_class": "A", "outlet_type": "grocery",
+                 "weekday": 2, "latitude": 35.6, "longitude": 51.4},
+            )
+            person_id = result["person_id"]
+            assert person_id > 0
+            assert result["person"]["data"]["id"] == person_id
+            assert result["stop"]["person_id"] == person_id
+            assert result["profile"]["onboarded_at"]
+            assert session.query(Person).count() == 1
+            assert session.query(DistributionCustomerProfile).count() == 1
+            assert session.query(DistributionRouteStop).count() == 1
+            assert notices == [(10, person_id, tuple(result["person"]["data"]["person_types"]))]
+    finally:
+        with engine.begin() as conn:
+            for table in reversed(created):
+                conn.execute(DropTable(table, if_exists=True))
+        engine.dispose()
