@@ -466,7 +466,12 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
 	_assert_territory_has_no_locked_plans(db, business_id, territory_id)
-	db.query(DistributionRoute).filter(DistributionRoute.territory_id == territory_id).update({"territory_id": None})
+	# The FK is a global ID and legacy data may incorrectly link routes
+	# from other businesses to this territory. Never rewrite those routes.
+	db.query(DistributionRoute).filter(
+		DistributionRoute.business_id == business_id,
+		DistributionRoute.territory_id == territory_id,
+	).update({"territory_id": None})
 	db.delete(row)
 	db.commit()
 
