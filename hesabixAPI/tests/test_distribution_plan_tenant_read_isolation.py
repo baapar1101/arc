@@ -598,3 +598,30 @@ def test_team_map_masks_cross_tenant_legacy_visit_person_without_writes(db, monk
     assert "36.5" not in repr(result)
     assert "52.5" not in repr(result)
     assert "808" not in repr(result)
+
+
+def test_route_update_does_not_expose_foreign_territory_or_prevent_repair(db, monkeypatch):
+    from app.services import sepidar_plugin_service
+
+    monkeypatch.setattr(
+        sepidar_plugin_service, "assert_plugin_entity_editable",
+        lambda *_args: None,
+    )
+    db.add(DistributionTerritory(
+        id=18, business_id=11, code="T-FOREIGN",
+        name="FOREIGN-TERRITORY-SECRET",
+    ))
+    db.commit()
+    db.get(DistributionRoute, 99).territory_id = 18
+    db.commit()
+
+    result = distribution.update_route(db, 10, 99, {"name": "Valid local rename"})
+    assert result["name"] == "Valid local rename"
+    assert result["territory_id"] is None
+    assert result["territory_name"] is None
+    assert "FOREIGN-TERRITORY-SECRET" not in repr(result)
+
+    repaired = distribution.update_route(db, 10, 99, {"territory_id": None})
+    assert repaired["territory_id"] is None
+    assert db.get(DistributionRoute, 99).territory_id is None
+    assert db.get(DistributionTerritory, 18).name == "FOREIGN-TERRITORY-SECRET"
