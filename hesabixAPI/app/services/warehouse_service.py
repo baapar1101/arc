@@ -4624,9 +4624,10 @@ def _validate_manual_variant_cancellation(
 			exclude_warehouse_document_ids=[int(document.id)],
 		)
 		if remaining < 0:
-			is_receipt = document.doc_type == "receipt"
+			is_receipt = document.doc_type in ("receipt", "production_in")
 			error_kind, label = {
 				"receipt": ("RECEIPT", "رسید"),
+				"production_in": ("PRODUCTION_RECEIPT", "رسید تولید"),
 				"adjustment": ("ADJUSTMENT", "تعدیل"),
 				"transfer": ("TRANSFER", "انتقال"),
 			}[document.doc_type]
@@ -4683,7 +4684,7 @@ def cancel_warehouse_document(
 	if len(linked_order_ids) > 1:
 		raise ApiError("MULTIPLE_PRODUCTION_ORDER_LINKS", "حواله به چند سفارش تولید متصل است و قابل ابطال نیست", http_status=409)
 	if (
-		wh.doc_type == "receipt"
+		wh.doc_type in ("receipt", "production_in")
 		and wh.source_type == "manual"
 		and wh.source_document_id is None
 		and not (wh.extra_info or {}).get("cancels_warehouse_document_id")
