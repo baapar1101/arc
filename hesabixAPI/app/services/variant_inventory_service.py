@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -154,6 +155,7 @@ def compute_available_variant_stock(
 
     # Opening stock is financial stock, like the product-level reader; its warehouse mirror is excluded below.
     if product is not None and is_variant_inventory_product(product) and product.track_inventory:
+        from app.services.legacy_opening_variant_service import require_converted_legacy_openings
         from app.services.variant_allocation_service import opening_allocations_in_main_units
 
         opening_q = db.query(Document.id).filter(
@@ -166,21 +168,33 @@ def compute_available_variant_stock(
         opening_lines = db.query(DocumentLine).filter(
             DocumentLine.document_id.in_(opening_ids), DocumentLine.product_id == int(product_id),
         ).all() if opening_ids else []
+        legacy_openings: dict[tuple[int | None, int], Decimal] = defaultdict(Decimal)
         for line in opening_lines:
             info = extra_info_dict(line.extra_info)
             if (info.get("movement") or "in") != "in" or info.get("inventory_posted") is False or info.get("inventory_tracked") is False:
                 continue
-            if warehouse_id is not None:
-                try:
-                    if int(info.get("warehouse_id")) != int(warehouse_id):
-                        continue
-                except (TypeError, ValueError):
-                    continue
+            try:
+                opening_warehouse = int(info.get("warehouse_id"))
+            except (TypeError, ValueError):
+                opening_warehouse = None
+            if warehouse_id is not None and opening_warehouse != int(warehouse_id):
+                continue
             if _d(line.quantity) <= 0:
+                continue
+            if info.get("allocations") in (None, []) and info.get("variant_id") is None:
+                legacy_openings[(opening_warehouse, line.document_id)] += inventory_quantity_to_main(
+                    line.quantity, product, info,
+                )
                 continue
             for vid, qty, _price in opening_allocations_in_main_units(db, business_id, product, line.quantity, info):
                 if vid == int(variant_id):
                     bal += qty
+        if legacy_openings:
+            # The posted conversion contributes through its warehouse allocations below.
+            require_converted_legacy_openings(
+                db, business_id, product, legacy_openings, up_to_date,
+                excluded_warehouse_documents=exclude_warehouse_document_ids,
+            )
 
     wh_q = (
         db.query(WarehouseLineVariantAllocation, WarehouseDocumentLine, WarehouseDocument)
