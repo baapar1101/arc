@@ -223,16 +223,19 @@ def test_payments_only_update_syncs_payments_and_commits(
 def test_update_invoice_uses_payments_only_path_when_body_unchanged(mock_preserves, mock_apply):
     mock_apply.return_value = {"id": 10, "path": "payments_only"}
     document = _document()
+    refreshed_document = _document()
     fiscal = SimpleNamespace(is_last=True)
+    document_query = MagicMock()
+    document_query.filter.return_value.first.return_value = document
+    by_id = document_query.filter_by.return_value
+    locked_query = by_id.with_for_update.return_value
+    locked_query.populate_existing.return_value.first.return_value = refreshed_document
 
     def query_side_effect(model):
-        q = MagicMock()
         if model is Document:
-            q.filter.return_value.first.return_value = document
-        elif model is FiscalYear:
-            q.filter.return_value.first.return_value = fiscal
-        else:
-            q.filter.return_value.first.return_value = None
+            return document_query
+        q = MagicMock()
+        q.filter.return_value.first.return_value = fiscal if model is FiscalYear else None
         return q
 
     db = MagicMock()
@@ -243,6 +246,10 @@ def test_update_invoice_uses_payments_only_path_when_body_unchanged(mock_preserv
         4,
         {"invoice_type": "invoice_purchase", "payments": [{"amount": 1}]},
     )
+    document_query.filter_by.assert_called_once_with(id=10)
+    by_id.with_for_update.assert_called_once_with(key_share=True)
+    locked_query.populate_existing.assert_called_once_with()
     mock_preserves.assert_called_once()
     mock_apply.assert_called_once()
+    assert mock_apply.call_args.kwargs["document"] is refreshed_document
     assert result["path"] == "payments_only"
