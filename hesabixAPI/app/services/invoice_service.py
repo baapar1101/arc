@@ -8885,8 +8885,14 @@ def update_invoice(
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
 
-    if document.document_type == INVOICE_SALES and (document.extra_info or {}).get("source") == "woocommerce":
-        document = db.query(Document).filter_by(id=document_id).with_for_update().populate_existing().first()
+    is_purchase = document.document_type == INVOICE_PURCHASE
+    if is_purchase or (
+        document.document_type == INVOICE_SALES and (document.extra_info or {}).get("source") == "woocommerce"
+    ):
+        # Purchase receipt posting takes the same source lock before writing stock or GRNI.
+        document = db.query(Document).filter_by(id=document_id).with_for_update(
+            key_share=is_purchase,
+        ).populate_existing().first()
         if document is None or document.document_type not in SUPPORTED_INVOICE_TYPES:
             raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
 
@@ -10231,7 +10237,10 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
     """
     logger.info(f"[DELETE_INVOICE] ===== Starting delete process for invoice {document_id} =====")
     try:
-        document = db.query(Document).filter(Document.id == document_id).first()
+        document_query = db.query(Document).filter(Document.id == document_id)
+        document = document_query.first()
+        if document is not None and document.document_type == INVOICE_PURCHASE:
+            document = document_query.with_for_update(key_share=True).populate_existing().first()
         if not document:
             logger.error(f"[DELETE_INVOICE] Invoice {document_id} not found")
             raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)

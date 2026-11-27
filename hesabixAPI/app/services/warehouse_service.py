@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from datetime import datetime, date
 import logging
 
@@ -796,6 +796,8 @@ def _compute_line_quantities_core(
 	item_rows: List[Any],
 	warehouse_docs: List[WarehouseDocument],
 	products_by_id: Optional[Dict[int, Any]] = None,
+	*,
+	main_units: bool = False,
 ) -> List[Dict[str, Any]]:
 	"""هستهٔ محاسبه required/processed/remaining برای ردیف‌های فاکتور.
 
@@ -803,7 +805,14 @@ def _compute_line_quantities_core(
 	را ببیند. تعداد حوالهٔ ذخیره‌شده ابتدا به واحد اصلی و بعد به واحد ردیف فاکتور
 	برگردانده می‌شود تا حواله‌های قدیمی (کپی واحد فرعی) و جدید (واحد اصلی) یکی شوند.
 	"""
+	from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
 	products_by_id = products_by_id or {}
+	item_rows = [
+		row for row in item_rows
+		if row.product_id and not invoice_line_skips_warehouse(getattr(row, "extra_info", None) or {})
+	]
+	line_products = {int(row.id): int(row.product_id) for row in item_rows} if main_units else {}
 	processed_main_by_line: Dict[int, Decimal] = {}
 	orphan_main_by_product: Dict[int, Decimal] = {}
 
@@ -819,30 +828,29 @@ def _compute_line_quantities_core(
 			extra = extra_info_dict(getattr(wh_line, "extra_info", None))
 			product = products_by_id.get(int(wh_line.product_id)) if wh_line.product_id is not None else None
 			qty_main = inventory_quantity_to_main(qty, product, extra, strict=False)
-			line_id = extra.get("invoice_item_line_id")
-			if line_id is not None:
-				try:
-					processed_main_by_line[int(line_id)] = processed_main_by_line.get(int(line_id), Decimal(0)) + qty_main
-				except (TypeError, ValueError):
-					orphan_main_by_product[wh_line.product_id] = orphan_main_by_product.get(wh_line.product_id, Decimal(0)) + qty_main
+			line_id = _optional_line_int(extra.get("invoice_item_line_id"))
+			if line_id is not None and (not main_units or line_products.get(line_id) == wh_line.product_id):
+				processed_main_by_line[line_id] = processed_main_by_line.get(line_id, Decimal(0)) + qty_main
 			else:
 				orphan_main_by_product[wh_line.product_id] = orphan_main_by_product.get(wh_line.product_id, Decimal(0)) + qty_main
-
-	from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
 
 	line_quantities: List[Dict[str, Any]] = []
 	invoice_unit_by_entry: Dict[int, Optional[str]] = {}
 	for row in item_rows:
-		if not row.product_id:
-			continue
-		if invoice_line_skips_warehouse(getattr(row, "extra_info", None) or {}):
-			continue
 		product = products_by_id.get(int(row.product_id))
 		invoice_extra = extra_info_dict(getattr(row, "extra_info", None))
 		invoice_unit = invoice_extra.get("unit")
 		required = Decimal(str(row.quantity or 0))
 		processed_main = processed_main_by_line.get(int(row.id), Decimal(0))
-		processed = quantity_main_to_line(processed_main, product, invoice_unit, strict=False)
+		if main_units:
+			# Match the persisted Numeric(18, 6) warehouse movement, including its rounding.
+			required = inventory_quantity_to_main(required, product, invoice_extra).quantize(
+				_WAREHOUSE_QTY_EPSILON, rounding=ROUND_HALF_UP,
+			)
+			processed = processed_main
+			invoice_unit = "main"
+		else:
+			processed = quantity_main_to_line(processed_main, product, invoice_unit, strict=False)
 		remaining = required - processed
 		entry_index = len(line_quantities)
 		invoice_unit_by_entry[entry_index] = invoice_unit
@@ -851,9 +859,11 @@ def _compute_line_quantities_core(
 				"invoice_item_line_id": int(row.id),
 				"product_id": int(row.product_id),
 				"unit": invoice_unit,
-				"required_quantity": float(required),
-				"processed_quantity": float(processed),
-				"remaining_quantity": float(remaining) if remaining > _WAREHOUSE_QTY_EPSILON else 0.0,
+				"required_quantity": required if main_units else float(required),
+				"processed_quantity": processed if main_units else float(processed),
+				"remaining_quantity": max(Decimal(0), remaining) if main_units else (
+					float(remaining) if remaining > _WAREHOUSE_QTY_EPSILON else 0.0
+				),
 			}
 		)
 
@@ -876,9 +886,11 @@ def _compute_line_quantities_core(
 			take_line = quantity_main_to_line(take_main, product, invoice_unit, strict=False)
 			proc += take_line
 			left_main -= take_main
-			entry["processed_quantity"] = float(proc)
+			entry["processed_quantity"] = proc if main_units else float(proc)
 			rem = req - proc
-			entry["remaining_quantity"] = float(rem) if rem > _WAREHOUSE_QTY_EPSILON else 0.0
+			entry["remaining_quantity"] = max(Decimal(0), rem) if main_units else (
+				float(rem) if rem > _WAREHOUSE_QTY_EPSILON else 0.0
+			)
 
 	return line_quantities
 
@@ -887,18 +899,19 @@ def compute_invoice_line_quantities(
 	db: Session,
 	business_id: int,
 	invoice: Document,
+	*,
+	main_units: bool = False,
 ) -> List[Dict[str, Any]]:
 	"""مقادیر مورد نیاز، پردازش‌شده و باقی‌مانده برای هر ردیف فاکتور (بر اساس invoice_item_line_id)."""
 	from adapters.db.models.invoice_item_line import InvoiceItemLine
 
-	item_rows = (
+	items = (
 		db.query(InvoiceItemLine)
 		.filter(InvoiceItemLine.document_id == invoice.id)
 		.order_by(InvoiceItemLine.id.asc())
-		.all()
 	)
 
-	warehouse_docs = (
+	documents = (
 		db.query(WarehouseDocument)
 		.options(joinedload(WarehouseDocument.lines))
 		.filter(
@@ -908,14 +921,19 @@ def compute_invoice_line_quantities(
 				WarehouseDocument.source_document_id == invoice.id,
 			)
 		)
-		.all()
 	)
+	if main_units:
+		# Called after taking the invoice lock. Discard cached quantities and draft statuses.
+		items = items.populate_existing()
+		documents = documents.filter(WarehouseDocument.status == "posted", counts_toward_physical_stock()).populate_existing()
+	item_rows = items.all()
 
 	return _compute_line_quantities_core(
 		invoice.document_type,
 		item_rows,
-		warehouse_docs,
+		documents.all(),
 		products_by_id=_products_by_id_for_lines(db, business_id, item_rows),
+		main_units=main_units,
 	)
 
 
@@ -1368,6 +1386,17 @@ def _unique_instance_ids_from_line(ln: Dict[str, Any], extra: Dict[str, Any]) ->
 	return []
 
 
+def _lock_purchase_invoice(db: Session, business_id: int, invoice_id: int) -> Document | None:
+	from app.services.invoice_service import INVOICE_PURCHASE
+
+	# Serialize receipt writes without conflicting with foreign-key key-share locks.
+	return db.query(Document).filter(
+		Document.id == invoice_id,
+		Document.business_id == business_id,
+		Document.document_type == INVOICE_PURCHASE,
+	).with_for_update(key_share=True).populate_existing().first()
+
+
 def create_from_invoice(
 	db: Session,
 	business_id: int,
@@ -1378,6 +1407,12 @@ def create_from_invoice(
 	extra_data: Optional[Dict[str, Any]] = None,
 ) -> WarehouseDocument:
 	"""ساخت حواله انبار draft از روی فاکتور (بدون پست)."""
+	from app.services.invoice_service import INVOICE_PURCHASE
+
+	# Bulk creation may post in this transaction. Lock before the warehouse code counter.
+	if wh_doc_type == "receipt" and invoice.document_type == INVOICE_PURCHASE:
+		_lock_purchase_invoice(db, business_id, int(invoice.id))
+
 	invoice_extra_info = extra_info_dict(invoice.extra_info)
 	validate_invoice_warehouse_ownership(db, business_id, invoice_extra_info, lines)
 	fy = _get_current_fiscal_year(db, business_id)
@@ -2551,6 +2586,17 @@ def create_linked_warehouse_document_bulk(
 	return wh
 
 
+def _lock_purchase_receipt_invoice(db: Session, wh: WarehouseDocument) -> Document | None:
+	if wh.doc_type != "receipt" or wh.source_type != "invoice" or not wh.source_document_id:
+		return None
+
+	# Lock the shared purchase before reading draft lines, stock, or the GRNI balance.
+	invoice = _lock_purchase_invoice(db, int(wh.business_id), int(wh.source_document_id))
+	if invoice is not None:
+		db.refresh(wh)
+	return invoice
+
+
 def update_warehouse_document(
 	db: Session,
 	business_id: int,
@@ -2564,6 +2610,8 @@ def update_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	if wh.status == "draft":
+		_lock_purchase_receipt_invoice(db, wh)
 	
 	# حواله‌های draft و posted قابل ویرایش هستند
 	# حواله‌های cancelled قابل ویرایش نیستند
@@ -3408,6 +3456,8 @@ def update_warehouse_document_line(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	if wh.status == "draft":
+		_lock_purchase_receipt_invoice(db, wh)
 	
 	if wh.status != "draft":
 		raise ApiError("NOT_EDITABLE", "فقط حواله‌های draft قابل ویرایش هستند", http_status=400)
@@ -3487,6 +3537,36 @@ def update_warehouse_document_line(
 	return wline
 
 
+def _validate_purchase_receipt_post_limit(
+	db: Session, invoice: Document, lines: list[WarehouseDocumentLine]
+) -> None:
+	business_id = int(invoice.business_id)
+	quantities = compute_invoice_line_quantities(db, business_id, invoice, main_units=True)
+	by_line = {entry["invoice_item_line_id"]: entry for entry in quantities}
+	products = _products_by_id_for_lines(db, business_id, lines)
+	requested_by_line: dict[int, Decimal] = defaultdict(Decimal)
+	for index, line in enumerate(lines, start=1):
+		if line.movement != "in" or line.quantity <= 0:
+			continue
+		pid = int(line.product_id)
+		entry = by_line.get(_optional_line_int(extra_info_dict(line.extra_info).get("invoice_item_line_id")))
+		if entry is None or entry["product_id"] != pid:
+			entry = _invoice_quantity_entry(quantities, None, pid)
+		requested = _warehouse_line_qty_main(line, products)
+		remaining = Decimal(0)
+		if entry is not None:
+			line_id = entry["invoice_item_line_id"]
+			requested_by_line[line_id] += requested
+			requested = requested_by_line[line_id]
+			remaining = entry["remaining_quantity"]
+		if requested > remaining:
+			raise ApiError(
+				"QUANTITY_EXCEEDS_REMAINING",
+				f"خط {index}: تعداد ({requested}) از باقی‌مانده ({remaining}) در واحد اصلی بیشتر است",
+				http_status=400,
+			)
+
+
 def post_warehouse_document(
 	db: Session,
 	wh_id: int,
@@ -3512,6 +3592,7 @@ def post_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	purchase_invoice = _lock_purchase_receipt_invoice(db, wh) if wh.status not in ("posted", "cancelled") else None
 	if wh.status == "posted":
 		return {"id": wh.id, "status": wh.status}
 	if (wh.status or "").strip().lower() == "cancelled":
@@ -3530,16 +3611,21 @@ def post_warehouse_document(
 		if transfer_currency is None:
 			raise ApiError("CURRENCY_NOT_FOUND", "ارز پایه کسب‌وکار یافت نشد", http_status=404)
 
-	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
+	lines_query = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id)
+	if purchase_invoice is not None:
+		lines_query = lines_query.populate_existing()
+	lines = lines_query.all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	if purchase_invoice is not None:
+		_validate_purchase_receipt_post_limit(db, purchase_invoice, lines)
 	if wh.doc_type == "transfer":
 		from app.services.variant_allocation_service import (
 			assert_transfer_document_allocations_match,
 		)
 
 		assert_transfer_document_allocations_match(db, lines)
-	if wh.source_type == "invoice" and wh.doc_type == "receipt" and wh.source_document_id:
+	if purchase_invoice is None and wh.source_type == "invoice" and wh.doc_type == "receipt" and wh.source_document_id:
 		from app.services.woo_return_source_service import STOCK_KEY, validate_woo_return_receipt
 
 		invoice = db.get(Document, wh.source_document_id)
@@ -4515,6 +4601,8 @@ def delete_warehouse_document(db: Session, business_id: int, wh_id: int) -> bool
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	if wh.status == "draft":
+		_lock_purchase_receipt_invoice(db, wh)
 	
 	if wh.status != "draft":
 		raise ApiError("NOT_DELETABLE", "فقط حواله‌های draft قابل حذف هستند", http_status=400)
@@ -4674,6 +4762,8 @@ def cancel_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	if wh.status == "posted":
+		_lock_purchase_receipt_invoice(db, wh)
 	if wh.doc_type in ("adjustment", "transfer"):
 		db.refresh(wh)
 	
