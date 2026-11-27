@@ -57,6 +57,7 @@ from app.services.invoice_profit_costing import (
     inventory_line_unit_cost_main_base,
     stamp_sales_return_in_layer_costs,
 )
+from app.services.warehouse_ownership_service import validate_invoice_warehouse_ownership
 import jdatetime
 import io
 import csv
@@ -7175,6 +7176,7 @@ def create_invoice(
         ln["extra_info"] = info
     from app.services.fixed_asset_service import prepare_invoice_capital_lines
 
+    validate_invoice_warehouse_ownership(db, business_id, header_extra, lines_input)
     prepare_invoice_capital_lines(db, business_id, invoice_type, lines_input)
     _apply_invoice_missing_line_warehouse_policy(
         db,
@@ -8966,6 +8968,10 @@ def update_invoice(
     from app.services.woo_proforma_service import prepare_woo_proforma_finalization
 
     data = prepare_woo_proforma_finalization(db, document, data, inv_type)
+    business_id = int(document.business_id)
+    validate_invoice_warehouse_ownership(
+        db, business_id, data.get("extra_info"), data.get("lines") or []
+    )
     preserve_issue = _woo_posted_issue_update(db, document, data, inv_type)
     if preserve_issue and isinstance(data.get("description"), str):
         document.description = data["description"]
@@ -9304,6 +9310,8 @@ def update_invoice(
         existing_invoice_id=int(document.id),
     )
     _doc_ex_work = dict(document.extra_info or {})
+    # A full rewrite can inherit a legacy header or derive new references from production data.
+    validate_invoice_warehouse_ownership(db, business_id, _doc_ex_work, lines_input)
     _apply_invoice_missing_line_warehouse_policy(
         db,
         int(document.business_id),

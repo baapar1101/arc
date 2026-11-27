@@ -12,6 +12,11 @@ from sqlalchemy import Integer, String, and_, cast, exists, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 
+from app.services.warehouse_ownership_service import (
+	require_owned_warehouses,
+	validate_invoice_warehouse_ownership,
+)
+
 logger = logging.getLogger(__name__)
 
 from adapters.db.models.warehouse_document import WarehouseDocument
@@ -39,6 +44,7 @@ from app.services.invoice_unit_conversion_service import (
 	quantity_main_to_line,
 	warehouse_payload_quantity_to_main,
 )
+
 
 def _attach_variant_allocations_for_warehouse_line(
 	db: Session,
@@ -1406,11 +1412,13 @@ def create_from_invoice(
 	# Bulk creation may post in this transaction. Lock before the warehouse code counter.
 	if wh_doc_type == "receipt" and invoice.document_type == INVOICE_PURCHASE:
 		_lock_purchase_invoice(db, business_id, int(invoice.id))
+
+	invoice_extra_info = extra_info_dict(invoice.extra_info)
+	validate_invoice_warehouse_ownership(db, business_id, invoice_extra_info, lines)
 	fy = _get_current_fiscal_year(db, business_id)
 	
 	# خواندن انبار کلی از سطح سند فاکتور (extra_info.warehouse_id)
 	# این انبار به سطح سند حواله منتقل می‌شود
-	invoice_extra_info = invoice.extra_info or {}
 	invoice_warehouse_id = invoice_extra_info.get("warehouse_id")
 	warehouse_id_from = None
 	warehouse_id_to = None
@@ -3633,6 +3641,11 @@ def post_warehouse_document(
 				raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
 			validate_woo_return_receipt(db, invoice, wh, lines)
 
+	require_owned_warehouses(
+		db,
+		int(wh.business_id),
+		[wh.warehouse_id_from, wh.warehouse_id_to, *(line.warehouse_id for line in lines)],
+	)
 	production_order_ids: set[int] = set()
 	for line in lines:
 		try:
