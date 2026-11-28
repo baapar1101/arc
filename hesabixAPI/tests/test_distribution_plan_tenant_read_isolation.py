@@ -431,3 +431,20 @@ def test_return_request_accepts_valid_same_tenant_visit(db, monkeypatch):
     assert created["visit_id"] == 32
     assert created["person_id"] == 707
     assert db.query(DistributionReturnRequest).count() == 1
+
+
+@pytest.mark.parametrize("payload", [
+    {"customer_class": "A"}, {"visit_frequency": "monthly"},
+    {"cycle_offset": 2}, {"owner_user_id": 21},
+])
+def test_locked_customer_profile_fields_are_rejected_before_write(db, payload):
+    from app.core.responses import ApiError
+    db.add(DistributionDailyPlanLock(
+        business_id=10, user_id=20, plan_date=DAY, is_locked=True,
+        published_by_user_id=1, published_at=datetime.utcnow(),
+    ))
+    db.commit()
+    with pytest.raises(ApiError) as error:
+        field_ops.upsert_customer_profile(db, 10, 707, payload)
+    assert error.value.status_code == 409
+    assert db.query(DistributionCustomerProfile).count() == 0
