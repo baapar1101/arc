@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import false as sql_false
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
@@ -514,6 +514,76 @@ def plan_lock_to_dict(row: Optional[DistributionDailyPlanLock]) -> Dict[str, Any
 	}
 
 
+_PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE = 174021
+
+
+def _serialize_distribution_plan_mutation(db: Session, business_id: int) -> None:
+	"""Serialize publication and related edits per business until commit/rollback.
+
+	PostgreSQL uses an advisory transaction lock; SQL Server uses an exclusive
+	transaction-owned application lock in the current database. Both protect the
+	read/check/write sequence from concurrent writes using this helper. SQLite
+	is used only for isolated unit tests and has no cross-session lock here.
+	"""
+	dialect = db.get_bind().dialect.name
+	if dialect == "sqlite":
+		return
+	if dialect == "postgresql":
+		db.execute(
+			text("SELECT pg_advisory_xact_lock(:namespace, :business_id)"),
+			{
+				"namespace": _PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE,
+				"business_id": int(business_id),
+			},
+		).scalar()
+		return
+	if dialect == "mssql":
+		# SET NOCOUNT keeps the stored-procedure batch to one result set,
+		# compatible with the pymssql/pyodbc SQLAlchemy mssql dialects.
+		result = db.execute(
+			text("""
+				SET NOCOUNT ON;
+				DECLARE @distribution_lock_result int;
+				BEGIN TRY
+					EXEC @distribution_lock_result = sys.sp_getapplock
+						@Resource = :resource,
+						@LockMode = 'Exclusive',
+						@LockOwner = 'Transaction',
+						@LockTimeout = 10000;
+				END TRY
+				BEGIN CATCH
+					SET NOCOUNT OFF;
+					THROW;
+				END CATCH;
+				-- NOCOUNT is connection-scoped. Leaving it ON makes pymssql
+				-- report rowcount=-1 for subsequent ORM UPDATE statements,
+				-- causing SQLAlchemy to raise StaleDataError on valid writes.
+				SET NOCOUNT OFF;
+				SELECT @distribution_lock_result;
+			"""),
+			{
+				"resource": (
+					f"hesabix:distribution:plan-mutation:"
+					f"{_PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE}:{int(business_id)}"
+				),
+			},
+		).scalar_one()
+		if result is None or int(result) < 0:
+			raise ApiError(
+				"CONFLICT",
+				"Unable to obtain the distribution plan transaction lock; retry safely",
+				http_status=409,
+			)
+		return
+	# Never silently bypass coordination on an untested production dialect.
+	raise ApiError(
+		"SERVICE_UNAVAILABLE",
+		"Distribution plan transaction lock is unavailable for this database",
+		http_status=503,
+	)
+
+
+
 def _upsert_plan_lock_row(
 	db: Session,
 	business_id: int,
@@ -540,6 +610,8 @@ def _upsert_plan_lock_row(
 		)
 		db.add(row)
 	else:
+		if row.is_locked:
+			raise ApiError("CONFLICT", "Existing locked plan must be explicitly unpublished before republishing", http_status=409)
 		row.is_locked = bool(locked)
 		row.published_by_user_id = int(actor_user_id)
 		row.published_at = now
@@ -556,11 +628,12 @@ def publish_daily_plan(
 	target_user_id: int,
 	plan_date: date,
 	*,
-	locked: bool = True,
+	locked: bool = False,
 	notes: Optional[str] = None,
 	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	if ctx is not None:
 		assert_user_visible_for_ctx(
 			db,
@@ -570,6 +643,10 @@ def publish_daily_plan(
 			write=True,
 			message="نشر برنامه این ویزیتور برای شما مجاز نیست.",
 		)
+	if locked:
+		raise ApiError("VALIDATION_ERROR", "Locked publication is unavailable until snapshot and mutation guards are integrated", http_status=400)
+	if int(target_user_id) not in assigned_user_ids_for_date(db, business_id, plan_date):
+		raise ApiError("VALIDATION_ERROR", "Visitor has no active route assignment for this business/date", http_status=400)
 	row = _upsert_plan_lock_row(
 		db, business_id, actor_user_id, target_user_id, plan_date, locked=locked, notes=notes,
 	)
@@ -581,8 +658,11 @@ def publish_daily_plan(
 def assigned_user_ids_for_date(db: Session, business_id: int, on_date: date) -> set:
 	rows = (
 		db.query(DistributionRouteAssignment.user_id)
+		.join(DistributionRoute, DistributionRoute.id == DistributionRouteAssignment.route_id)
 		.filter(
 			DistributionRouteAssignment.business_id == business_id,
+			DistributionRoute.business_id == business_id,
+			DistributionRoute.is_active.is_(True),
 			DistributionRouteAssignment.valid_from <= on_date,
 			or_(
 				DistributionRouteAssignment.valid_to.is_(None),
@@ -601,17 +681,20 @@ def publish_daily_plans_for_date(
 	actor_user_id: int,
 	plan_date: date,
 	*,
-	locked: bool = True,
+	locked: bool = False,
 	notes: Optional[str] = None,
 	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	"""نشر برنامه برای همهٔ ویزیتورهای تخصیص‌یافته در آن روز (محدود به قلمرو ناظر)."""
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	ids = assigned_user_ids_for_date(db, business_id, plan_date)
 	if ctx is not None:
 		scoped = scoped_user_ids_for_ctx(db, business_id, ctx)
 		if scoped is not None:
 			ids = {uid for uid in ids if uid in scoped}
+	if locked:
+		raise ApiError("VALIDATION_ERROR", "Locked publication is unavailable until snapshot and mutation guards are integrated", http_status=400)
 	items: List[Dict[str, Any]] = []
 	rows: List[DistributionDailyPlanLock] = []
 	for uid in sorted(ids):
@@ -641,6 +724,7 @@ def unpublish_daily_plan(
 	ctx: Optional[AuthContext] = None,
 ) -> None:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	if ctx is not None:
 		assert_user_visible_for_ctx(
 			db,
