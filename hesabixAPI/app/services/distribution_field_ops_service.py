@@ -169,9 +169,12 @@ def upsert_customer_profile(
 	db: Session, business_id: int, person_id: int, payload: Dict[str, Any],
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
+	dist_svc._serialize_distribution_plan_mutation(db, business_id)
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if {"customer_class", "visit_frequency", "cycle_offset", "owner_user_id"}.intersection(payload):
+		dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	row = get_profile(db, business_id, person_id)
 	if not row:
 		row = DistributionCustomerProfile(business_id=business_id, person_id=person_id)
@@ -441,7 +444,9 @@ def enrich_daily_plan(
 	plan_date: date,
 	items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Daily-plan reads must not commit: publication holds a transaction-level
+	# PostgreSQL advisory lock until the plan and its snapshot are persisted.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	carry = bool(getattr(settings, "carry_over_missed_visits", True))
 	lookback = max(1, int(getattr(settings, "carry_over_days", 7) or 7))
 
@@ -461,10 +466,20 @@ def enrich_daily_plan(
 
 	for asn in assignments:
 		route = db.query(DistributionRoute).filter(DistributionRoute.id == asn.route_id).first()
-		if not route or not route.is_active:
+		if not route or route.business_id != business_id or not route.is_active:
 			continue
 		stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
+		valid_person_ids = {
+			int(row[0]) for row in db.query(Person.id).filter(
+				Person.business_id == business_id,
+				Person.id.in_([s.person_id for s in stops]),
+			).all()
+		}
 		for s in stops:
+			# Do not schedule a foreign-business customer via an invalid
+			# legacy stop reference; keep any valid local stops intact.
+			if int(s.person_id) not in valid_person_ids:
+				continue
 			stop_meta[int(s.id)] = s
 			profile = get_profile(db, business_id, int(s.person_id))
 			freq = getattr(s, "frequency", None) or (profile.visit_frequency if profile else "weekly")
@@ -483,11 +498,19 @@ def enrich_daily_plan(
 		done = _completed_person_days(db, business_id, target_user_id, plan_date - timedelta(days=lookback), plan_date)
 		for asn in assignments:
 			route = db.query(DistributionRoute).filter(DistributionRoute.id == asn.route_id).first()
-			if not route or not route.is_active:
+			if not route or route.business_id != business_id or not route.is_active:
 				continue
 			stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
+			valid_person_ids = {
+				int(row[0]) for row in db.query(Person.id).filter(
+					Person.business_id == business_id,
+					Person.id.in_([s.person_id for s in stops]),
+				).all()
+			}
 			for s in stops:
 				pid = int(s.person_id)
+				if pid not in valid_person_ids:
+					continue
 				if pid in seen_persons:
 					continue
 				profile = get_profile(db, business_id, pid)
@@ -539,7 +562,8 @@ def _stop_plan_item(
 	customer_class: Optional[str],
 	frequency: Optional[str],
 ) -> Dict[str, Any]:
-	person = db.query(Person).filter(Person.id == s.person_id).first()
+	# Never expose a person from another tenant through a corrupt route stop.
+	person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == route.business_id).first()
 	pname = (person.alias_name or "").strip() if person else None
 	plats = person_coords(person) if person else (None, None)
 	day_sort = s.sort_order
@@ -996,11 +1020,33 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 		raise ApiError("FORBIDDEN", "user required", http_status=403)
 	today = business_today(business_id)
 	plan = dist_svc.get_daily_plan(db, business_id, uid, today)
-	settings = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
-	person_ids = [int(it["person_id"]) for it in plan.get("items") or [] if it.get("person_id")]
+	# Offline preparation is read-only. Never commit an implicit settings
+	# initialization before verifying a persisted plan snapshot.
+	settings = dist_svc.settings_for_read(db, business_id)
+	plan_items = plan.get("items")
+	if not isinstance(plan_items, list):
+		raise ApiError("CONFLICT", "Offline daily plan must contain a valid item list", http_status=409)
+	try:
+		person_ids = list(dict.fromkeys(int(item["person_id"]) for item in plan_items))
+	except (KeyError, TypeError, ValueError, OverflowError):
+		raise ApiError("CONFLICT", "Offline daily plan contains an invalid customer", http_status=409)
+	if any(person_id <= 0 for person_id in person_ids):
+		raise ApiError("CONFLICT", "Offline daily plan contains an invalid customer", http_status=409)
 	persons = []
 	if person_ids:
-		for p in db.query(Person).filter(Person.id.in_(person_ids)).all():
+		# Old locked snapshots may contain invalid cross-business references.
+		# Validate the complete list before returning any offline pack.
+		local_people = db.query(Person).filter(
+			Person.business_id == business_id,
+			Person.id.in_(person_ids),
+		).all()
+		if {int(p.id) for p in local_people} != set(person_ids):
+			raise ApiError(
+				"CONFLICT",
+				"Daily plan refers to a customer outside this business",
+				http_status=409,
+			)
+		for p in local_people:
 			persons.append({
 				"id": p.id,
 				"name": (p.alias_name or "").strip(),
@@ -1062,6 +1108,8 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 		"promotions": promos,
 		"reason_catalog": reason_catalog(),
 	}
+
+
 
 
 def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:

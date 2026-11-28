@@ -10,6 +10,8 @@ if (!defined('WPINC')) {
 	die;
 }
 
+require_once __DIR__ . '/class-hesabix-v2-decimal.php';
+
 class Hesabix_V2_Gateway_Fee_Service
 {
 	const FEE_LINE_SERVICE = 'service';
@@ -286,11 +288,11 @@ class Hesabix_V2_Gateway_Fee_Service
 			$f = 1.0;
 		}
 
-		$fee_total = Hesabix_V2_Validation::sanitize_price((float) $fee_item->get_total() * $f);
+		$fee_total = Hesabix_V2_Decimal::multiply($fee_item->get_total(), $f);
 		$fee_tax = method_exists($fee_item, 'get_total_tax')
-			? Hesabix_V2_Validation::sanitize_price((float) $fee_item->get_total_tax() * $f)
-			: 0.0;
-		if (abs($fee_total) < 0.00001 && abs($fee_tax) < 0.00001) {
+			? Hesabix_V2_Decimal::multiply($fee_item->get_total_tax(), $f)
+			: '0';
+		if ($fee_total === '0' && $fee_tax === '0') {
 			return;
 		}
 
@@ -305,11 +307,9 @@ class Hesabix_V2_Gateway_Fee_Service
 		if ($fee_total < 0 && self::negative_fee_uses_deduction_adjustment()) {
 			$account_id = self::resolve_fee_deduction_account_id();
 			if ($account_id > 0) {
-				$abs_net = Hesabix_V2_Validation::sanitize_price(-(float) $fee_total);
-				$tax_rate = 0.0;
-				if ($abs_net > 0 && $fee_tax > 0) {
-					$tax_rate = ((float) $fee_tax / (float) $abs_net) * 100;
-				}
+				$abs_net = Hesabix_V2_Decimal::subtract('0', $fee_total);
+				$tax = self::adjustment_tax_contract($abs_net, Hesabix_V2_Decimal::subtract('0', $fee_tax));
+				$tax_rate = $tax['rate'];
 				$row = array(
 					'kind' => 'deduction',
 					'amount' => $abs_net,
@@ -322,8 +322,8 @@ class Hesabix_V2_Gateway_Fee_Service
 					$row['exclude_from_profit'] = true;
 				}
 				$invoice_adjustments[] = $row;
-				$adjustment_net -= (float) $abs_net;
-				$adjustment_tax -= (float) $fee_tax;
+				$adjustment_net = Hesabix_V2_Decimal::subtract($adjustment_net, $abs_net);
+				$adjustment_tax = Hesabix_V2_Decimal::subtract($adjustment_tax, $tax['amount']);
 				return;
 			}
 			Hesabix_V2_Log_Service::warning(
@@ -335,13 +335,11 @@ class Hesabix_V2_Gateway_Fee_Service
 		if ($fee_total > 0 && self::positive_fee_uses_account_adjustment()) {
 			$account_id = self::resolve_fee_income_account_id();
 			if ($account_id > 0) {
-				$tax_rate = 0.0;
-				if ($fee_total > 0 && $fee_tax > 0) {
-					$tax_rate = ((float) $fee_tax / (float) $fee_total) * 100;
-				}
+				$tax = self::adjustment_tax_contract($fee_total, $fee_tax);
+				$tax_rate = $tax['rate'];
 				$row = array(
 					'kind' => 'addition',
-					'amount' => (float) $fee_total,
+					'amount' => $fee_total,
 					'tax_rate' => $tax_rate,
 					'account_id' => $account_id,
 					'description' => sanitize_text_field(mb_substr($fee_label, 0, 500)),
@@ -351,8 +349,8 @@ class Hesabix_V2_Gateway_Fee_Service
 					$row['exclude_from_profit'] = true;
 				}
 				$invoice_adjustments[] = $row;
-				$adjustment_net += (float) $fee_total;
-				$adjustment_tax += (float) $fee_tax;
+				$adjustment_net = Hesabix_V2_Decimal::add($adjustment_net, $fee_total);
+				$adjustment_tax = Hesabix_V2_Decimal::add($adjustment_tax, $tax['amount']);
 				return;
 			}
 			Hesabix_V2_Log_Service::warning(
@@ -362,6 +360,30 @@ class Hesabix_V2_Gateway_Fee_Service
 		}
 
 		self::append_fee_service_line($order, $fee_item, $f, $fee_total, $fee_tax, $fee_label, $lines);
+	}
+
+	/**
+	 * Match the API: positive net, rate 0–100, per-row half-up tax cents.
+	 * Reject amounts that cannot be represented rather than shifting tax.
+	 */
+	public static function adjustment_tax_contract($net, $tax)
+	{
+		$net = Hesabix_V2_Decimal::add($net, '0');
+		$tax = Hesabix_V2_Decimal::add($tax, '0');
+		if (Hesabix_V2_Decimal::compare($net, '0') <= 0
+			|| Hesabix_V2_Decimal::compare($tax, '0') < 0
+			|| Hesabix_V2_Decimal::compare($tax, $net) > 0
+			|| Hesabix_V2_Decimal::round($net, 2) !== $net) {
+			throw new RuntimeException('WooCommerce adjustment cannot be represented by the accounting API.');
+		}
+		$tax_cents = Hesabix_V2_Decimal::round($tax, 2);
+		$rate = (float) Hesabix_V2_Decimal::divide(Hesabix_V2_Decimal::multiply($tax, '100'), $net);
+		$encoded = json_encode($rate);
+		if ($encoded === false || $rate < 0 || $rate > 100
+			|| Hesabix_V2_Decimal::round(Hesabix_V2_Decimal::multiply(Hesabix_V2_Decimal::multiply($net, $encoded), '0.01'), 2) !== $tax_cents) {
+			throw new RuntimeException('WooCommerce adjustment tax cannot be represented by the accounting API.');
+		}
+		return array('rate' => $rate, 'amount' => $tax_cents);
 	}
 
 	/**
@@ -390,9 +412,9 @@ class Hesabix_V2_Gateway_Fee_Service
 		if ($fee_total < 0) {
 			$line_extra = array(
 				'unit_price' => 0,
-				'line_discount' => Hesabix_V2_Validation::sanitize_price(-(float) $fee_total),
+				'line_discount' => Hesabix_V2_Decimal::subtract('0', $fee_total),
 				'tax_amount' => $fee_tax,
-				'line_total' => $fee_total + $fee_tax,
+				'line_total' => Hesabix_V2_Decimal::add($fee_total, $fee_tax),
 				'unit' => 'عدد',
 				'unit_price_source' => 'base',
 				'discount_type' => 'amount',
@@ -408,7 +430,7 @@ class Hesabix_V2_Gateway_Fee_Service
 				'unit_price' => $fee_total,
 				'line_discount' => 0,
 				'tax_amount' => $fee_tax,
-				'line_total' => $fee_total + $fee_tax,
+				'line_total' => Hesabix_V2_Decimal::add($fee_total, $fee_tax),
 				'unit' => 'عدد',
 				'unit_price_source' => 'base',
 				'discount_type' => 'amount',
@@ -430,6 +452,71 @@ class Hesabix_V2_Gateway_Fee_Service
 			'description' => sanitize_text_field(mb_substr($fee_label, 0, 500)),
 			'extra_info' => $line_extra,
 		);
+	}
+
+	/**
+	 * Exact invoice-currency commission; retain the legacy public method and
+	 * float filter contract for third-party WooCommerce extensions.
+	 */
+	public static function resolve_invoice_commission($order, $payment_amount, $amount_factor, array $policy)
+	{
+		$sync = self::get_sync();
+		$mode = $sync['gateway_settlement_mode'];
+		$base = Hesabix_V2_Decimal::add($payment_amount, '0');
+		if (Hesabix_V2_Decimal::compare($base, '0') <= 0) {
+			return '0';
+		}
+		$f = (float) $amount_factor;
+		if (!is_finite($f) || $f <= 0) {
+			$f = 1.0;
+		}
+		$commission = '0';
+		if ($mode === self::SETTLEMENT_PERCENT) {
+			$commission = Hesabix_V2_Decimal::multiply(Hesabix_V2_Decimal::multiply($base, $sync['gateway_settlement_percent']), '0.01');
+		} elseif ($mode === self::SETTLEMENT_FIXED) {
+			$commission = Hesabix_V2_Decimal::multiply($sync['gateway_settlement_fixed'], $f);
+		} elseif ($mode === self::SETTLEMENT_RULES) {
+			$method = method_exists($order, 'get_payment_method') ? sanitize_key((string) $order->get_payment_method()) : '';
+			foreach ($sync['gateway_settlement_rules'] as $rule) {
+				if ($rule['payment_method'] === '' || ($method !== '' && $rule['payment_method'] !== $method)) {
+					continue;
+				}
+				$commission = Hesabix_V2_Decimal::add(
+					Hesabix_V2_Decimal::multiply(Hesabix_V2_Decimal::multiply($base, $rule['percent']), '0.01'),
+					Hesabix_V2_Decimal::multiply($rule['fixed'], $f)
+				);
+				break;
+			}
+		} elseif ($mode === self::SETTLEMENT_ORDER_META) {
+			$keys = array($sync['gateway_settlement_meta_key'], '_gateway_settlement_fee', '_transaction_fee', 'gateway_fee', '_wc_gateway_fee', '_payment_fee');
+			foreach (array_unique($keys) as $key) {
+				if ($key === '') {
+					continue;
+				}
+				$raw = $order->get_meta($key, true);
+				if (is_numeric($raw) && Hesabix_V2_Decimal::compare($raw, '0') > 0) {
+					$commission = Hesabix_V2_Decimal::multiply($raw, $f);
+					break;
+				}
+			}
+		}
+		// Bound both built-in results and the final extension result.
+		$commission = self::bound_invoice_commission($commission, $base);
+		if (has_filter('hesabix_v2_order_gateway_commission') !== false) {
+			$commission = apply_filters('hesabix_v2_order_gateway_commission', (float) $commission, $order, (float) $base, $f, $sync);
+		}
+		$commission = self::bound_invoice_commission($commission, $base);
+		$commission = Hesabix_V2_Decimal::money($commission, $policy);
+		return self::bound_invoice_commission($commission, $base);
+	}
+
+	private static function bound_invoice_commission($amount, $base)
+	{
+		$amount = Hesabix_V2_Decimal::add($amount, '0');
+		if (Hesabix_V2_Decimal::compare($amount, '0') < 0) {
+			return '0';
+		}
+		return Hesabix_V2_Decimal::compare($amount, $base) > 0 ? $base : $amount;
 	}
 
 	/**

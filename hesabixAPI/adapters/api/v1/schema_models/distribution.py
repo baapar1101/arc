@@ -360,7 +360,7 @@ class DailyPlanPublishPayload(BaseModel):
 	plan_date: Optional[str] = Field(None, description="YYYY-MM-DD")
 	target_user_id: Optional[int] = Field(None, gt=0)
 	all_assigned: bool = False
-	locked: bool = True
+	locked: bool = False
 	notes: Optional[str] = None
 
 

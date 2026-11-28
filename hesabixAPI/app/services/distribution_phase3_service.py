@@ -624,11 +624,13 @@ def apply_route_optimize(
 	start_lng: Optional[float] = None,
 ) -> Dict[str, Any]:
 	"""بهینه‌سازی و ذخیرهٔ ترتیب فقط برای همان روز (بدون بازنویسی sort_order کاتالوگ)."""
+	dist_svc._ensure_plugin(db, business_id)
+	# Lock before reading the catalog, not just before storing its result.
+	dist_svc.assert_plan_unlocked_for_route(db, business_id, route_id, plan_date)
 	result = optimize_route_plan(db, business_id, route_id, plan_date, start_lat, start_lng)
 	items = result.get("items") or []
 	if not result.get("optimized"):
 		return {**result, "persisted": False, "persist_mode": "day_override"}
-	dist_svc.assert_plan_unlocked_for_route(db, business_id, route_id, plan_date)
 	route = db.query(DistributionRoute).filter(
 		DistributionRoute.id == route_id,
 		DistributionRoute.business_id == business_id,
@@ -645,15 +647,7 @@ def apply_route_optimize(
 			continue
 		day_map[str(int(sid))] = int(new_sort)
 	overrides[day_key] = day_map
-	# پاکسازی کلیدهای قدیمی‌تر از ۹۰ روز برای جلوگیری از رشد بی‌نهایت
-	try:
-		from datetime import timedelta
-
-		cutoff = (plan_date - timedelta(days=90)).isoformat()
-		overrides = {k: v for k, v in overrides.items() if isinstance(k, str) and k >= cutoff}
-		overrides[day_key] = day_map
-	except Exception:
-		pass
+	# Do not prune older overrides: a legacy locked plan may still rely on them.
 	route.plan_sort_overrides = overrides
 	route.updated_at = datetime.utcnow()
 	db.commit()
@@ -729,7 +723,9 @@ def optimize_route_plan(
 	for s in stops:
 		if not dist_svc._weekday_matches(plan_date, s.weekday):
 			continue
-		person = db.query(Person).filter(Person.id == s.person_id).first()
+		person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == business_id).first()
+		if person is None:
+			continue
 		lat, lng = person_coords(person) if person else (None, None)
 		items.append(
 			{
@@ -812,7 +808,7 @@ def get_team_map(
 
 	d = plan_date or business_today(business_id)
 	start_utc, end_utc = business_day_utc_bounds(business_id, d)
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	share_live = bool(getattr(settings, "share_live_location", False))
 
 	user_ids: set[int] = set()
@@ -888,15 +884,23 @@ def get_team_map(
 	for uid in sorted(user_ids):
 		visit = in_progress.get(uid) or latest_visit.get(uid)
 		person = None
+		safe_person_id = None
 		plats: Tuple[Optional[float], Optional[float]] = (None, None)
 		if visit:
-			person = db.query(Person).filter(Person.id == visit.person_id).first()
-			plats = person_coords(person) if person else (None, None)
-			if plats[0] is not None and plats[1] is not None and visit.person_id not in seen_customers:
-				seen_customers.add(int(visit.person_id))
+			# Old visits may reference a person in another business.
+			# Do not disclose their customer name, coordinates or ID.
+			person = db.query(Person).filter(
+				Person.id == visit.person_id,
+				Person.business_id == business_id,
+			).first()
+			if person is not None:
+				safe_person_id = int(person.id)
+				plats = person_coords(person)
+			if safe_person_id is not None and plats[0] is not None and plats[1] is not None and safe_person_id not in seen_customers:
+				seen_customers.add(safe_person_id)
 				customers.append(
 					{
-						"person_id": visit.person_id,
+						"person_id": safe_person_id,
 						"person_name": (person.alias_name or "").strip() if person else None,
 						"latitude": plats[0],
 						"longitude": plats[1],
@@ -943,7 +947,7 @@ def get_team_map(
 				"live_updated_at": updated_at.isoformat() + "Z" if updated_at else None,
 				"visit_id": current.id if current else (visit.id if visit else None),
 				"status": current.status if current else (visit.status if visit else None),
-				"person_id": (current.person_id if current else (visit.person_id if visit else None)),
+				"person_id": safe_person_id,
 				"person_name": (person.alias_name or "").strip() if person else None,
 				"customer_latitude": plats[0],
 				"customer_longitude": plats[1],
