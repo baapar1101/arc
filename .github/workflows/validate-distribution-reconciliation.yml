@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'hesabixAPI/app/services/distribution*.py'
+      - 'hesabixAPI/app/services/person_service.py'
       - 'hesabixAPI/adapters/db/models/distribution.py'
       - 'hesabixAPI/adapters/api/v1/schema_models/distribution.py'
       - 'hesabixAPI/tests/test_distribution*.py'
@@ -12,6 +13,7 @@ on:
       - integration/reconcile-master-20261125
     paths:
       - 'hesabixAPI/app/services/distribution*.py'
+      - 'hesabixAPI/app/services/person_service.py'
       - 'hesabixAPI/adapters/db/models/distribution.py'
       - 'hesabixAPI/adapters/api/v1/schema_models/distribution.py'
       - 'hesabixAPI/tests/test_distribution*.py'
@@ -37,4 +39,4 @@ jobs:
       - name: Compile changed services
         run: python -m compileall -q app/services/distribution_service.py app/services/distribution_field_ops_service.py tests/test_distribution_plan_tenant_read_isolation.py
       - name: Tenant isolation regressions
-        run: python -m pytest -q tests/test_distribution_plan_tenant_read_isolation.py tests/test_distribution_sqlserver_transaction_lock.py tests/test_distribution_publication_reconciliation.py
+        run: python -m pytest -q tests/test_distribution_plan_tenant_read_isolation.py tests/test_distribution_sqlserver_transaction_lock.py tests/test_distribution_publication_reconciliation.py tests/test_distribution_person_snapshot_guard.py
