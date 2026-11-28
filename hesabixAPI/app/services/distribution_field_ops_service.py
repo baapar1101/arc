@@ -169,9 +169,12 @@ def upsert_customer_profile(
 	db: Session, business_id: int, person_id: int, payload: Dict[str, Any],
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
+	dist_svc._serialize_distribution_plan_mutation(db, business_id)
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if {"customer_class", "visit_frequency", "cycle_offset", "owner_user_id"}.intersection(payload):
+		dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	row = get_profile(db, business_id, person_id)
 	if not row:
 		row = DistributionCustomerProfile(business_id=business_id, person_id=person_id)
