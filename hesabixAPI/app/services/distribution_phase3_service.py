@@ -624,11 +624,13 @@ def apply_route_optimize(
 	start_lng: Optional[float] = None,
 ) -> Dict[str, Any]:
 	"""بهینه‌سازی و ذخیرهٔ ترتیب فقط برای همان روز (بدون بازنویسی sort_order کاتالوگ)."""
+	dist_svc._ensure_plugin(db, business_id)
+	# Lock before reading the catalog, not just before storing its result.
+	dist_svc.assert_plan_unlocked_for_route(db, business_id, route_id, plan_date)
 	result = optimize_route_plan(db, business_id, route_id, plan_date, start_lat, start_lng)
 	items = result.get("items") or []
 	if not result.get("optimized"):
 		return {**result, "persisted": False, "persist_mode": "day_override"}
-	dist_svc.assert_plan_unlocked_for_route(db, business_id, route_id, plan_date)
 	route = db.query(DistributionRoute).filter(
 		DistributionRoute.id == route_id,
 		DistributionRoute.business_id == business_id,
@@ -645,15 +647,7 @@ def apply_route_optimize(
 			continue
 		day_map[str(int(sid))] = int(new_sort)
 	overrides[day_key] = day_map
-	# پاکسازی کلیدهای قدیمی‌تر از ۹۰ روز برای جلوگیری از رشد بی‌نهایت
-	try:
-		from datetime import timedelta
-
-		cutoff = (plan_date - timedelta(days=90)).isoformat()
-		overrides = {k: v for k, v in overrides.items() if isinstance(k, str) and k >= cutoff}
-		overrides[day_key] = day_map
-	except Exception:
-		pass
+	# Do not prune older overrides: a legacy locked plan may still rely on them.
 	route.plan_sort_overrides = overrides
 	route.updated_at = datetime.utcnow()
 	db.commit()
@@ -729,7 +723,9 @@ def optimize_route_plan(
 	for s in stops:
 		if not dist_svc._weekday_matches(plan_date, s.weekday):
 			continue
-		person = db.query(Person).filter(Person.id == s.person_id).first()
+		person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == business_id).first()
+		if person is None:
+			continue
 		lat, lng = person_coords(person) if person else (None, None)
 		items.append(
 			{
