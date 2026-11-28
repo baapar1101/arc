@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import false as sql_false
-from sqlalchemy import func, or_, text
+from sqlalchemy import and_, func, or_, text, true
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
@@ -81,7 +81,7 @@ def get_distribution_settings_row(db: Session, business_id: int) -> Optional[Dis
 	)
 
 
-def get_or_create_distribution_settings(db: Session, business_id: int) -> DistributionBusinessSettings:
+def get_or_create_distribution_settings(db: Session, business_id: int, *, commit: bool = True) -> DistributionBusinessSettings:
 	row = get_distribution_settings_row(db, business_id)
 	if row:
 		return row
@@ -100,7 +100,10 @@ def get_or_create_distribution_settings(db: Session, business_id: int) -> Distri
 		updated_at=datetime.utcnow(),
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return row
 
@@ -741,43 +744,108 @@ def unpublish_daily_plan(
 	db.commit()
 
 
-def assert_plan_unlocked_for_route(db: Session, business_id: int, route_id: int, plan_date: date) -> None:
-	settings = get_or_create_distribution_settings(db, business_id)
-	if not bool(getattr(settings, "lock_published_plans", False)):
-		return
-	assigns = (
-		db.query(DistributionRouteAssignment.user_id)
-		.filter(
-			DistributionRouteAssignment.business_id == business_id,
-			DistributionRouteAssignment.route_id == int(route_id),
-			DistributionRouteAssignment.valid_from <= plan_date,
-			or_(
-				DistributionRouteAssignment.valid_to.is_(None),
-				DistributionRouteAssignment.valid_to >= plan_date,
+def assert_route_has_no_locked_plans(
+	db: Session,
+	business_id: int,
+	route_id: int,
+	*,
+	plan_date: Optional[date] = None,
+) -> None:
+	"""Block edits affecting any locked visitor plan assigned to this route.
+
+	The catalog is currently shared across dates. Until immutable plan
+	snapshots are available, a lock on *any* assigned date protects the
+	underlying route, except a day-specific ordering override which only
+	checks its own date.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	q = (
+		db.query(DistributionDailyPlanLock.id)
+		.join(
+			DistributionRouteAssignment,
+			and_(
+				DistributionRouteAssignment.business_id == DistributionDailyPlanLock.business_id,
+				DistributionRouteAssignment.user_id == DistributionDailyPlanLock.user_id,
+				DistributionRouteAssignment.valid_from <= DistributionDailyPlanLock.plan_date,
+				or_(
+					DistributionRouteAssignment.valid_to.is_(None),
+					DistributionRouteAssignment.valid_to >= DistributionDailyPlanLock.plan_date,
+				),
 			),
 		)
-		.distinct()
-		.all()
-	)
-	uids = [int(r[0]) for r in assigns if r[0]]
-	if not uids:
-		return
-	locked = (
-		db.query(DistributionDailyPlanLock)
 		.filter(
 			DistributionDailyPlanLock.business_id == business_id,
-			DistributionDailyPlanLock.user_id.in_(uids),
-			DistributionDailyPlanLock.plan_date == plan_date,
-			DistributionDailyPlanLock.is_locked.is_(True),
+			DistributionRouteAssignment.route_id == route_id,
+			DistributionDailyPlanLock.is_locked == true(),
 		)
-		.first()
 	)
-	if locked:
+	if plan_date is not None:
+		q = q.filter(DistributionDailyPlanLock.plan_date == plan_date)
+	if q.first() is not None:
 		raise ApiError(
 			"CONFLICT",
-			"برنامهٔ این روز منتشر و قفل شده است؛ برای تغییر ترتیب ابتدا قفل را بردارید.",
+			"Route is used by a locked daily plan; unpublish before editing",
 			http_status=409,
 		)
+
+
+
+def assert_assignment_has_no_locked_plans(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	valid_from: date,
+	valid_to: Optional[date],
+) -> None:
+	"""Protect an already-published visitor plan from assignment changes."""
+	if valid_to is not None and valid_to < valid_from:
+		raise ApiError("VALIDATION_ERROR", "valid_to must not precede valid_from", http_status=400)
+	_serialize_distribution_plan_mutation(db, business_id)
+	q = db.query(DistributionDailyPlanLock.id).filter(
+		DistributionDailyPlanLock.business_id == business_id,
+		DistributionDailyPlanLock.user_id == user_id,
+		DistributionDailyPlanLock.is_locked == true(),
+		DistributionDailyPlanLock.plan_date >= valid_from,
+	)
+	if valid_to is not None:
+		q = q.filter(DistributionDailyPlanLock.plan_date <= valid_to)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Visitor has a locked daily plan in this assignment period; unpublish first",
+			http_status=409,
+		)
+
+
+
+def assert_daily_plan_inputs_unlocked(db: Session, business_id: int) -> None:
+	"""Protect business-wide scheduling inputs for existing locked daily plans.
+
+	The carry-over policy and lookback interval control the scheduled/missed
+	stops copied into immutable snapshots. Serialize the check with the same
+	business-scoped transaction lock used by publishing and route edits.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	if (
+		db.query(DistributionDailyPlanLock.id)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.is_locked == true(),
+		)
+		.first()
+		is not None
+	):
+		raise ApiError(
+			"CONFLICT",
+			"Locked daily plans exist; unpublish before changing shared planning inputs",
+			http_status=409,
+		)
+
+
+
+def assert_plan_unlocked_for_route(db: Session, business_id: int, route_id: int, plan_date: date) -> None:
+	# Existing lock rows are authoritative even if the setting is later changed.
+	assert_route_has_no_locked_plans(db, business_id, route_id, plan_date=plan_date)
 
 
 def _validate_document_for_business(db: Session, business_id: int, document_id: int, person_id: Optional[int] = None) -> None:
@@ -1136,6 +1204,7 @@ def list_territories(db: Session, business_id: int, ctx: AuthContext) -> List[Di
 
 def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	code = str(payload.get("code") or "").strip()
 	name = str(payload.get("name") or "").strip()
 	if not code or not name:
@@ -1170,6 +1239,7 @@ def update_territory(db: Session, business_id: int, territory_id: int, payload: 
 	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
 	assert_plugin_entity_editable(db,business_id,'distribution_territories',territory_id)
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	row = (
 		db.query(DistributionTerritory)
 		.filter(DistributionTerritory.id == territory_id, DistributionTerritory.business_id == business_id)
@@ -1177,6 +1247,8 @@ def update_territory(db: Session, business_id: int, territory_id: int, payload: 
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
+	# Hierarchy changes can alter inherited supervisor and route visibility.
+	assert_daily_plan_inputs_unlocked(db, business_id)
 	if "name" in payload:
 		row.name = str(payload["name"])[:255]
 	if "description" in payload:
@@ -1200,6 +1272,7 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
 	assert_plugin_entity_editable(db,business_id,'distribution_territories',territory_id)
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	row = (
 		db.query(DistributionTerritory)
 		.filter(DistributionTerritory.id == territory_id, DistributionTerritory.business_id == business_id)
@@ -1207,7 +1280,9 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
-	db.query(DistributionRoute).filter(DistributionRoute.territory_id == territory_id).update({"territory_id": None})
+	# Hierarchy changes can alter inherited supervisor and route visibility.
+	assert_daily_plan_inputs_unlocked(db, business_id)
+	db.query(DistributionRoute).filter(DistributionRoute.business_id == business_id, DistributionRoute.territory_id == territory_id).update({"territory_id": None})
 	db.delete(row)
 	db.commit()
 
@@ -1256,6 +1331,7 @@ def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[st
 
 def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	code = str(payload.get("code") or "").strip()
 	name = str(payload.get("name") or "").strip()
 	if not code or not name:
@@ -1294,9 +1370,11 @@ def delete_route(db: Session, business_id: int, route_id: int) -> None:
 	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
 	assert_plugin_entity_editable(db,business_id,'distribution_routes',route_id)
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	in_progress = (
 		db.query(DistributionFieldVisit.id)
 		.filter(
@@ -1316,9 +1394,11 @@ def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str
 	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
 	assert_plugin_entity_editable(db,business_id,'distribution_routes',route_id)
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	if "name" in payload:
 		row.name = str(payload["name"])[:255]
 	if "description" in payload:
@@ -1388,9 +1468,11 @@ def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthCont
 
 def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	person_id = int(payload.get("person_id") or 0)
 	if person_id <= 0:
 		raise ApiError("VALIDATION_ERROR", "person_id required", http_status=400)
@@ -1455,9 +1537,11 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 
 def delete_route_stop(db: Session, business_id: int, route_id: int, stop_id: int) -> None:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	row = db.query(DistributionRouteStop).filter(DistributionRouteStop.id == stop_id, DistributionRouteStop.route_id == route_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Stop not found", http_status=404)
@@ -1496,8 +1580,11 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 	return out
 
 
-def _person_ids_on_route(db: Session, route_id: int) -> List[int]:
-	rows = db.query(DistributionRouteStop.person_id).filter(DistributionRouteStop.route_id == int(route_id)).all()
+def _person_ids_on_route(db: Session, route_id: int, *, business_id: Optional[int] = None) -> List[int]:
+	q = db.query(DistributionRouteStop.person_id).filter(DistributionRouteStop.route_id == int(route_id))
+	if business_id is not None:
+		q = q.join(Person, Person.id == DistributionRouteStop.person_id).filter(Person.business_id == business_id)
+	rows = q.all()
 	return [int(r[0]) for r in rows if r[0]]
 
 
@@ -1540,7 +1627,7 @@ def assert_assignment_exclusive(
 	*,
 	ignore_id: Optional[int] = None,
 ) -> None:
-	settings = get_or_create_distribution_settings(db, business_id)
+	settings = get_distribution_settings_row(db, business_id)
 	q = db.query(DistributionRouteAssignment).filter(
 		DistributionRouteAssignment.business_id == business_id,
 		DistributionRouteAssignment.route_id == int(route.id),
@@ -1626,6 +1713,7 @@ def assert_customer_owner_allows_visit(
 
 def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	route_id = int(payload.get("route_id") or 0)
 	user_id = int(payload.get("user_id") or 0)
 	if route_id <= 0 or user_id <= 0:
@@ -1640,6 +1728,7 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 	valid_to = None
 	if payload.get("valid_to"):
 		valid_to = date.fromisoformat(str(payload["valid_to"])[:10])
+	assert_assignment_has_no_locked_plans(db, business_id, user_id, valid_from, valid_to)
 	existing_same = (
 		db.query(DistributionRouteAssignment)
 		.filter(
@@ -1658,6 +1747,7 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 		valid_from, valid_to = merge_date_ranges(
 			merged_row.valid_from, merged_row.valid_to, valid_from, valid_to,
 		)
+		assert_assignment_has_no_locked_plans(db, business_id, user_id, valid_from, valid_to)
 		assert_assignment_exclusive(
 			db, business_id, rt, user_id, valid_from, valid_to, ignore_id=int(merged_row.id),
 		)
@@ -1675,11 +1765,11 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 		)
 		db.add(row)
 	transferred: List[int] = []
-	settings = get_or_create_distribution_settings(db, business_id)
+	settings = get_distribution_settings_row(db, business_id)
 	if bool(getattr(settings, "exclusive_customer_ownership", True)) and bool(
 		getattr(settings, "exclusive_assignments", True)
 	):
-		for pid in _person_ids_on_route(db, route_id):
+		for pid in _person_ids_on_route(db, route_id, business_id=business_id):
 			prev = _claim_customer_owner(db, business_id, pid, user_id, transfer=True)
 			if prev is not None and int(prev) != int(user_id):
 				transferred.append(int(pid))
@@ -1698,6 +1788,7 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 
 def delete_assignment(db: Session, business_id: int, assignment_id: int) -> None:
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	row = (
 		db.query(DistributionRouteAssignment)
 		.filter(DistributionRouteAssignment.id == assignment_id, DistributionRouteAssignment.business_id == business_id)
@@ -1705,6 +1796,7 @@ def delete_assignment(db: Session, business_id: int, assignment_id: int) -> None
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Assignment not found", http_status=404)
+	assert_assignment_has_no_locked_plans(db, business_id, row.user_id, row.valid_from, row.valid_to)
 	db.delete(row)
 	db.commit()
 
@@ -2565,7 +2657,11 @@ def resolve_return_request(
 
 def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	row = get_or_create_distribution_settings(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
+	if {"carry_over_missed_visits", "carry_over_days", "lock_published_plans", "require_published_plan", "require_visit_in_daily_plan", "shared_routing_catalog", "exclusive_assignments", "exclusive_territories", "exclusive_customer_ownership"}.intersection(payload):
+		assert_daily_plan_inputs_unlocked(db, business_id)
+	# Never commit settings initialization before the enclosing mutation.
+	row = get_or_create_distribution_settings(db, business_id, commit=False)
 	if "shared_routing_catalog" in payload:
 		row.shared_routing_catalog = bool(payload["shared_routing_catalog"])
 	if "require_visit_in_daily_plan" in payload:
